@@ -1,0 +1,10 @@
+{
+  "job": "research_fast",
+  "case_id": "case_123",
+  "user_id": "user_9",
+  "document_ids": [
+    "doc_1"
+  ],
+  "user_language": "es",
+  "user_note_en": "I got this today, what does it mean?"
+}

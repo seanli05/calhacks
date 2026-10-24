@@ -1,0 +1,11 @@
+{
+  "job": "call",
+  "case_id": "case_123",
+  "user_id": "user_9",
+  "brief_id": "brief_77",
+  "user_language": "es",
+  "consent_at": "2026-10-25T10:02:00Z",
+  "consent_message_id": "msg_41",
+  "max_hold_minutes": 60,
+  "dial_number_source": "official_phone"
+}
