@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 import pytest
 from app.contracts import (
     CallState,
+    CaseBrief,
     Component,
     Event,
     EventType,
@@ -123,6 +124,49 @@ async def test_official_dial_number_refuses_verified_without_phone() -> None:
         await reads.official_dial_number(case.id)
 
 
+async def test_demo_dial_number_replaces_only_a_verified_number(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """C40: the override changes the number, never which cases may be dialed."""
+    monkeypatch.setenv("DEMO_DIAL_NUMBER", "+15672298566")
+    get_settings.cache_clear()
+    _, case = await _user_and_case()
+    with pytest.raises(UnverifiedNumber):
+        await reads.official_dial_number(case.id)
+    await research.save_verification(case.id, _verification("verified", phone=None))
+    with pytest.raises(UnverifiedNumber):
+        await reads.official_dial_number(case.id)
+    await research.save_verification(case.id, _verification("verified"))
+    assert await reads.official_dial_number(case.id) == "+15672298566"
+
+
+async def test_create_case_is_idempotent() -> None:
+    user, case = await _user_and_case()
+    again = await research.create_case(case.id, user.id, ["doc_other"])
+    assert again.id == case.id
+    assert again.document_ids == case.document_ids
+
+
+async def test_save_brief_keeps_the_briefs_own_id() -> None:
+    _, case = await _user_and_case()
+    brief = CaseBrief.model_validate(reset.demo_brief(case.id, new_id("brief")))
+    row = await research.save_brief(case.id, brief)
+    assert row.id == brief.brief_id
+    assert row.handoff_note == brief.handoff_note
+    assert (await reads.get_brief(brief.brief_id)).brief["call_goal_en"]
+    with pytest.raises(ValueError):
+        await research.save_brief("case_other", brief)
+
+
+async def test_needs_user_input_is_needs_answer() -> None:
+    _, case = await _user_and_case()
+    result = FastResult(
+        case_id=case.id, status="needs_user_input", question_en="Which letter first?"
+    )
+    await research.save_fast_result(case.id, result)
+    assert await reads.case_progress(case.id) == CaseStage.NEEDS_ANSWER
+
+
 async def test_case_progress_through_the_demo() -> None:
     user, case = await _user_and_case()
     assert await reads.case_progress(case.id) == CaseStage.RECEIVED
@@ -137,7 +181,9 @@ async def test_case_progress_through_the_demo() -> None:
     )
     assert await reads.case_progress(case.id) == CaseStage.EXPLAINING
 
-    result = FastResult(case_id=case.id, status="ok")
+    result = FastResult(
+        case_id=case.id, status="ok", doc_type="i797c", explanation_en="A notice."
+    )
     await research.save_fast_result(case.id, result)
     await jobs.finish(fast.id, result)
     assert await reads.case_progress(case.id) == CaseStage.CHECKING

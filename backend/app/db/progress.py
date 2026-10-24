@@ -13,6 +13,7 @@ class CaseStage(StrEnum):
     RECEIVED = "received"
     EXPLAINING = "explaining"
     NEEDS_BETTER_IMAGE = "needs_better_image"
+    NEEDS_ANSWER = "needs_answer"
     CHECKING = "checking"
     SUSPICIOUS = "suspicious"
     UNKNOWN = "unknown"
@@ -65,6 +66,8 @@ def compute_stage(
         return CaseStage.EXPLAINING
     if fast_result == FastResultStatus.NEEDS_BETTER_IMAGE:
         return CaseStage.NEEDS_BETTER_IMAGE
+    if fast_result == FastResultStatus.NEEDS_USER_INPUT:
+        return CaseStage.NEEDS_ANSWER
     if (
         deep_job in _ACTIVE
         or latest_verification == VerificationStatus.PENDING

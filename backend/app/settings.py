@@ -1,16 +1,20 @@
 """The single settings object. All config comes from env vars, or the repo-root
 .env and .env.local (written by `neon env pull`; it wins over .env)."""
 
+import re
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # libpq-style params asyncpg rejects; sslmode is translated to ssl.
 _LIBPQ_ONLY_PARAMS = {"sslmode", "channel_binding"}
+
+_E164 = re.compile(r"^\+[1-9]\d{6,14}$")
 
 
 def to_asyncpg_url(url: str) -> str:
@@ -64,6 +68,20 @@ class Settings(BaseSettings):
 
     # Dev-only endpoints under /dev (e.g. the fake phone call); never on for the demo
     dev_endpoints: bool = False
+
+    # Demo only (Plan.md C40): when set, the phone agent dials this instead of the
+    # verified official number, so rehearsals never call a real agency.
+    demo_dial_number: str = ""
+
+    # Run the research agent's job worker in this process (needs ANTHROPIC_API_KEY).
+    research_worker: bool = True
+
+    @field_validator("demo_dial_number")
+    @classmethod
+    def _e164(cls, value: str) -> str:
+        if value and not _E164.match(value):
+            raise ValueError("DEMO_DIAL_NUMBER must be E.164, e.g. +15551234567")
+        return value
 
     @property
     def async_database_url(self) -> str:

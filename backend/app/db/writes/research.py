@@ -1,6 +1,7 @@
 """Writes owned by the research agent: cases, briefs, verifications, case_refs."""
 
 from collections.abc import Sequence
+from typing import Any
 
 from sqlalchemy.dialects.postgresql import insert
 
@@ -15,9 +16,14 @@ from app.db.tables import utcnow
 async def create_case(
     case_id: CaseId, user_id: UserId, document_ids: Sequence[DocumentId]
 ) -> tables.Case:
-    """`case_id` was minted by the orchestrator in H1 (schema resolution 1)."""
-    case = tables.Case(id=case_id, user_id=user_id, document_ids=list(document_ids))
+    """`case_id` was minted by the orchestrator in H1 (schema resolution 1).
+    Idempotent: returns the existing case when the fast pass runs again for it
+    (C39, after the user answers a `needs_user_input` question)."""
     async with session() as db:
+        existing = await db.get(tables.Case, case_id)
+        if existing is not None:
+            return existing
+        case = tables.Case(id=case_id, user_id=user_id, document_ids=list(document_ids))
         db.add(case)
         await db.commit()
         return case
@@ -51,9 +57,26 @@ async def save_verification(
 
 
 async def save_brief(
-    case_id: CaseId, brief: CaseBrief, handoff_note: str
+    case_id: CaseId,
+    brief: CaseBrief | dict[str, Any],
+    handoff_note: str | None = None,
 ) -> tables.CaseBrief:
-    row = tables.CaseBrief(case_id=case_id, brief=brief, handoff_note=handoff_note)
+    """A `CaseBrief` names its own row (`brief_id`, so R2 can point at it before
+    this returns) and carries its handoff note. A plain dict, from dev tools and
+    tests, gets a new ID and needs `handoff_note`."""
+    if isinstance(brief, CaseBrief):
+        if brief.case_id != case_id:
+            raise ValueError(f"brief {brief.brief_id} is for {brief.case_id}")
+        row = tables.CaseBrief(
+            id=brief.brief_id,
+            case_id=case_id,
+            brief=brief.model_dump(mode="json"),
+            handoff_note=handoff_note or brief.handoff_note,
+        )
+    else:
+        if handoff_note is None:
+            raise ValueError("a dict brief needs a handoff_note")
+        row = tables.CaseBrief(case_id=case_id, brief=brief, handoff_note=handoff_note)
     async with session() as db:
         db.add(row)
         await db.commit()

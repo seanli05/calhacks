@@ -1,5 +1,6 @@
 """Fixtures for the WhatsApp side (pipe and relay), built on whatsapp_fakes."""
 
+import os
 from typing import Any
 
 import pytest
@@ -12,6 +13,10 @@ from app.orchestrator.pipe import InboundPipe
 from app.orchestrator.verdicts import Verdicts
 from app.relay.ask_user import AskUser
 from whatsapp_fakes import QUIET_S, FakeDB, FakeTranslator, FakeWhatsApp
+
+# A developer's .env may set the demo dial override (C40); tests that want it set
+# it themselves. Env vars win over .env files.
+os.environ["DEMO_DIAL_NUMBER"] = ""
 
 _ORCHESTRATOR_WRITES = (
     "get_or_create_user",

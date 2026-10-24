@@ -31,6 +31,7 @@ from app.db.engine import session
 from app.db.errors import NotFound, UnverifiedNumber
 from app.db.events import from_row
 from app.db.progress import CaseStage, compute_stage
+from app.settings import get_settings
 
 _REF = re.compile(r"^<ref:([a-z0-9_]+)>$")
 
@@ -185,7 +186,10 @@ async def official_dial_number(case_id: CaseId) -> str:
         raise UnverifiedNumber(f"case {case_id} is not verified (latest: {status})")
     if not verification.official_phone:
         raise UnverifiedNumber(f"case {case_id} is verified but has no official phone")
-    return verification.official_phone
+    # Plan.md C40: a demo exception to rule 2. The case still has to pass every
+    # check above; only the number changes, to the mock agency line.
+    demo_number = get_settings().demo_dial_number
+    return demo_number or verification.official_phone
 
 
 async def resolve_ref(case_id: CaseId, name: str) -> str:

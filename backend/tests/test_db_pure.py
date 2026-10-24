@@ -57,6 +57,11 @@ def _stage(**overrides: object) -> CaseStage:
             {"fast_job": JobStatus.QUEUED, "fast_result": "needs_better_image"},
             CaseStage.EXPLAINING,
         ),
+        ({"fast_result": "needs_user_input"}, CaseStage.NEEDS_ANSWER),
+        (
+            {"fast_job": JobStatus.QUEUED, "fast_result": "needs_user_input"},
+            CaseStage.EXPLAINING,
+        ),
         ({"fast_job": JobStatus.DONE, "fast_result": "ok"}, CaseStage.CHECKING),
         ({"deep_job": JobStatus.RUNNING}, CaseStage.CHECKING),
         ({"latest_verification": "pending"}, CaseStage.CHECKING),
