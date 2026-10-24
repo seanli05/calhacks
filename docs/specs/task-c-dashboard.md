@@ -96,4 +96,121 @@ Plain JSON routes under `/api`, response bodies as Pydantic models defined in `a
 - Each step is merged to `main`. Report to Chris: what landed, and anything the team needs to know (for example, which event `data` fields the feed templates expect).
 
 ## Design
-*To be filled in with Chris during step 1.*
+Approved by Chris (step 1). Mockups are drawn in English; the real UI shows the user's language.
+
+### Look
+- **Canvas:** dark, deep green-black (around `#0B1410`), not pure black.
+- **Green:** forest-toned surfaces; mint (around `#3DF5A7`) only for live things (call pulse, current step, hold timer).
+- **Type:** a warm serif for big headlines, a clean sans (Inter or Geist) for UI. Fonts must cover every script we show; use Noto fallbacks. Arabic and right-to-left are out.
+- **Futuristic:** glassy cards, hairline borders, a soft glow from the active element. No gradient mesh, no illustrations.
+- **Human:** copy is plain sentences in the user's language, not system logs. Rounded corners, slow pulses.
+- **Status colors:** "verified" is a mint check plus a label, never color alone. Warnings are amber, "suspicious" is coral (not bright red).
+- **1080p video:** big type, high contrast, relative times ("3 min ago"), no tiny clock text.
+
+### Language
+- Language-agnostic: UI labels come from one string file per language, picked from the user's profile. Feed templates are per language (step 2). Adding a language means adding those two files.
+- Spanish and English for the demo, plus a language switch in the header to flip the whole dashboard live.
+- Feed lines: the user's language, with English smaller and muted underneath.
+
+### Other decisions
+- **User:** the single seeded user, from the URL. No picker.
+- **Refs:** masked to the last 4 (`Receipt ••••4821`).
+- **Product name:** not chosen yet; `[App]` placeholder.
+- **Assistant panel:** a mirror of the WhatsApp thread with three suggestion cards on top and a chat bar at the bottom. The suggestion buttons and the chat bar open WhatsApp (`wa.me` link) with the text prefilled. The orchestrator answers there, and the reply shows up in the panel through polling. This keeps rules 1 and 5. Sending directly from the dashboard would need a team decision.
+- **Suggestions:** rule-based, with no model call: a countdown to the interview date, checklist items still open, and glossary terms that appear in the letter. Rendered server-side from the per-language templates.
+- **Deletes:** only on the memory page.
+
+### What this adds to steps 2 and 3
+- `GET /api/users/{user_id}/suggestions`: the three cards, rendered in the user's language with their `wa.me` prefill text.
+- A new read in `app.db.reads` for the glossary terms that appear in a case's letter.
+- Landing QR: the WhatsApp sandbox number (`TWILIO_WHATSAPP_FROM`) plus the sandbox join code. The join code needs a new env var (for example `TWILIO_SANDBOX_JOIN_CODE`).
+
+### Pages
+
+**1. Landing `/`:** explains the product, and a QR code opens WhatsApp with the sandbox join message prefilled, so judges can try it.
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ ◉ [App]                                                    [ EN ▾ ]      │
+│                Your letter, explained. Your call, made.                  │
+│                     (serif headline, mint glow behind)                   │
+│        We read immigration letters in your language, check they're       │
+│           real, and wait on hold with the agency for you.                │
+│                        ┌────────┐                                        │
+│                        │  [QR]  │   Scan to try it on WhatsApp           │
+│                        └────────┘                                        │
+│    ① Send a photo  ───────  ② We check it's real  ───────  ③ We call     │
+│    of your letter          against official sources        and ring you  │
+│                                                            when a human  │
+│                                                            picks up      │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+**2. My cases `/u/<id>`:** active cases with a five-step tracker, a history list, and the assistant panel.
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ ◉ [App]      My cases · What we know about you                 [ EN ▾ ]  │
+├───────────────────────────────────────────────┬──────────────────────────┤
+│  My cases                                     │  ASSISTANT               │
+│  ┌─────────────────────────────────────────┐  │ ┌──────────────────────┐ │
+│  │ [thumb]  Asylum interview · I-797C      │  │ │ Your interview is in │ │
+│  │ ● On hold with USCIS          12:34     │  │ │ 20 days  [Prepare →] │ │
+│  │ ●─────●─────●─────◉─────○               │  │ └──────────────────────┘ │
+│  │ Letter Verified Calling Hold Person     │  │ ┌──────────────────────┐ │
+│  └─────────────────────────────────────────┘  │ │ Key English words    │ │
+│                                               │ │ asylum · interpreter │ │
+│  HISTORY                                      │ │          [Practice →]│ │
+│  📄  Letter received              2 days ago  │ └──────────────────────┘ │
+│  ✓   Confirmed it's real          2 days ago  │ ┌──────────────────────┐ │
+│  📞  Call to USCIS                 now        │ │ Still need: an       │ │
+│  💬  12 messages                  see all     │ │ interpreter  [Ask →] │ │
+│                                               │ └──────────────────────┘ │
+│                                               │ ──────────────────────── │
+│                                               │   [letter photo]    You  │
+│                                               │ This is an asylum        │
+│                                               │ interview notice. Want   │
+│                                               │ us to call USCIS?        │
+│                                               │                Yes ✓ You │
+│                                               │ ┌──────────────────────┐ │
+│                                               │ │ Ask anything...    ➤ │ │
+│                                               │ └──────────────────────┘ │
+└───────────────────────────────────────────────┴──────────────────────────┘
+```
+The tracker collapses the 12 `CaseStage` values into Letter → Verified → Calling → Hold → Person.
+
+**3. Case live view `/u/<id>/cases/<id>`:** on screen for the whole call segment of the demo. The feed is newest at the bottom. When the call ends, the headline block becomes the call report, with a "View transcript" slide-over.
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ ◉ [App]   ← My cases                                           [ EN ▾ ]  │
+├──────────────────┬───────────────────────────────────┬───────────────────┤
+│ YOUR LETTER      │  We're on hold with USCIS         │  ASSISTANT        │
+│ [thumb]  I-797C  │  ● 12:34      (serif, mint pulse) │ ┌───────────────┐ │
+│ Asylum interview │                                   │ │ suggestion    │ │
+│ Nov 12 · 9:00 AM │  ●─────●─────●─────◉─────○        │ └───────────────┘ │
+│ Receipt ••••4821 │  Letter Verified Calling Hold Pers│ ──────────────── │
+│                  │                                   │ Want us to call   │
+│ ✓ It's real      │  3 min ago                        │ USCIS?            │
+│   number matches │  We confirmed the official number │           Yes ✓   │
+│   uscis.gov      │  1 min ago                        │ Calling now. We'll│
+│                  │  We chose option 2 in the menu    │ ring you when a   │
+│ WHAT TO DO       │  now                              │ person answers.   │
+│ ☐ Bring an       │  We're on hold                    │                   │
+│   interpreter    │                                   │ ┌───────────────┐ │
+│ ☐ Bring passport │                                   │ │ Ask...      ➤ │ │
+└──────────────────┴───────────────────────────────────┴───────────────────┘
+```
+
+**4. What we know about you `/u/<id>/memory`:** profile and facts, documents, and transcripts, each with a delete button, plus "Delete everything". A deleted row fades out and leaves "(deleted Oct 23)" in the feed.
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ ◉ [App]      My cases · What we know about you                 [ EN ▾ ]  │
+├──────────────────────────────────────────────────────────────────────────┤
+│  What we know about you                                                  │
+│  You can delete anything, any time.                                      │
+│  PROFILE      Name · Language · City                                     │
+│  FACTS        "Has two children"                            [ Delete ]   │
+│               "Has a lawyer at a legal aid clinic"          [ Delete ]   │
+│  DOCUMENTS    [thumb]  I-797C interview notice              [ Delete ]   │
+│  CALLS        Transcript · call to USCIS, Oct 23            [ Delete ]   │
+│                          [ Delete everything ]                           │
+└──────────────────────────────────────────────────────────────────────────┘
+```
