@@ -120,11 +120,8 @@ class Extraction(_Schema):
     checklist: list[ExtractedChecklistItem]
     what_is_asked: OptStr = Field(description="One short line: what the letter asks")
     explanation_en: OptStr = Field(
-        description="3-6 plain English sentences; no sensitive values, no legal advice"
-    )
-    summary_en: OptStr = Field(
-        description="2 short sentences, at most 40 words, for WhatsApp; no date, "
-        "time, place or checklist items",
+        description="Two paragraphs separated by a blank line: a 2-sentence summary, "
+        "then 2-4 sentences of details; no sensitive values, no legal advice"
     )
     urgency: Literal["low", "medium", "high"]
     phones: list[ExtractedPhone] = Field(
@@ -142,10 +139,6 @@ class Extraction(_Schema):
     county: OptStr = Field(description="County named on the letter, or empty")
     call_purpose: OptStr = Field(
         description="What a phone call to the sender would be about, one line"
-    )
-    call_goal_short: OptStr = Field(
-        description="The call's goal for the user: one clause, at most 12 words, "
-        "starting with a verb, no trailing period",
     )
     unknown_terms: list[str] = Field(
         description="Official jargon a family may not know, as printed"

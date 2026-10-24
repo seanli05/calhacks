@@ -64,8 +64,7 @@
       "page": 1
     }
   ],
-  "explanation_en": "This is a notice from USCIS scheduling your asylum interview...",
-  "summary_en": "This is a USCIS notice scheduling your asylum interview. You must go, or your application can be dismissed.",
+  "explanation_en": "This is a USCIS notice scheduling your asylum interview. You must go, or your application can be dismissed.\n\nThe interview is on November 18, 2026 at 8:30 AM at the asylum office...",
   "urgency": "high",
   "verification": "pending",
   "proposed_facts": [

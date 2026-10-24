@@ -136,9 +136,10 @@ async def test_explanation_carries_the_date_checklist_and_closing(
     [message] = db.messages
     assert message.sender == "orchestrator"
     assert message.case_id == "case_1"
-    # The short summary leads (C41); the full explanation is for the dashboard.
-    assert message.body_original.startswith(f"[es] {result.summary_en}")
-    assert result.explanation_en not in message.body_original
+    # Only the summary paragraph; the details repeat the date line and checklist (C41).
+    summary, details = result.explanation_en.split("\n\n")
+    assert message.body_original.startswith(f"[es] {summary}\n\n")
+    assert details not in message.body_original
     # The date line is a template with the date formatted in code, never translated.
     assert (
         render(
@@ -158,18 +159,19 @@ async def test_explanation_carries_the_date_checklist_and_closing(
     assert verdicts.is_watching("case_1")
 
 
-async def test_r1_without_a_summary_sends_the_explanation(
+async def test_explanation_without_a_summary_paragraph_is_sent_whole(
     db: FakeDB, letter_results: LetterResults
 ) -> None:
     user = await use_spanish(db)
+    one_paragraph = "This is a notice from USCIS. Your interview is on November 18."
     result = FastResult.model_validate(
-        fixture("fast_result.json", case_id="case_1", summary_en=None)
+        fixture("fast_result.json", case_id="case_1", explanation_en=one_paragraph)
     )
 
     await letter_results.fast_done(await finished_fast_job(db, user, "case_1", result))
 
     [message] = db.messages
-    assert message.body_original.startswith(f"[es] {result.explanation_en}")
+    assert message.body_original.startswith(f"[es] {one_paragraph}\n\n")
 
 
 async def test_untranslated_explanation_falls_back_to_templates_never_english(

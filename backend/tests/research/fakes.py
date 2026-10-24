@@ -279,10 +279,15 @@ async def fake_answer_question(
     )
 
 
+async def fake_short_goal(goal_en: str, **_: Any) -> str | None:
+    return "Confirm your form was received"
+
+
 def fake_deps() -> ResearchDeps:
     settings = Settings(
         _env_file=None,  # type: ignore[call-arg]
         model_default="fake",
+        model_fast="fake-fast",
         model_deep="fake",
         anthropic_api_key="fake",
     )
@@ -292,4 +297,5 @@ def fake_deps() -> ResearchDeps:
         deep_pass_fn=fake_deep_pass,
         to_blocks_fn=fake_to_blocks,
         question_fn=fake_answer_question,
+        short_goal_fn=fake_short_goal,
     )

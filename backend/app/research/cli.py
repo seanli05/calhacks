@@ -55,7 +55,6 @@ def _print_output(out: FastPassOutput, latency_s: float) -> None:
     print("\n== Legitimacy signals")
     print(out.signals.model_dump_json(indent=2))
     print(f"\n== call_purpose: {out.call_purpose}")
-    print(f"== call_goal_short: {out.call_goal_short}")
     print(f"== unknown_terms: {', '.join(out.unknown_terms) or '-'}")
     print("== sensitive_values (masked)")
     for sv in out.sensitive_values:

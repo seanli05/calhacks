@@ -1,6 +1,6 @@
 """Turning R1 into the user's explanation (Plan.md → R1, C9, C31; Goal 6.1).
 
-One message: the short summary (C41; the full explanation on older R1s), the interview date and time, the checklist (who must
+One message: the explanation's summary paragraph (C41), the interview date and time, the checklist (who must
 come, what to bring, other deadlines), and "I'm checking that this letter is
 legitimate". The explanation and checklist are translated free text (in parallel);
 the date line and the closing are relay templates, with the date formatted in code,
@@ -140,8 +140,7 @@ class LetterResults:
 
     async def _explain(self, user: tables.User, result: FastResult) -> None:
         language = user.language or "en"
-        # The short summary (C41); R1s from before it carry only the explanation.
-        explanation_en = result.summary_en or result.explanation_en or ""
+        explanation_en = _summary(result.explanation_en or "")
         checklist = checklist_en(result)
         explanation, translated_checklist = await asyncio.gather(
             self._localize(explanation_en, language),
@@ -250,3 +249,10 @@ def _document_ids(job: tables.Job) -> list[DocumentId]:
 
 def _join(*parts: str | None) -> str:
     return "\n\n".join(part for part in parts if part)
+
+
+def _summary(explanation_en: str) -> str:
+    """The explanation's first paragraph: research writes a two-sentence summary,
+    a blank line, then the details the date line and checklist repeat (C41). An
+    explanation without a blank line is sent whole."""
+    return explanation_en.split("\n\n", 1)[0].strip()

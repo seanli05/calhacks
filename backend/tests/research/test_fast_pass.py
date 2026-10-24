@@ -95,9 +95,8 @@ def canned(**overrides: Any) -> Extraction:
         ],
         "what_is_asked": "Attend an asylum interview",
         "explanation_en": "This is a USCIS notice scheduling your asylum interview. "
+        "You must go, or your application can be dismissed.\n\n"
         "Your receipt number is at the top of page 1.",
-        "summary_en": "This is a USCIS notice scheduling your asylum interview. "
-        "You must go, or your application can be dismissed.",
         "urgency": "low",
         "phones": [
             {
@@ -123,7 +122,6 @@ def canned(**overrides: Any) -> Extraction:
         "signature_block": None,
         "county": None,
         "call_purpose": "Ask about the interview appointment",
-        "call_goal_short": "Confirm your interview is still scheduled.",
         "unknown_terms": ["Notice of Action", "A-Number"],
         "proposed_facts": [
             {
@@ -331,42 +329,32 @@ def test_bad_deadline_is_dropped_and_hedged() -> None:
     assert "in the past" in (r1.explanation_en or "")
 
 
-def test_summary_is_shipped_and_keeps_the_date_hedge() -> None:
+def test_explanation_keeps_the_summary_paragraph() -> None:
     r1 = build(canned()).r1
-    assert r1.summary_en == (
+    summary, details = (r1.explanation_en or "").split("\n\n")
+    assert summary == (
         "This is a USCIS notice scheduling your asylum interview. "
         "You must go, or your application can be dismissed."
     )
-    hedged = build(
-        canned(appointments=[], deadline_raw="Jan 1, 2020", deadline_iso="2020-01-01")
-    ).r1
-    assert "in the past" in (hedged.summary_en or "")
+    assert details == "Your receipt number is at the top of page 1."
 
 
-def test_summary_sentence_with_a_sensitive_value_is_scrubbed() -> None:
-    r1 = build(canned(summary_en=f"Your receipt is {RECEIPT}. You must go.")).r1
-    assert RECEIPT not in (r1.summary_en or "")
-    assert "You must go." in (r1.summary_en or "")
+def test_date_hedge_goes_in_the_summary_paragraph() -> None:
+    ex = canned(appointments=[], deadline_raw="Jan 1, 2020", deadline_iso="2020-01-01")
+    summary = (build(ex).r1.explanation_en or "").split("\n\n")[0]
+    assert "in the past" in summary
 
 
-def test_missing_summary_stays_none() -> None:
-    assert build(canned(summary_en="")).r1.summary_en is None
-
-
-def test_short_call_goal_is_one_short_clause() -> None:
-    assert (
-        build(canned()).call_goal_short == "Confirm your interview is still scheduled"
+def test_scrub_keeps_paragraphs_and_messy_breaks_are_normalized() -> None:
+    ex = canned(
+        explanation_en=f"USCIS sent this. Your receipt is {RECEIPT}.\n \n"
+        "Go to the interview."
     )
-    long = " ".join(["word"] * 20) + "."
-    assert build(canned(call_goal_short=long)).call_goal_short == " ".join(
-        ["word"] * 12
-    )
-    assert build(canned(call_goal_short="")).call_goal_short is None
-
-
-def test_short_call_goal_with_a_sensitive_value_is_dropped() -> None:
-    out = build(canned(call_goal_short=f"Ask about case {RECEIPT}"))
-    assert out.call_goal_short is None
+    explanation = build(ex).r1.explanation_en or ""
+    assert RECEIPT not in explanation
+    summary, details = explanation.split("\n\n")
+    assert summary.startswith("USCIS sent this.")
+    assert details == "Go to the interview."
 
 
 def test_needs_better_image() -> None:

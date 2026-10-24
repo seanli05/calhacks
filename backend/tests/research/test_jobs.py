@@ -50,9 +50,7 @@ def fast_job(
     return store.add_claimed_job(payload, "case_1")
 
 
-async def deep_job(
-    store: FakeResearchDB, short_goal: str | None = "Confirm your form was received"
-) -> tables.Job:
+async def deep_job(store: FakeResearchDB) -> tables.Job:
     out = fake_fast_pass_output("case_1")
     await store.create_case("case_1", "user_1", ["doc_1"])
     await store.save_fast_result("case_1", out.r1)
@@ -62,7 +60,6 @@ async def deep_job(
         document_ids=["doc_1"],
         signals=out.signals.model_copy(update={"county": "Signal County"}),
         call_purpose=out.call_purpose,
-        call_goal_short_en=short_goal,
     )
     return store.add_claimed_job(payload, "case_1")
 
@@ -93,7 +90,6 @@ async def test_fast_happy_path(store: FakeResearchDB) -> None:
     assert memory.payload["source_ref"] == "doc_1"
     deep = next(j for j in store.jobs.values() if j.type == "research_deep")
     assert deep.payload["call_purpose"] == "Confirm the form was received"
-    assert deep.payload["call_goal_short_en"] == "Confirm your form was received"
     assert deep.payload["signals"] == fake_fast_pass_output().signals.model_dump(
         mode="json"
     )
@@ -256,24 +252,41 @@ async def test_deep_happy_path(store: FakeResearchDB) -> None:
 async def test_r2_gets_the_short_goal_and_the_brief_keeps_the_full_one(
     store: FakeResearchDB,
 ) -> None:
+    seen: dict[str, Any] = {}
+
+    async def short(goal_en: str, **kwargs: Any) -> str | None:
+        seen.update(goal_en=goal_en, model=kwargs["model"])
+        return "Confirm your form was received"
+
     job = await deep_job(store)
-    await handle_research_deep(job, deps())
+    await handle_research_deep(job, deps(short_goal_fn=short))
 
     r2 = DeepResult.model_validate(job.result)
     assert r2.call_goal_en == "Confirm your form was received"
     brief = store.case_briefs[r2.brief_id].brief
-    assert brief["call_goal_en"] == fake_deep_findings().call_goal_en
+    assert seen == {"goal_en": brief["call_goal_en"], "model": "fake-fast"}
     assert brief["call_goal_en"] != r2.call_goal_en
 
 
-async def test_deep_job_without_a_short_goal_leaves_r2_goal_empty(
-    store: FakeResearchDB,
+@pytest.mark.parametrize("failure", ["timeout", "network", "unusable"])
+async def test_short_goal_failure_leaves_r2_goal_empty(
+    store: FakeResearchDB, failure: str
 ) -> None:
-    job = await deep_job(store, short_goal=None)
-    await handle_research_deep(job, deps())
+    async def short(*_: Any, **__: Any) -> str | None:
+        if failure == "network":
+            raise httpx.ConnectError("down")
+        if failure == "timeout":
+            await asyncio.sleep(1)
+        return None
 
+    job = await deep_job(store)
+    await handle_research_deep(
+        job, deps(short_goal_fn=short, short_goal_timeout_s=0.02)
+    )
+
+    assert job.status == "done"
     r2 = DeepResult.model_validate(job.result)
-    assert r2.call_goal_en is None
+    assert r2.call_goal_en is None and r2.brief_id
     assert store.case_briefs[r2.brief_id].brief["call_goal_en"]
 
 

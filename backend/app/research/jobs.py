@@ -44,6 +44,7 @@ from app.research.fetch_tool import registered_domain
 from app.research.models import CaseRecord, DeepFindings, FastPassOutput
 from app.research.preprocess import ContentBlock, UnsupportedMedia, to_content_blocks
 from app.research.question import answer_question, letter_context
+from app.research.short_goal import shorten_goal
 from app.research.verify_cache import VerifyCache
 from app.settings import Settings
 
@@ -54,11 +55,13 @@ FAST_SLOW_S = 45.0
 FAST_CAP_S = 120.0
 DEEP_TIMEOUT_S = 180.0
 QUESTION_TIMEOUT_S = 30.0
+SHORT_GOAL_TIMEOUT_S = 10.0
 
 ToBlocksFn = Callable[[bytes, str], Awaitable[list[ContentBlock]]]
 FastPassFn = Callable[..., Awaitable[FastPassOutput]]
 DeepPassFn = Callable[..., Awaitable[DeepFindings]]
 QuestionFn = Callable[..., Awaitable[QuestionAnswer]]
+ShortGoalFn = Callable[..., Awaitable[str | None]]
 
 
 @dataclass
@@ -72,11 +75,13 @@ class ResearchDeps:
     deep_pass_fn: DeepPassFn = run_deep_pass
     to_blocks_fn: ToBlocksFn = to_content_blocks
     question_fn: QuestionFn = answer_question
+    short_goal_fn: ShortGoalFn = shorten_goal
     seed: VerifyCache | None = None
     fast_slow_s: float = FAST_SLOW_S
     fast_cap_s: float = FAST_CAP_S
     deep_timeout_s: float = DEEP_TIMEOUT_S
     question_timeout_s: float = QUESTION_TIMEOUT_S
+    short_goal_timeout_s: float = SHORT_GOAL_TIMEOUT_S
 
 
 async def handle_research_fast(job: tables.Job, deps: ResearchDeps) -> None:
@@ -146,7 +151,6 @@ async def _run_fast(
                 document_ids=payload.document_ids,
                 signals=output.signals,
                 call_purpose=output.call_purpose,
-                call_goal_short_en=output.call_goal_short,
             ),
             payload.user_id,
             case_id,
@@ -288,11 +292,14 @@ async def _run_deep(
     ver_row = await writes.save_verification(payload.case_id, verification)
 
     brief_id: str | None = None
+    call_goal_en = findings.call_goal_en
     if verification.status == "verified":
         brief = build_brief(case, findings)
         guard.check("case_briefs row", brief.model_dump(mode="json"))
         await writes.save_brief(payload.case_id, brief)
         brief_id = brief.brief_id
+        # The short goal the user reads (C41); the brief keeps the full one.
+        call_goal_en = await _short_goal(deps, brief.call_goal_en, job.id)
 
     r2 = DeepResult(
         case_id=payload.case_id,
@@ -304,9 +311,7 @@ async def _run_deep(
             and verification.official_phone is not None
         ),
         brief_id=brief_id,
-        # The short goal the user reads (C41); the brief keeps the full one for the
-        # phone agent. None makes the orchestrator fall back to the brief's goal.
-        call_goal_en=payload.call_goal_short_en,
+        call_goal_en=call_goal_en,
     )
     await _finish(guard, job.id, r2)
     data: dict[str, Any] = {
@@ -401,6 +406,23 @@ async def _run_question(
         f"Finished researching a question: {answer.status}",
         {"status": answer.status, "source_count": len(answer.sources)},
     )
+
+
+async def _short_goal(deps: ResearchDeps, goal_en: str, job_id: str) -> str | None:
+    """None on any model or network failure: the consent question then uses the
+    brief's goal, so a failure here never holds up R2."""
+    try:
+        return await asyncio.wait_for(
+            deps.short_goal_fn(
+                goal_en, client=deps.anthropic, model=deps.settings.model_fast
+            ),
+            deps.short_goal_timeout_s,
+        )
+    except (TimeoutError, httpx.HTTPError, APIError) as exc:
+        logger.warning(
+            "short goal failed job_id=%s error=%s", job_id, type(exc).__name__
+        )
+        return None
 
 
 async def _call_deep_pass(
