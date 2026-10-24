@@ -46,26 +46,30 @@ Each row is something `app.contracts` would reject once research writes through 
 
 **Person 3: fill in "Needed?"** with `yes` (the agent depends on it), `nice` (useful, but the agent works without it), or `no` (drop it on your side). Person 1 adds to the contracts only the `yes` and `nice` rows. Rows marked "fix on research's side" aren't a choice.
 
+Person 3's answers (Oct 24) are filled in below. `yes` means the agent breaks or gets less safe without it.
+
 | # | Mismatch | Research code | Contract on `main` | Needed? |
 |---|---|---|---|---|
 | 1 | R1 status `needs_user_input` (+ `question_en`) | `research/models.py:25`, `:94` | `backend/app/contracts/common.py:77` (`FastResultStatus`), `results.py:44` (`FastResult`) | (kept; see "The `needs_user_input` flow") |
-| 2 | R1 `key_dates` | `research/models.py:98` | `backend/app/contracts/results.py:44` | |
-| 3 | `KeyFact`: `value` or `ref` (ref optional), plus `quote` and `page`; no `citation` | `research/models.py:49`–`56` | `backend/app/contracts/results.py:24`–`27` (ref and citation required) | |
-| 4 | `Appointment.time` optional | `research/models.py:71` | `backend/app/contracts/results.py:32` (required) | |
-| 5 | `Appointment.location_ref` optional | `research/models.py:72` | `backend/app/contracts/results.py:34` (required) | |
-| 6 | `ProposedFact.sensitivity` | `research/models.py:85` | `backend/app/contracts/jobs.py:20` | |
+| 2 | R1 `key_dates` | `research/models.py:98` | `backend/app/contracts/results.py:44` | **yes**: immigration notices often have no deadline, only an interview or biometrics date. Built at `research/fast_pass.py:290`, and the explanation depends on it |
+| 3 | `KeyFact`: `value` or `ref` (ref optional), plus `quote` and `page`; no `citation` | `research/models.py:49`–`56` | `backend/app/contracts/results.py:24`–`27` (ref and citation required) | **yes**: public facts like the form ID have no sensitive value, so a required ref is wrong. The quote is how facts stay grounded in the letter |
+| 4 | `Appointment.time` optional | `research/models.py:71` | `backend/app/contracts/results.py:32` (required) | **yes**: many letters give a date with no time; a required field pushes the model to invent one |
+| 5 | `Appointment.location_ref` optional | `research/models.py:72` | `backend/app/contracts/results.py:34` (required) | **yes**: some appointment notices have no location; a required field means making up a ref |
+| 6 | `ProposedFact.sensitivity` | `research/models.py:85` | `backend/app/contracts/jobs.py:20` | **yes** (safety): facts research marks sensitive reach the memory writer marked, so they're held until the user consents |
 | 7 | Sensitivity value `high` | `research/models.py:23` | `backend/app/contracts/common.py:48` (`normal` / `sensitive`) | Fix on research's side: rename to `sensitive` |
-| 8 | `Verification.signals` | `research/models.py:155` | `backend/app/contracts/results.py:65` | |
-| 9 | R2 `official_phone_purpose` | `research/models.py:170` | `backend/app/contracts/results.py:75` (`DeepResult`) | |
-| 10 | R2 `alternative_contacts` | `research/models.py:171` | `backend/app/contracts/results.py:75` | |
+| 8 | `Verification.signals` | `research/models.py:155` | `backend/app/contracts/results.py:65` | **yes**: `research/brief.py:96` builds the brief from it, and it explains why a letter is `unknown` rather than `suspicious` |
+| 9 | R2 `official_phone_purpose` | `research/models.py:170` | `backend/app/contracts/results.py:75` (`DeepResult`) | **nice**: lets the brief say which line is being called; the agent works without it |
+| 10 | R2 `alternative_contacts` | `research/models.py:171` | `backend/app/contracts/results.py:75` | **yes**: the housing and medical letter types depend on it. A private landlord letter or an unverified letter gets verified alternatives instead of a dead end (`research/deep_verify.py:820`) |
 | 11 | R2 `brief_id` optional (no brief for a suspicious letter) | `research/models.py:173` | `backend/app/contracts/results.py:81` (required) | Contract changes: research is right |
-| 12 | Deep job `answers` | `research/models.py:238`, read at `research/jobs.py:220` | `backend/app/contracts/jobs.py:36` (`ResearchDeepJob`) | |
+| 12 | Deep job `answers` | `research/models.py:238`, read at `research/jobs.py:227` | `backend/app/contracts/jobs.py:36` (`ResearchDeepJob`) | **no**: nothing ever sends it. Research deletes the one fallback that reads it (`research/jobs.py:227`); the county comes from the letter or the profile |
 | 13 | Deep pass needs `signals` and `call_purpose` from the fast pass | `research/sim/store.py:39`–`40`, `research/models.py:254`–`255` | `backend/app/db/tables.py:123` (`cases` has no columns for them) | Decided: add them to `ResearchDeepJob` |
 | 14 | Proposed facts in the `memory_write` job carry `sensitivity` | `research/jobs.py:133` | `backend/app/contracts/jobs.py:59` (`MemoryWriteJob`) | Follows row 6 |
 | 15 | Jobs have no `user_id` | `research/sim/store.py:43`, `:86` | `backend/app/db/jobs.py:27` (`enqueue` requires it) | Fix on research's side: pass `user_id` |
 | 16 | Events have no `user_id` | `research/sim/store.py:53`, `:100`, `research/events.py:70` | `backend/app/contracts/events.py:83` (required) | Fix on research's side: pass `user_id` |
-| 17 | Event types `research.fast_slow`, `fast_failed`, `deep_failed`, `search`, `fetch`, `check` | `research/events.py:17`–`25` | `backend/app/contracts/events.py:20` (`EventType`) | |
+| 17 | Event types `research.fast_slow`, `fast_failed`, `deep_failed`, `search`, `fetch`, `check` | `research/events.py:17`–`25` | `backend/app/contracts/events.py:20` (`EventType`) | **yes** for `fast_failed` and `deep_failed` (the failure rules and the dashboard need them). **nice** for `fast_slow` (lets the orchestrator send a "still working" message) and `search` / `fetch` / `check` (the dashboard's live research log, and debugging) |
 | 18 | `CaseBrief` model | `research/models.py` (`CaseBrief`) | `backend/app/contracts/brief.py` (a plain dict) | Not a violation; becomes the contract (decision 1) |
+| 19 | New job `research_question` (chat questions): `ResearchQuestionPayload`, result `QuestionAnswer` / `QuestionSource` / `QuestionStatus`, events `research.question_started` / `question_done` / `question_failed` | `research/models.py:241`–`280`, `research/events.py:24`–`26`, `research/sim/store.py:18` | Not in `backend/app/contracts/common.py:13` (`JobType`), `jobs.py`, `results.py` or `events.py:20` (`EventType`) | **yes** for the chat-question feature person 2 agreed to; added after this table was written. A new contract, so it needs persons 1 and 2. A question sent with `case_id` reads only the case's R1 and refs |
+| 20 | Structure: code in top-level `research/`, `research/models.py` duplicates contract models, the simulated `Store` and `ResearchSettings` | `research/`, `research/sim/store.py`, `research/sim/settings.py` | `backend/app/research/`, `app.contracts`, `app.db`, `app.settings` | **no** (the agent doesn't need any of it); step 2 removes it when the code moves |
 
 Not violations: `ResearchFastJob` matches. The safety handling also matches Plan.md: refs, `LeakGuard`, the required `must_not_do`, and never using the letter's phone number.
 
@@ -80,8 +84,9 @@ These touch person 1's code, so person 1 makes them in one PR, **after person 3 
 - `ProposedFact` gains `sensitivity`.
 - `Verification` gains `signals`.
 - `DeepResult` gains `official_phone_purpose` and `alternative_contacts`, and `brief_id` becomes optional.
-- `ResearchDeepJob` gains `signals`, `call_purpose` and `answers`.
+- `ResearchDeepJob` gains `signals` and `call_purpose` (not `answers`: row 12 is `no`).
 - `CaseBrief` becomes their model, including the required `must_not_do`.
+- `JobType` gains `research_question`, with its payload and `QuestionAnswer` result, and `EventType` gains `research.question_started`, `research.question_done` and `research.question_failed` (row 19; needs person 2's OK too).
 - `EventType` gains `research.fast_slow`, `research.fast_failed`, `research.deep_failed`, `research.search`, `research.fetch`, `research.check` and `research.needs_user_input`.
 - The fixtures in `backend/tests/fixtures/contracts/` are updated to match.
 
@@ -138,9 +143,38 @@ Today research emits it in one case: the pages look like different letters, and 
 3. **Research:** the fast pass reads `user_note_en` to pick the pages, and runs as usual from there. `create_case` is idempotent after step 1.
 4. **Dashboard:** shows stage `needs_answer` ("We need one answer from you") until the second fast pass runs.
 
-`ResearchDeepJob.answers` stays for answers the deep pass needs, such as `county`. Nothing triggers it yet; the county comes from the letter or the profile.
+`ResearchDeepJob.answers` is dropped (row 12): nothing sends it, and research deletes its one fallback at `research/jobs.py:227`. The county comes from the letter or the profile.
 
 Rough cost: person 1 about an hour (in step 1), person 2 about 2 hours, research about 30 minutes. The demo letter, a clean I-797C, never triggers it.
+
+## Migration cost (to estimate)
+
+The work each row implies, grouped by owner, for sizing the migration later. Additive changes keep existing callers working; changes to required fields also touch callers and fixtures.
+
+**Research's side (person 3), not a choice:**
+- Rename sensitivity `high` to `sensitive` (row 7).
+- Pass `user_id` on every job and event (rows 15, 16).
+- Delete the `answers` fallback (row 12).
+
+**Contracts and callers (person 1, step 1):**
+
+| Row | Change | Kind | Callers and fixtures to touch | Cost |
+|---|---|---|---|---|
+| 2 | `FastResult.key_dates` | additive | fixtures | |
+| 3 | `KeyFact`: `value` or `ref`, `quote`, `page`; drop `citation` | breaking | `app/dev/fake_research.py`, `app/db/reset.py`, dashboard letter panel, fixtures | |
+| 4, 5 | `Appointment.time` and `location_ref` optional | loosening | `app/api/`, dashboard, fixtures | |
+| 6, 14 | `ProposedFact.sensitivity` | additive | memory writer (person 2) must hold `sensitive` facts | |
+| 8 | `Verification.signals` | additive | fixtures | |
+| 9 | `DeepResult.official_phone_purpose` (nice) | additive | fixtures | |
+| 10 | `DeepResult.alternative_contacts` | additive | orchestrator relays them (person 2), fixtures | |
+| 11 | `DeepResult.brief_id` optional | loosening | callers that assume a brief | |
+| 13 | `ResearchDeepJob.signals`, `call_purpose` | additive | fixtures | |
+| 17 | new research event types | additive | dashboard feed templates | |
+| 18 | `CaseBrief` model | replaces a dict | `save_brief`, phone agent's brief reader (person 4) | |
+| 19 | `research_question` job, result, events | new | orchestrator queues it and relays answers (person 2), dashboard templates | |
+| 1 | `needs_user_input` flow | new | see that section: person 1 about an hour, person 2 about 2 hours, research about 30 minutes | |
+
+**Research's integration (person 3, step 2):** move the code, switch to `app.contracts`, swap the simulated `Store` for the real helpers in `research/jobs.py`, use `app.settings`, add the worker (row 20 and step 2).
 
 ## Done when
 
