@@ -1,52 +1,72 @@
-# Integrating the research agent
+# Integrating the research agent: runbook
 
-How the research agent on branch `research_agent` (person 3) joins `main`. It covers where research sits in the system, the design decisions already made, what person 1 changes first, and the steps for person 3's agent.
+This runbook brings the research agent (person 3, branch `research_agent`) onto `main`. Two Claude sessions run it end to end without stopping for questions:
+- **Step 1** runs in person 1's session: contracts, data layer, dashboard, Plan.md.
+- **Step 2** runs in person 3's session: moving the research code and wiring it to the real database.
 
-Read first:
-1. [CLAUDE.md](../CLAUDE.md) and [backend/AGENTS.md](../backend/AGENTS.md).
-2. [data-layer-guide.md](data-layer-guide.md), especially **Research agent** under Recipes.
-3. [dashboard-AGENTS.md](dashboard-AGENTS.md), the person 3 section.
+Every decision is already made. If something comes up that this doc doesn't cover, follow "When to stop" below.
 
-[Plan.md](../Plan.md) is the source of truth: H1, R1, R2, the case brief, and the failure rules.
+**Prompt for step 1 (person 1's session):**
+> Read `docs/research-integration.md` and carry out step 1 end to end, including the gate and the merge. Update the status table as you go.
 
-## Where research sits
+**Prompt for step 2 (person 3's session):**
+> Read `CLAUDE.md`, `backend/AGENTS.md`, `docs/data-layer-guide.md`, `docs/dashboard-AGENTS.md` (person 3), then `docs/research-integration.md`. Carry out step 2 end to end, including the end-to-end check, the gate and the merge. Update the status table as you go.
 
-Research never talks to another component directly. It claims jobs from Postgres and writes its own tables. Other components read what it wrote.
+## Status
 
-```
-User sends a letter photo
-  → orchestrator saves it (`documents`) and queues `research_fast` (H1)          [on main: orchestrator/letters.py]
-  → research claims the job and reads the pages
-      writes `cases` + R1, and `case_refs` for every sensitive value
-      finishes the job with R1, then queues `memory_write` (proposed facts) and `research_deep`
-  → orchestrator sees R1 done → explains the letter on WhatsApp
-  → research deep pass: web lookups, verification
-      writes `verifications` (verdict, official phone, evidence) and `case_briefs` (the call plan)
-      finishes the job with R2
-  → orchestrator sees R2 → asks the user for consent to call
-  → phone agent reads straight from the database:
-      number to dial ← reads.official_dial_number(case_id) ← the verification
-      call plan      ← reads.get_brief(brief_id), with brief_id from the call job
-  → dashboard reads everything research wrote
-```
+Each step updates its row when it starts and when it finishes, and pushes that change to `main` right away. The other agent reads this table from `origin/main` to know where things are.
 
-- **Memory:** research never writes `facts` or `profile`. It queues `memory_write` with *proposed* facts, and the memory writer (person 2) decides what to keep (Plan.md → job table). Research may *read* the profile, for example the county as a fallback.
-- **Sensitive values** (receipt number, A-Number, date of birth, interview location) go in `case_refs` through `put_ref` and travel only as `<ref:name>`. This includes R1, R2, the brief, events and logs.
+| Step | Owner | State | Commit on `main` | Notes |
+|---|---|---|---|---|
+| 1. Contracts, data layer, dashboard, Plan.md | person 1's session | not started | | |
+| 2. Move and wire the research agent | person 3's session | not started | | |
+| 3. Hand-offs sent | person 1 | not started | | |
 
-## Decisions (person 1, Oct 24)
+## Before anyone starts (humans, about 5 minutes)
 
-1. **The contracts adopt research's richer models**, limited to the fields person 3 marks as needed in the table below. Those shapes go into `app.contracts`, and their `CaseBrief` becomes the contract. The fields are mostly additive, so existing callers keep working. `DeepResult.brief_id` becomes optional, because a suspicious letter gets no brief. One exception: sensitivity stays `normal` / `sensitive` (the value `facts` already stores), so research renames `high` to `sensitive`.
-2. **`needs_user_input` stays.** Research uses it when the photos come from different letters: the orchestrator groups photos sent within 6 seconds into one letter, and only research can see that they don't belong together. It needs a small new flow, described in "The `needs_user_input` flow" below.
-3. **Signals travel in the deep job.** The fast pass's `signals` (letterhead, phones, URLs, form IDs; no personal data) and `call_purpose` go into `ResearchDeepJob` when the fast pass queues the deep pass. There's no schema change and no reset.
-4. **The demo dials the mock line, decided on the phone side.** Research saves the real official number it finds, so the dashboard shows the true verification. When `DEMO_DIAL_NUMBER` is set, `reads.official_dial_number` returns that number instead, and only for a case that passes the same verified check. The phone agent still has exactly one way to get a number, and an unverified case still gets none. **Team note:** this means the number dialed is no longer the verified number itself. It's a deliberate demo exception to rule 2, so leave `DEMO_DIAL_NUMBER` unset only once the agent should call real agencies.
+1. **A Neon branch per agent.** The person who owns the Neon project (person 1) creates them from the shared database. In a terminal logged in to Neon (`npx neonctl auth`):
+   ```bash
+   npx neonctl branches create --name research-int-p1   # for step 1
+   npx neonctl branches create --name research-int-p3   # for step 2
+   npx neonctl connection-string research-int-p3
+   ```
+   Send person 3 their URL privately, never through git. Each person puts their URL in their own repo-root `.env.local` as `TEST_DATABASE_URL`. The end-to-end check also points `DATABASE_URL` and `DATABASE_URL_UNPOOLED` at it. **No agent ever uses the shared database.**
+2. **Person 3's `.env`** has `ANTHROPIC_API_KEY`. The end-to-end check makes real model calls and fetches from the web, at a cost of a few cents.
 
-## Where research differs from the contracts today
+## Decisions (final)
 
-Each row is something `app.contracts` would reject once research writes through the real helpers. The contracts forbid unknown fields, so it fails loudly. Locations are on branch `research_agent` (top-level `research/`) and on `main`, as of Oct 24.
+1. **The contracts adopt research's models** for every row marked `yes` or `nice` in the table below. Their `CaseBrief` becomes the contract. Sensitivity stays `normal` / `sensitive`.
+2. **`needs_user_input` is in.** This integration adds the contract, the new `needs_answer` stage, and the research side. Person 2 builds the orchestrator side after the merge (the prompt is under "Hand-offs"). Until then the orchestrator must not crash on it (step 1).
+3. **`research_question` is in.** This integration adds the contracts, the job type, Plan.md entry C38, the worker, and feed templates. Person 2 wires the orchestrator side after the merge.
+4. **Signals travel in the deep job.** `ResearchDeepJob` gains `signals` and `call_purpose`. There's no schema change and no reset.
+5. **The demo dials the mock line, decided on the phone side.**
+   - Research saves the real official number.
+   - When `DEMO_DIAL_NUMBER` is set, `reads.official_dial_number` returns it instead, and only for a case that passes the same verified check.
+   - This is recorded in Plan.md as C40, a demo exception to rule 2.
+6. **The code is copied, not rebased.** Step 2 starts a fresh branch from `main` and copies person 3's files in. The `research_agent` branch merged an old `main`, and replaying its history would conflict with tonight's work.
+7. **The research worker** starts with the app when `RESEARCH_WORKER=true` (the default) and `ANTHROPIC_API_KEY` is set. Set it to `false` to run the backend without research.
+8. **`research.search`, `research.fetch` and `research.check` are kept out of the feed.** They're logged for debugging and fire many times per check.
+9. **The agents merge to `main` themselves**, each after its own gate passes.
 
-**Person 3: fill in "Needed?"** with `yes` (the agent depends on it), `nice` (useful, but the agent works without it), or `no` (drop it on your side). Person 1 adds to the contracts only the `yes` and `nice` rows. Rows marked "fix on research's side" aren't a choice.
+## Ground rules for both agents
 
-Person 3's answers (Oct 24) are filled in below. `yes` means the agent breaks or gets less safe without it.
+- **Never touch the shared database:** no reset, no tests against it, no running the app against it. Use only your Neon branch.
+- **Commits:** one short imperative line each, with **no `Co-Authored-By` or other AI attribution** (CLAUDE.md). Commit after each logical piece.
+- **Another person's package:** if a change breaks a caller in someone else's package, make the **smallest fix that keeps today's behavior**, and list it under "Notes" in the status table so that person hears about it. Don't add features there.
+- **Before merging:** `git pull --rebase origin main`, run the gate, then `git push origin HEAD:main`. If the push is rejected, pull, rerun the gate, and push again.
+- **Secrets:** never log or commit secrets, letter contents, or real phone numbers. Research's `LeakGuard` must keep running on everything it writes.
+
+### When to stop
+
+Stop, write the reason in the status table's "Notes", push it, and report to your human, if:
+- a product rule in CLAUDE.md would have to bend, other than the C40 exception;
+- the gate fails twice for the same reason after a real fix attempt;
+- a change would alter the shape of a contract that other components already write (beyond the rows here);
+- you'd need the shared database, someone else's credentials, or a design decision this doc doesn't cover.
+
+## Where research differs from the contracts
+
+The record of each mismatch, with person 3's answers from Oct 24. Line numbers are on branch `research_agent`.
 
 | # | Mismatch | Research code | Contract on `main` | Needed? |
 |---|---|---|---|---|
@@ -71,121 +91,177 @@ Person 3's answers (Oct 24) are filled in below. `yes` means the agent breaks or
 | 19 | New job `research_question` (chat questions): `ResearchQuestionPayload`, result `QuestionAnswer` / `QuestionSource` / `QuestionStatus`, events `research.question_started` / `question_done` / `question_failed` | `research/models.py:241`–`280`, `research/events.py:24`–`26`, `research/sim/store.py:18` | Not in `backend/app/contracts/common.py:13` (`JobType`), `jobs.py`, `results.py` or `events.py:20` (`EventType`) | **yes** for the chat-question feature person 2 agreed to; added after this table was written. A new contract, so it needs persons 1 and 2. A question sent with `case_id` reads only the case's R1 and refs |
 | 20 | Structure: code in top-level `research/`, `research/models.py` duplicates contract models, the simulated `Store` and `ResearchSettings` | `research/`, `research/sim/store.py`, `research/sim/settings.py` | `backend/app/research/`, `app.contracts`, `app.db`, `app.settings` | **no** (the agent doesn't need any of it); step 2 removes it when the code moves |
 
-Not violations: `ResearchFastJob` matches. The safety handling also matches Plan.md: refs, `LeakGuard`, the required `must_not_do`, and never using the letter's phone number.
+## Step 1: person 1's session
 
-## Step 1: person 1's prep (lands before the integration)
+Work on the branch `chris/research-contracts` from `main`. Set the status row to `in progress`.
 
-These touch person 1's code, so person 1 makes them in one PR, **after person 3 fills in the table above**. The list below is the full set; drop whatever person 3 marked `no`.
+**1a. Contracts (`backend/app/contracts/`).** Take field names, types and validators from `research/models.py` on `origin/research_agent` (`git show origin/research_agent:research/models.py`), and put each in the contract module that already owns that kind of thing:
+- `common.py`:
+  - `FastResultStatus` gains `needs_user_input`.
+  - `JobType` gains `research_question`.
+  - New `KeyDateType`, `SignalState` and `QuestionStatus` enums.
+- `results.py`:
+  - `FastResult` gains `question_en` and `key_dates` (new `KeyDate`), and their `R1` status validator.
+  - `KeyFact` becomes theirs: exactly one of `value` or `ref`, plus `quote` and `page`; no `citation`.
+  - In `Appointment`, `time` and `location_ref` become optional. Keep this contract's stricter time pattern.
+  - `Verification` gains `signals` (new `SignalResult`).
+  - `DeepResult` gains `official_phone_purpose` and `alternative_contacts` (new `AlternativeContact`). `brief_id` becomes optional, and their `call_recommended` validator comes too.
+  - New `QuestionSource` and `QuestionAnswer`, with its validator.
+- `jobs.py`:
+  - `ProposedFact` gains `sensitivity: Sensitivity = NORMAL`.
+  - `ResearchDeepJob` gains `signals: LegitimacySignals` and `call_purpose: str | None`. `LegitimacySignals` and `LetterPhone` move into the contracts.
+  - New `ResearchQuestionJob` (their `ResearchQuestionPayload`), added to the `JobPayload` union.
+- `brief.py`: `CaseBrief` becomes their model (with `RepQuestion` and `REQUIRED_MUST_NOT_DO`). It includes `brief_id` and `case_id`.
+- `events.py`: `EventType` gains these, and `USER_MESSAGING_EVENTS` doesn't change:
+  - `research.fast_slow`, `research.fast_failed`, `research.deep_failed`;
+  - `research.search`, `research.fetch`, `research.check`;
+  - `research.needs_user_input`;
+  - `research.question_started`, `research.question_done`, `research.question_failed`.
+- Export everything new from `app/contracts/__init__.py`.
+- Update `backend/tests/fixtures/contracts/*.json`, and add `research_question_job.json` and `question_answer.json`.
 
-**Contracts (`backend/app/contracts/`):**
-- `FastResultStatus` gains `needs_user_input`, and `FastResult` gains `question_en` and `key_dates`.
-- `KeyFact` becomes theirs: exactly one of `value` or `ref`, plus `quote` and `page`.
-- `Appointment.time` and `location_ref` become optional.
-- `ProposedFact` gains `sensitivity`.
-- `Verification` gains `signals`.
-- `DeepResult` gains `official_phone_purpose` and `alternative_contacts`, and `brief_id` becomes optional.
-- `ResearchDeepJob` gains `signals` and `call_purpose` (not `answers`: row 12 is `no`).
-- `CaseBrief` becomes their model, including the required `must_not_do`.
-- `JobType` gains `research_question`, with its payload and `QuestionAnswer` result, and `EventType` gains `research.question_started`, `research.question_done` and `research.question_failed` (row 19; needs person 2's OK too).
-- `EventType` gains `research.fast_slow`, `research.fast_failed`, `research.deep_failed`, `research.search`, `research.fetch`, `research.check` and `research.needs_user_input`.
-- The fixtures in `backend/tests/fixtures/contracts/` are updated to match.
+**1b. Data layer (`backend/app/db/`).**
+- `writes.research.create_case` is idempotent: it returns the existing row when the case ID already exists.
+- `writes.research.save_brief(case_id, brief, handoff_note, brief_id=None)` uses the given `brief_id` when there is one. The brief's own `brief_id` and the row's ID must match.
+- `progress.py`: a new `CaseStage.NEEDS_ANSWER`, which applies when the latest R1 is `needs_user_input` and no newer fast job is running. Add it to the stage table in `docs/data-layer-guide.md`.
+- `settings.py`: `demo_dial_number: str = ""` (with an E.164 check when set), and `research_worker: bool = True`. Add both to `.env.example`, with `DEMO_DIAL_NUMBER` defaulting to the mock agency line.
+- `reads.official_dial_number`: keep every existing check. When `demo_dial_number` is set, return it instead of the verified number, and add a comment pointing to C40.
+- `reset.py` and `seed_story.py`: the seed's key facts use the new `KeyFact` shape, and the seed's brief validates against the new `CaseBrief`.
+- Tests:
+  - `create_case` is idempotent;
+  - `save_brief` with a `brief_id`;
+  - `needs_answer` in the stage tests;
+  - `official_dial_number` with and without `DEMO_DIAL_NUMBER`, and still refusing an unverified case either way.
 
-**Callers of those contracts:**
-- `app/dev/fake_research.py` (person 2's file, with their OK): skip key facts that have no `ref`.
-- `app/db/reset.py`: the seed's key facts.
-- `app/api/`: an appointment without a time or location, and the new stage.
+**1c. Callers in other packages (smallest fixes that keep today's behavior; list them in Notes).**
+- `app/dev/fake_research.py`: collect refs only from key facts that have a `ref`. Its brief must validate against the new `CaseBrief`.
+- `app/orchestrator/letter_result.py:55`: when there's no appointment time, leave the time out.
+- The orchestrator's R1 handling: a `needs_user_input` R1 gets the existing generic "still working on it" reply, or nothing, but never an exception.
+- `app/phone/`: the brief is still read as a dict (`model_dump`). Confirm `menu.py` and `adapters.py` still read their keys.
+- Run the whole test suite; it shows any other caller.
 
-**Data layer:**
-- A new `CaseStage.NEEDS_ANSWER`, computed when the latest R1 is `needs_user_input`.
-- `create_case` becomes idempotent, because the `needs_user_input` flow re-runs the fast pass for the same case.
-- `DEMO_DIAL_NUMBER` in settings and `.env.example`, and its use in `official_dial_number`.
+**1d. Dashboard API and pages.**
+- `app/api/case_views.py`: an appointment with no `location_ref` skips the lookup. `Appointment.time` is optional in `app/api/models.py` and `dashboard/lib/api/types.ts`. The dashboard shows the date alone when there's no time.
+- `feed_templates.py`, with English and Spanish:
+  - `research.fast_slow`: "Still reading your letter"
+  - `research.fast_failed` / `research.deep_failed`: "We couldn't finish reading your letter"
+  - `research.needs_user_input`: "We need one answer from you"
+  - `research.question_started` / `research.question_done`: "Looking up your question" / "We found an answer to your question"
+  - `research.question_failed`: "We couldn't find an official answer"
+  - Hide `research.search`, `fetch` and `check` from the feed (decision 8).
+- The `needs_answer` stage:
+  - `CaseStage` in `types.ts`;
+  - `lib/stage.ts`: it sits on the tracker's "Letter" step and is a warning;
+  - the hero copy in `lib/i18n/strings/{en,es}/case.ts`: "We need one answer from you" / "Necesitamos una respuesta suya";
+  - a fixture step is optional.
 
-**Dashboard:** strings and the tracker for `needs_answer`, plus feed templates for the new event types.
+**1e. Plan.md** (person 1 owns this change, and these decisions are the team's record):
+- **C38**: the `research_question` job: the orchestrator queues it with an English question; research answers only from official sources, with quotes, or declines (legal advice, the asylum claim, out of scope); the orchestrator relays the answer. Add a row to the job table.
+- **C39**: R1 `needs_user_input` with `question_en` (pages from different letters). The orchestrator asks the question, then queues `research_fast` again for the same case with the reply as `user_note_en`.
+- **C40**: the demo dial override (decision 5), as an explicit exception to rule 2 that holds only while `DEMO_DIAL_NUMBER` is set.
+- In the handoff sections, write R1, R2 and the brief with their new fields.
 
-## Step 2: person 3's integration (on a branch from `main` after step 1)
+**1f. Gate, then merge.**
+- `ruff format . && ruff check --fix . && pytest` passes, with `TEST_DATABASE_URL` set to `research-int-p1`.
+- `cd dashboard && npm run build` passes.
+- `python -m app.db.reset --yes` runs against `research-int-p1` (with `DATABASE_URL_UNPOOLED` pointed at it), and `/api/cases/{id}` returns 200 for the seeded case.
+- Merge (ground rules). Set the status row to `done` with the commit.
 
-1. **Move the code.** Rebase on `main`. Move top-level `research/` into `backend/app/research/`, which already exists with its owner docstring, and `tests/research/` into `backend/tests/research/`. Delete `research/sim/`, except anything the tests still use as fakes.
-2. **Use the contracts.** Delete `research/models.py`'s copies of R1, R2, `Verification`, `KeyFact`, `Appointment`, `ChecklistItem`, `ProposedFact`, `CaseBrief` and the job payloads. Import them from `app.contracts` instead. Models internal to research stay, for example `FastPassOutput`, `DeepFindings`, `SensitiveValue` and `LegitimacySignals`, unless step 1 moved them into the contracts.
-3. **Replace the simulated `Store` with the real helpers.** Only `research/jobs.py` uses it, so the swap stays in one file:
+## Step 2: person 3's session
 
-   | `Store` call | Real helper |
-   |---|---|
-   | `get_document` | `reads.get_document(id)`: `pages` is `[{"media_id", "added_at"}]`. Get the bytes and content type with `reads.get_media(media_id)` |
-   | `insert_case` | `writes.research.create_case(case_id, user_id, document_ids)`, then `save_fast_result(case_id, r1)` |
-   | `get_case` (deep pass) | Not needed: `signals` and `call_purpose` arrive in the `ResearchDeepJob` payload. R1 is in `reads.get_case(case_id).fast_result` if needed |
-   | `insert_case_ref` | `writes.research.put_ref(case_id, field, value)` returns nothing; build the placeholder `<ref:field>` yourself |
-   | `insert_verification` | `writes.research.save_verification(case_id, verification)` |
-   | `insert_case_brief` | `writes.research.save_brief(case_id, brief.model_dump(mode="json"), handoff_note)` returns the row; use its `id` as `brief_id` |
-   | `create_job` | `jobs.enqueue(payload_model, Component.RESEARCH_AGENT, user_id, case_id)` with a contract model, not a dict |
-   | `update_job` | `jobs.claim_next` sets `running`; finish with `jobs.finish(job.id, result_model)` or `jobs.fail(job.id, reason)` |
-   | `add_event` | `events.append_event(Event(...))` with **`user_id`**, which every event requires; take it from the job |
+**2a. Wait for step 1.** Step 2's code depends on step 1's contracts. While step 1's status row isn't `done`, prepare 2b–2e on the branch, then rebase it on `main` once step 1 is merged. Check `git fetch && git show origin/main:docs/research-integration.md` for the status.
 
-   Check the exact signatures in `backend/app/db/`, which is authoritative.
-4. **Settings.** Replace `ResearchSettings` with `app.settings.get_settings()`: `anthropic_api_key`, `model_default`, `model_deep`. Ask person 1 before adding a setting.
-5. **Worker.** Add `backend/app/research/worker.py`: a background task that polls `jobs.claim_next(JobType.RESEARCH_FAST)` and `RESEARCH_DEEP` about once a second and runs the handlers. Start it from the app's lifespan in `main.py` (tell person 1). There's one backend process, so no `--workers`.
-6. **Fake research off.** `/dev/fake-research` claims from the same queue. Don't run it when the real worker is running; keep `DEV_ENDPOINTS=false`.
-7. **What the dashboard reads.** Follow [dashboard-AGENTS.md](dashboard-AGENTS.md) → person 3:
-   - the official source first in `evidence`;
-   - `verification.verified` carries `source` (the domain);
-   - the brief has `call_goal_en` and `questions_to_ask`;
-   - `issuer` is set.
+**2b. Bring the code across** on the branch `research/integrate` from `main`. Set the status row to `in progress`.
+```bash
+git checkout -b research/integrate origin/main
+git checkout origin/research_agent -- research tests/research fixtures
+git mv research/* backend/app/research/        # keep backend/app/research/__init__.py's owner docstring
+git mv tests/research backend/tests/research
+git mv fixtures backend/tests/fixtures/research
+```
+- Fix the imports from `research.` to `app.research.`.
+- Paths that pointed at `fixtures/...` now resolve from the module's own location (`Path(__file__)`), never from the working directory.
+- Don't touch the other files on `research_agent` (Plan.md, CLAUDE.md, README.md, `pyproject.toml`, `.env.example`). `main` has newer copies.
+- Copy only the research lines from its `requirements.txt` (pillow, phonenumbers, tldextract, beautifulsoup4, pypdf, pinned as they are).
+- `pyproject.toml` needs no change, since the tests now live under `backend/tests`.
 
-## The `needs_user_input` flow
+**2c. Use the contracts.**
+- Delete from `research/models.py` everything that step 1 moved into `app.contracts`, and import those from `app.contracts`.
+- Keep the models internal to research there: `SensitiveValue`, `FastPassOutput`, `DeepFindings` and the other pass outputs.
+- Rename sensitivity `high` to `sensitive` everywhere.
+- Delete `ResearchDeepPayload.answers` and its fallback in `jobs.py` (row 12).
+- When the fast pass queues the deep pass, put `signals` and `call_purpose` in the `ResearchDeepJob`. The deep pass reads them from the payload, not from a case record.
 
-Today research emits it in one case: the pages look like different letters, and it asks "Which letter should I look at first?" The new flow:
+**2d. Use the real database.**
+- In `research/jobs.py`, replace every `Store` call using the table below. Then delete `research/sim/`, after moving anything the tests still use as a fake into `backend/tests/research/`.
+- Every job and event carries `user_id`, taken from the job payload.
 
-1. **Research:**
-   - writes R1 with `status=needs_user_input` and `question_en`;
-   - finishes the job;
-   - doesn't queue the deep pass (it already behaves this way);
-   - logs `research.needs_user_input`.
-2. **Orchestrator (person 2):** on that R1, asks `question_en` in the user's language. That's free-form, so the orchestrator sends it (rule 1). When the user replies, it queues `research_fast` again for **the same `case_id`**, with the reply, in English, as `user_note_en`. This is the same pattern as "same letter or new?", which `orchestrator/photos.py` already handles.
-3. **Research:** the fast pass reads `user_note_en` to pick the pages, and runs as usual from there. `create_case` is idempotent after step 1.
-4. **Dashboard:** shows stage `needs_answer` ("We need one answer from you") until the second fast pass runs.
+| `Store` call | Real helper |
+|---|---|
+| `get_document` | `reads.get_document(id)`. Its `pages` is `[{"media_id", "added_at"}]`; for each page, `reads.get_media(media_id)` gives `.data` and `.content_type` |
+| `insert_case` | `writes.research.create_case(case_id, user_id, document_ids)` (idempotent), then `save_fast_result(case_id, r1)` |
+| `get_case` | Not needed: the deep pass reads `signals` and `call_purpose` from its job. R1 is in `reads.get_case(case_id).fast_result` if needed |
+| `insert_case_ref` | `writes.research.put_ref(case_id, field, value)` returns nothing; the placeholder is `<ref:field>` |
+| `insert_verification` | `writes.research.save_verification(case_id, verification)` |
+| `insert_case_brief` | `writes.research.save_brief(case_id, brief.model_dump(mode="json"), handoff_note, brief_id=brief.brief_id)` |
+| `create_job` | `jobs.enqueue(<contract model>, Component.RESEARCH_AGENT, user_id, case_id)` |
+| `update_job` | `jobs.claim_next` sets `running`; finish with `jobs.finish(job.id, result_model)` or `jobs.fail(job.id, reason)` |
+| `add_event` | `events.append_event(Event(event_id=new_id("event"), created_at=utcnow(), type=EventType..., source=Component.RESEARCH_AGENT, user_id=..., case_id=..., job_id=..., summary_en=..., data=...))` |
 
-`ResearchDeepJob.answers` is dropped (row 12): nothing sends it, and research deletes its one fallback at `research/jobs.py:227`. The county comes from the letter or the profile.
+- The `data` fields the dashboard reads are in `docs/dashboard-AGENTS.md`. For example, `verification.verified` carries `source`, and the official source comes first in `evidence`.
+- The brief has `call_goal_en` and `questions_to_ask`.
 
-Rough cost: person 1 about an hour (in step 1), person 2 about 2 hours, research about 30 minutes. The demo letter, a clean I-797C, never triggers it.
+**2e. Settings and the worker.**
+- Replace `ResearchSettings` with `app.settings.get_settings()` (`anthropic_api_key`, `model_default`, `model_deep`). If research needs another setting, add it to `app/settings.py` and `.env.example`, and list it in Notes.
+- New `backend/app/research/worker.py`: one background task that polls `jobs.claim_next` for `research_fast`, `research_deep` and `research_question` about once a second, and runs each job in its own task. A failure in one job is logged with the case and job IDs, and fails only that job.
+- Start it from the `lifespan` in `backend/app/main.py`, when `settings.research_worker` is true and `anthropic_api_key` is set. Stop it cleanly on shutdown.
+- Keep `research/cli.py` and `research/eval_harness.py` working as dev tools (`python -m app.research.cli`). Their replay mode runs from `backend/tests/fixtures/research/web` with no network.
 
-## Migration cost (to estimate)
+**2f. End-to-end check: `backend/tests/research/test_e2e_live.py`.** It runs only when `RESEARCH_E2E=1` and `TEST_DATABASE_URL` are set; otherwise it's skipped. It's a dev-only test, so it may write as the orchestrator to create its input.
+1. Rebuild the tables on the test branch the same way `test_db_helpers.py` does.
+2. Create a user (`writes.orchestrator`), the media for `backend/tests/fixtures/research/letters/i797c_asylum_interview/page_1.png`, and a document. Queue `ResearchFastJob` with a new `case_id` and `user_language="es"`.
+3. Start the worker, then wait up to 4 minutes for the deep job to reach `done`.
+4. Assert:
+   - `case_progress` is `awaiting_consent` (verified);
+   - R1 has `doc_type` and an `explanation_en`, and its key facts follow the new shape;
+   - the case has refs and a brief with `call_goal_en`, `questions_to_ask` and the required `must_not_do`;
+   - events for `research.fast_done`, `research.deep_done` and `verification.verified` (with `source`), each with `user_id`;
+   - nothing sensitive in any event, job result or brief: the receipt number and A-Number from `expected.json` don't appear;
+   - with `DEMO_DIAL_NUMBER` set, `reads.official_dial_number(case_id)` returns it. Without it, it returns the verified number.
+5. Queue a `ResearchQuestionJob` ("What should I bring to my asylum interview?", with the `case_id`). Assert a `QuestionAnswer` with status `answered` and at least one official source, or a valid decline status.
+6. Call the dashboard API in the same process with `httpx.ASGITransport`. `GET /api/cases/{case_id}?lang=es` returns 200 with an `issuer`, a `verification` whose evidence has a source first, masked refs and the brief's questions. `GET /api/users/{user_id}/feed?lang=es` has no line in English except hidden types.
 
-The work each row implies, grouped by owner, for sizing the migration later. Additive changes keep existing callers working; changes to required fields also touch callers and fixtures.
+**2g. Gate, then merge.**
+- `ruff format . && ruff check --fix . && pytest` passes, with `TEST_DATABASE_URL` set to `research-int-p3`. All of research's moved tests pass.
+- `RESEARCH_E2E=1 pytest backend/tests/research/test_e2e_live.py` passes.
+- `README.md` has `RESEARCH_WORKER`, `DEMO_DIAL_NUMBER`, and how to run the research CLI and the end-to-end test. In `backend/AGENTS.md`, the `research/` row is updated to "Done" with a short summary, and this doc's status row is set.
+- Merge (ground rules). Set the status row to `done` with the commit.
+- Delete nothing on `origin/research_agent`; person 3 retires it.
 
-**Research's side (person 3), not a choice:**
-- Rename sensitivity `high` to `sensitive` (row 7).
-- Pass `user_id` on every job and event (rows 15, 16).
-- Delete the `answers` fallback (row 12).
+## Hand-offs after both steps (step 3, person 1)
 
-**Contracts and callers (person 1, step 1):**
+Send these, then set row 3 to `done`.
 
-| Row | Change | Kind | Callers and fixtures to touch | Cost |
-|---|---|---|---|---|
-| 2 | `FastResult.key_dates` | additive | fixtures | S: one field |
-| 3 | `KeyFact`: `value` or `ref`, `quote`, `page`; drop `citation` | breaking | `app/dev/fake_research.py`, `app/db/reset.py`, dashboard letter panel, fixtures | S: three callers, each a line or two (`orchestrator/tools.py:237` only reads `field`, the dashboard doesn't read key facts) |
-| 4, 5 | `Appointment.time` and `location_ref` optional | loosening | `app/api/`, dashboard, fixtures | S: guard `None` in `api/case_views.py:33`, `:37`, the API model, and `orchestrator/letter_result.py:55` (`format_time`, person 2) |
-| 6, 14 | `ProposedFact.sensitivity` | additive | memory writer (person 2) must hold `sensitive` facts | S now; the memory writer isn't built yet |
-| 8 | `Verification.signals` | additive | fixtures | S |
-| 9 | `DeepResult.official_phone_purpose` (nice) | additive | fixtures | S |
-| 10 | `DeepResult.alternative_contacts` | additive | orchestrator relays them (person 2), fixtures | S for the contract; relaying them is person 2's call and not on the demo path |
-| 11 | `DeepResult.brief_id` optional | loosening | callers that assume a brief | S: `orchestrator/consent.py` reads the brief row, not R2's `brief_id` |
-| 13 | `ResearchDeepJob.signals`, `call_purpose` | additive | fixtures | S |
-| 17 | new research event types | additive | dashboard feed templates | S: enum values plus feed templates |
-| 18 | `CaseBrief` model | replaces a dict | `save_brief`, phone agent's brief reader (person 4) | M: their model carries `brief_id` inside, but `save_brief` mints the row's ID, so `save_brief` takes an optional `brief_id` (person 1). The phone agent reads the brief as a dict, so a model dump still works; person 4 confirms the fields |
-| 19 | `research_question` job, result, events | new | orchestrator queues it and relays answers (person 2), dashboard templates | L: a new job type and feature, not in Plan.md. Person 2 queues it and relays answers, plus contracts, templates and tests |
-| 1 | `needs_user_input` flow | new | see that section: person 1 about an hour, person 2 about 2 hours, research about 30 minutes | M: about 3.5 hours across three people |
+**Person 2**, prompt for their agent:
+> Read `docs/research-integration.md` (decisions 2 and 3, C38, C39 in Plan.md). In `orchestrator/`:
+> 1. On an R1 with status `needs_user_input`, ask the user `question_en` in their language. On their reply, queue `research_fast` again for the same `case_id` with the reply in English as `user_note_en`, the same pattern as "same letter or new?".
+> 2. Add a tool to the Claude turn that queues `ResearchQuestionJob` for a factual question about the user's letter or process. Relay the `QuestionAnswer` with its sources, or explain the decline.
+> 3. Optionally, offer the R2 `alternative_contacts` when a letter isn't verified.
+>
+> Stay in your packages. Test with fakes. Merge as usual.
 
-Sizes: **S** under 30 minutes, **M** 1–2 hours, **L** half a day or more, each with Claude.
+**Person 4:** the brief is now the `CaseBrief` model in `app.contracts.brief`, stored as its JSON. The phone agent can keep reading it as a dict or validate it with the model. `official_dial_number` returns `DEMO_DIAL_NUMBER` while it's set (C40).
 
-**Research's integration (person 3, step 2):** move the code, switch to `app.contracts`, swap the simulated `Store` for the real helpers in `research/jobs.py`, use `app.settings`, add the worker (row 20 and step 2).
+**Everyone:**
+- research runs for real once `ANTHROPIC_API_KEY` is set;
+- don't call `/dev/fake-research` while the worker runs;
+- person 1 resets the shared database before the next rehearsal.
 
 ## Done when
 
-- `ruff format . && ruff check --fix . && pytest` passes from the repo root, including the moved research tests.
-- With the backend running (`DEV_ENDPOINTS=false`) on your own Neon branch, a photo of the demo letter sent on WhatsApp produces, in order:
-  - the R1 explanation;
-  - the `verification.verified` event, with the `source` domain;
-  - a brief;
-  - the consent question.
-- The dashboard's case view (`NEXT_PUBLIC_DATA=live`) shows the letter panel filled: explanation, checklist, masked refs, the "checked against" source, and the brief's questions.
-- `reads.official_dial_number(case_id)` returns the mock line with `DEMO_DIAL_NUMBER` set, and the real verified number without it.
-- Nothing sensitive in events, logs or job results. Their `LeakGuard` keeps checking this.
+All three status rows are `done`, and a photo of the demo letter sent on WhatsApp (shared database, after the reset) produces, in order:
+- the explanation;
+- the verified verdict;
+- the consent question.
+
+The dashboard's case view shows the letter panel filled in.
