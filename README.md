@@ -115,7 +115,18 @@ The call runner (`phone/runner.py`) runs a whole call on fakes. To watch one aga
 
 To play the line yourself, run the playground from `backend/`: `python -m app.phone.playground`. Each line you paste is what the agency says; the real runner answers, and each step shows the 1c reading, the state change, the 1b action, what went out, and latency. Add `--fake` to run without Claude (you type the menu decision). `/help` lists the commands; `/save <name>` records a session, and `python -m app.phone.playground --replay app/phone/playground/scripts/<name>.json` replays it with a pass/fail table (add `--fake` to replay the recorded answers for free). In a new worktree, copy the main checkout's `.env` first, or export `ANTHROPIC_API_KEY`.
 
-The real phone line (Twilio + Pipecat + Cartesia) lives in the backend as two routes, `POST /phone/calls/{call_id}/status` and `WS /phone/calls/{call_id}/stream`, so a live call needs ngrok and `PUBLIC_BASE_URL` like WhatsApp does, plus `CARTESIA_API_KEY` and `CARTESIA_AGENT_VOICE_ID` (any Cartesia voice). How it works: [docs/specs/phone-ports.md → The real line](docs/specs/phone-ports.md#the-real-line-phase-2). A script to place a live test call comes next.
+The real phone line (Twilio + Pipecat + Cartesia) lives in the backend as two routes, `POST /phone/calls/{call_id}/status` and `WS /phone/calls/{call_id}/stream`, so a live call needs ngrok and `PUBLIC_BASE_URL` like WhatsApp does, plus `CARTESIA_API_KEY` and `CARTESIA_AGENT_VOICE_ID` (any Cartesia voice). How it works: [docs/specs/phone-ports.md → The real line](docs/specs/phone-ports.md#the-real-line-phase-2).
+
+To place a live test call (`phone/smoke.py`):
+
+1. Stop the backend: the smoke test serves the phone routes itself, on `--port` (default 8000).
+2. Run `ngrok http 8000` and set `PUBLIC_BASE_URL` to its https URL. Fill in the Twilio and Cartesia vars above, and have `.env.local` for the shared database.
+3. From `backend/`:
+   - `python -m app.phone.smoke`: dials the seeded demo case through the real number check. Type `say <text>`, `keys <digits>` or `hangup`; every line event prints with its time.
+   - `python -m app.phone.smoke --runner`: the call runner drives the whole call (needs `ANTHROPIC_API_KEY`). Type a number to answer the applicant's question. Until the bridge lands it hangs up once a person is detected.
+   - `python -m app.phone.smoke --own-number`: dials `PHONE_SMOKE_DIAL_NUMBER` from your `.env`, so you can play the agency yourself (greet like a rep, go quiet, play music).
+
+The smoke test dials only the mock agency line (it refuses any other number a case resolves to) or, with `--own-number`, your own phone. It writes nothing to the database, and what it hears prints to the terminal only.
 
 ### The research agent
 
