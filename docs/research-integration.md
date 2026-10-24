@@ -19,7 +19,7 @@ Each step updates its row when it starts and when it finishes, and pushes that c
 | Step | Owner | State | Commit on `main` | Notes |
 |---|---|---|---|---|
 | 1. Contracts, data layer, dashboard, Plan.md | person 1's session | in progress | | Branch `chris/research-contracts` |
-| 2. Move and wire the research agent | person 3's session | not started | | |
+| 2. Move and wire the research agent | person 3's session | in progress | | Preparing 2b–2e on `research/integrate`; waiting for step 1. No `research-int-p3` URL yet (needed for the gate and the end-to-end check) |
 | 3. Hand-offs sent | person 1 | not started | | |
 
 ## Before anyone starts (humans, about 5 minutes)
