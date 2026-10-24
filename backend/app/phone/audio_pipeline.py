@@ -196,5 +196,11 @@ async def run_stream(
     try:
         await runner.add_workers(worker)
         await runner.run()
+    except asyncio.CancelledError:
+        # `PipecatStream.close` cancels the runner, which raises here; that's the
+        # normal end of a stream. Only a cancel of this task itself goes on.
+        task = asyncio.current_task()
+        if task is not None and task.cancelling():
+            raise
     finally:
         line.detach_stream(seq)
