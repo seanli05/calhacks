@@ -17,8 +17,13 @@ def get_engine() -> AsyncEngine:
     if "-pooler." in url:
         # Transaction pooler: prepared-statement caching breaks across connections.
         connect_args["statement_cache_size"] = 0
-    # Neon suspends idle compute; pre_ping drops connections it closed meanwhile.
-    return create_async_engine(url, pool_pre_ping=True, connect_args=connect_args)
+    # No pre_ping: it costs a round trip on every checkout (~130 ms to us-east-2).
+    # Neon closes connections when it suspends after 5 idle minutes, so recycling
+    # at 4 minutes means a pooled connection is never older than the compute.
+    # 20 connections so the dashboard's concurrent reads don't queue for the pool.
+    return create_async_engine(
+        url, pool_size=20, pool_recycle=240, connect_args=connect_args
+    )
 
 
 @asynccontextmanager
