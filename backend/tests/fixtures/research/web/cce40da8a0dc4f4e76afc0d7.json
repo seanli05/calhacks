@@ -1,0 +1,9 @@
+{
+ "url": "https://www.uscis.gov/contactcenter",
+ "fetched_at": "2026-10-24T05:28:32.519474+00:00",
+ "status_code": 403,
+ "headers": {
+  "content-type": "text/html"
+ },
+ "body": "<HTML><HEAD>\n<TITLE>Access Denied</TITLE>\n</HEAD><BODY>\n<H1>Access Denied</H1>\n \nYou don't have permission to access \"http&#58;&#47;&#47;www&#46;uscis&#46;gov&#47;contactcenter\" on this server.<P>\nReference&#32;&#35;18&#46;680ed217&#46;1792819712&#46;2af2eae\n<P>https&#58;&#47;&#47;errors&#46;edgesuite&#46;net&#47;18&#46;680ed217&#46;1792819712&#46;2af2eae</P>\n</BODY>\n</HTML>\n"
+}

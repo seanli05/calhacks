@@ -1,0 +1,17 @@
+{
+  "doc_type": "private_landlord_rent_notice",
+  "call_purpose": "Ask about the notice to pay rent",
+  "signals": {
+    "letterhead": "Notice to Pay Rent or Quit",
+    "urls": [],
+    "form_ids": [],
+    "phones": [
+      {
+        "number": "+12025550112",
+        "label": "Landlord",
+        "quote": "Call me at (202) 555-0112"
+      }
+    ],
+    "signature_block": "Pat Example, Owner"
+  }
+}

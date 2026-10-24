@@ -1,0 +1,27 @@
+{
+  "status": "ok",
+  "issuer_contains": [
+    "Alameda"
+  ],
+  "deadline": "2026-11-12",
+  "url_domains": [
+    "mybenefitscalwin.org"
+  ],
+  "phones_e164": [
+    "+15105550142"
+  ],
+  "checklist_min": {
+    "who_must_come": 0,
+    "bring": 1
+  },
+  "sensitive_fields": [
+    "case_number"
+  ],
+  "forbidden_strings": [
+    "CF-4471902",
+    "4471902",
+    "LUIS EJEMPLO PRUEBA",
+    "88 SAMPLE STREET"
+  ],
+  "payment_instructions_present": false
+}

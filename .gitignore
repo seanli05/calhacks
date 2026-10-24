@@ -52,3 +52,4 @@ recordings/
 *.log
 .claude/settings.local.json
 .neon
+backend/tests/fixtures/research/private/

@@ -1,0 +1,19 @@
+{
+  "doc_type": "medicare_summary_notice",
+  "call_purpose": "Ask about a claim on the summary notice",
+  "signals": {
+    "letterhead": "Medicare",
+    "sub_agency": "Centers for Medicare & Medicaid Services",
+    "urls": [
+      "www.medicare.gov"
+    ],
+    "form_ids": [],
+    "phones": [
+      {
+        "number": "+18005550100",
+        "label": "Customer Service",
+        "quote": "Call 1-800-555-0100"
+      }
+    ]
+  }
+}

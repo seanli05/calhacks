@@ -1,0 +1,9 @@
+{
+ "url": "https://www.alamedacountysocialservices.org/index.page",
+ "fetched_at": "2026-10-24T09:13:40.344294+00:00",
+ "status_code": 302,
+ "headers": {
+  "location": "https://socialservices.alamedacountyca.gov"
+ },
+ "body": ""
+}

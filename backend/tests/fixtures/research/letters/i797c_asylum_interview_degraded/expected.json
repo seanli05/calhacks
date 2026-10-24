@@ -1,0 +1,36 @@
+{
+  "status": "ok",
+  "doc_type_prefix": "uscis_i797c",
+  "issuer_contains": [
+    "USCIS",
+    "Citizenship and Immigration"
+  ],
+  "deadline": "2026-11-25",
+  "appointment_date": "2026-11-25",
+  "appointment_time": "08:30",
+  "form_ids_contains": [
+    "I-797C"
+  ],
+  "url_domains": [
+    "uscis.gov"
+  ],
+  "phones_e164": [],
+  "checklist_min": {
+    "who_must_come": 2,
+    "bring": 2
+  },
+  "sensitive_fields": [
+    "receipt_number",
+    "a_number",
+    "interview_location"
+  ],
+  "forbidden_strings": [
+    "ZLA2690412873",
+    "A-219-555-031",
+    "219-555-031",
+    "ANA MUESTRA EJEMPLO",
+    "1234 EXAMPLE AVE APT 5",
+    "Hawthorne"
+  ],
+  "payment_instructions_present": false
+}
