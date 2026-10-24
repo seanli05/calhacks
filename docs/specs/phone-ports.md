@@ -8,7 +8,7 @@ The call runner talks to the outside world only through the Protocols in `ports.
 
 | Port | What it is | Real adapter | Fake |
 |---|---|---|---|
-| `Telephony` | One call's line: `dial_agency`, `say`, `press_keys`, `ring_user`, `connect_user`, `hang_up`, plus `events()`, the stream of everything that happens (`line.py`) | Phase 2 (Twilio + Pipecat) | `FakeTelephony`: a script, plus an optional `responder` that reacts to actions (how the simulator plugs in a phone tree) |
+| `Telephony` | One call's line: `dial_agency`, `say`, `press_keys`, `ring_user`, `connect_user`, `hang_up`, plus `events()`, the stream of everything that happens (`line.py`) | `TwilioTelephony` (`twilio_line.py`; agency leg only until Phase 3) | `FakeTelephony`: a script, plus an optional `responder` that reacts to actions (how the simulator plugs in a phone tree) |
 | `Relay` | `ask_user` (P1) | `RelayAskUser` → `app.relay.ask_user` | `FakeRelay`: scripted `Answer` / `NoAnswer` |
 | `CaseReader` | The brief | `DbCaseReader` | `FakeCaseReader` |
 | `CallStore` | `calls`, `transcripts` (only the phone agent writes them) | `DbCallStore` → `writes.phone` | `FakeCallStore` |
@@ -39,14 +39,15 @@ The call runner talks to the outside world only through the Protocols in `ports.
 
 Files: `runner.py` (lifecycle, dispatch, hold, the person, the bridge), `runner_menu.py` (menu and ask_user), `runner_base.py` (shared state, logging, classify, transcript, observer), `runner_parts.py` (config, inbox inputs, timers), `executor.py` (C37), `call_lines.py` (the fixed lines to the rep), `report.py` (stand-in P3 builder), `observe.py` (`StepRecord`).
 
-**Shape.** One inbox, one handler at a time. A pump task reads `events()` and stamps each event on arrival; the ask_user task and the timers (hold limit, user-answer backstop, menu budget) only post to the inbox. Model calls are awaited inside a handler, and whatever arrives meanwhile waits. Wrap-up is a `finally`: every exit (hang-up, timeout, crash) cancels the background work, hangs up, saves the transcript and the report, and fires `REPORT_SAVED`.
+**Shape.** One inbox, one handler at a time. A pump task reads `events()` and stamps each event on arrival; the ask_user task and the timers (hold limit, user-answer backstop, menu budget, menu quiet, turn backstop) only post to the inbox. Model calls are awaited inside a handler, and whatever arrives meanwhile waits. Wrap-up is a `finally`: every exit (hang-up, timeout, crash) cancels the background work, hangs up, saves the transcript and the report, and fires `REPORT_SAVED`.
 
 **Policies** (numbers in `RunnerConfig`; first guesses, to tune on real lines):
 
 | Moment | What the runner does |
 |---|---|
 | Dial | `create_call`, read the brief, `dial_agency`, then log `call.dialing`, only once the dial went out, so the user never hears "Calling now" for a call that didn't happen. `UnverifiedNumber` → `AGENT_ABORTED` |
-| Menu utterance | 1c and 1b in parallel; 1b's answer is dropped if 1c leaves the menu or newer speech arrived. 1b gets all menu speech since the last decision used, so a split prompt is decided whole. `call.menu_heard` carries the reading and the action kind |
+| Menu utterance | 1c and 1b in parallel; 1b's answer is dropped if 1c leaves the menu or newer speech arrived. 1b gets all menu speech since the last answer sent, so a split prompt is decided whole. `call.menu_heard` carries the reading and the action kind, logged when the answer goes out (`stale` if it was dropped) |
+| Every option first | **Never answer a menu before hearing all of it.** Every menu output (press, say, starting ask_user, the applicant's choice, the early default) is held until the line has been quiet `menu_quiet_s` (1 s) after the turn closed; with the audio line's ~1 s turn gap, that's ~2 s of quiet. `SpeechStarted` pauses it. More text drops a held decision and the menu so far is decided again; a turn with no text (`NonSpeech`, or the 30 s backstop) lets it out. The applicant's choice survives a reprompt of its prompt. Limit: a line that pauses > 2 s mid-list can still fool it; 1b's prompt also waits on a prompt cut off mid-option |
 | Back in a menu | The utterance that fired `MENU_RETURNED` is decided at once |
 | Press (C37) | Speak the digit word ("two"). Keys instead when the prompt names the keypad, or when a spoken press was answered with a no-match/no-input reprompt or the same prompt; then keys for the rest of that menu tree, until the next hold |
 | ask_user | Asked with a 30 s timeout. Reprompts of the asked prompt aren't decided again; the second one takes the default early (menus hang up after 2–3 no-inputs). A new prompt, hold, or a person drops the question (the task is cancelled) |
@@ -65,9 +66,31 @@ Files: `runner.py` (lifecycle, dispatch, hold, the person, the bridge), `runner_
 
 **Simulator.** `python -m app.phone.simulate --tree NAME` (from `backend/`) runs a call against a text tree in `sim_trees.py` with real Claude on `SystemClock`. `FakeClock` can't wait for a real request: `run` either jumps virtual time past it or stops as "stuck". `heldout_consular` is held out; don't tune to it.
 
+## The real line (Phase 2)
+
+`TwilioTelephony` is one call's agency leg. Everything runs in the one backend process, and `twilio_line.LINES` maps each `call_id` to its line so Twilio's two ways in can find it (`routes.py`, both signature-checked with `relay/signature.py`):
+
+| Route | What arrives | Becomes |
+|---|---|---|
+| `POST /phone/calls/{call_id}/status` | Twilio's call status callbacks | `in-progress` → `AgencyAnswered`; `busy`/`no-answer`/`failed`/`canceled` before an answer → `AgencyUnreachable`; `completed` → `AgencyHungUp` (unless we hung up) |
+| `WS /phone/calls/{call_id}/stream` | The media stream (`<Connect><Stream>`) | A Pipecat pipeline (`audio_pipeline.py`): Silero VAD → Cartesia Ink → `LineListener` → Cartesia Sonic. Its start also means answered |
+
+| Piece | What it does |
+|---|---|
+| Order | Callbacks and streams arrive in any order. The line only moves forward: answered once, gone once. Streams are numbered; a close counts only for the current one |
+| Turns (`listener.py`) | VAD stop 0.5 s; fragments join until 1 s of quiet (plus up to 1 s for speech-to-text's last fragment); cut at 25 s. Every `SpeechStarted` is closed by one `Heard`, or `NonSpeech` if it had no words |
+| `NonSpeech` | Between turns, every 5 s, `seconds` = the stretch so far; `music` if most 20 ms frames were above `LOUD_RMS`, else `silence`. Text is never dropped as music: a rep's lone "Hello?" after hold music must reach the classifier |
+| `say` | Queues the speech and a Twilio `mark` after it; returns when Twilio echoes the mark (the audio played). No mark within the spoken length + 5 s: logs and carries on. Cancelling it sends Twilio `clear` |
+| `press_keys` (C37) | REST update to `<Play digits="w…">` + a new stream; returns once that stream is up. None within 8 s: the agency hung up (`AgencyHungUp`), or we hang up; either way `LineClosed` |
+| `hang_up` | REST `completed`, closes the stream, unregisters, ends `events()`. Safe twice |
+| A stream that ends unasked | `completed` should follow; if it hasn't in 5 s, `AgencyHungUp` |
+| Not stored | No recording, no audio buffers (C29). Logs carry IDs and statuses, never numbers or speech |
+
+Settings: `CARTESIA_AGENT_VOICE_ID` (required for speech), `CARTESIA_STT_MODEL`, `CARTESIA_TTS_MODEL`, and `PUBLIC_BASE_URL` for Twilio to reach us. The Pipecat worker's idle timeout is off; its default would cancel the stream after 5 minutes on hold.
+
 **Open, for Phase 2 and the team:**
-- **Acting on part of a menu.** A decision is dropped only if the next utterance arrives while Claude is still deciding. When options come as separate utterances, the agent can press an early option before hearing a better one (seen in the simulator). The fix needs a "speech started" line event (from voice activity detection) so the runner can hold a choice until the menu goes quiet. That's a change to `line.py`.
-- `say` should return once the audio has played; the adapter must pin this.
+- The live smoke test (`python -m app.phone.smoke`) is next. Untested until then: which URL Twilio signs on the websocket handshake (both `https` and `wss` forms are accepted), the mark round trip, the reconnect time, and `LOUD_RMS` against real hold music.
+- `ring_user` and `connect_user` raise `NotImplementedError` (Phase 3), so a full call on the real line aborts and hangs up once a person is detected.
 - No `bridging → hold`: a "person" who transfers after the ring can't be undone (state.py).
 
 ## Open, with person 2 (`relay/ask_user.py`)

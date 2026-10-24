@@ -39,6 +39,7 @@ from app.phone.line import (
     AgencyHungUp,
     Heard,
     NonSpeech,
+    SpeechStarted,
     UserAnswered,
     UserUnreachable,
 )
@@ -217,6 +218,13 @@ async def _run(
     return call, report
 
 
+def _sent_step(
+    call: Call, sent: str, among: Iterable[StepRecord] | None = None
+) -> StepRecord:
+    """The first step that put `sent` on the line."""
+    return next(step for step in among or call.steps if sent in step.sent)
+
+
 MENU = "For appointments, press 2. For anything else, press 3."
 REP = "Thank you for holding, this is Maria, how can I help you?"
 
@@ -301,7 +309,11 @@ async def test_observer_sees_readings_actions_and_transitions() -> None:
     menu_step = next(step for step in call.steps if step.text == MENU)
     assert menu_step.reading is not None and menu_step.reading.phase == "menu"
     assert isinstance(menu_step.action, PressAction)
-    assert menu_step.sent == ["speech: two"]
+    assert menu_step.sent == []
+    assert "held" in menu_step.flags
+    sent_step = _sent_step(call, "speech: two")
+    assert sent_step.input == "timer:menu_quiet"
+    assert sent_step.at_s == pytest.approx(menu_step.at_s + 1.0)
     assert set(menu_step.latency_ms) == {"classify", "decide"}
     assert call.steps[0].input == "dial"
     assert call.steps[-1].input == "wrap_up"
@@ -345,8 +357,8 @@ async def test_ask_user_timeout_takes_the_default() -> None:
         llm, _opening(ASK_MENU), _hang_up_after(Said("four")), replies=[NoAnswer()]
     )
     assert Said("four") in call.actions
-    said_at = next(s.at_s for s in call.steps if s.sent == ["speech: four"])
-    assert said_at == pytest.approx(3 + 30)
+    # Asked once the menu had been quiet 1 s; the default goes out at the timeout.
+    assert _sent_step(call, "speech: four").at_s == pytest.approx(3 + 1 + 30)
 
 
 async def test_menu_reprompts_while_asking_take_the_default_early() -> None:
@@ -363,8 +375,8 @@ async def test_menu_reprompts_while_asking_take_the_default_early() -> None:
     assert len(llm.menu_calls) == 1
     assert call.relay is not None
     assert call.relay.cancelled == [call.relay.asked[0].question_id]
-    said_at = next(s.at_s for s in call.steps if s.sent == ["speech: four"])
-    assert said_at == pytest.approx(3 + 14)
+    # The default is held until the second reprompt has been quiet 1 s.
+    assert _sent_step(call, "speech: four").at_s == pytest.approx(3 + 14 + 1)
     flags = [flag for step in call.steps for flag in step.flags]
     assert flags.count("reprompt_while_asking") == 2
     assert "ask_default_early" in flags
@@ -680,4 +692,110 @@ async def test_a_menu_after_hold_is_answered_on_the_utterance_that_showed_it() -
     call, _ = await _run(llm, _opening(), tree, call=call)
     returned = next(step for step in call.steps if step.text == second_menu)
     assert [t.trigger for t in returned.transitions] == ["menu_returned"]
-    assert returned.sent == ["speech: two"]
+    assert isinstance(returned.action, PressAction)
+    later = [step for step in call.steps if step.at_s > returned.at_s]
+    assert _sent_step(call, "speech: two", among=later).at_s == pytest.approx(
+        returned.at_s + 1.0
+    )
+
+
+# Every option is heard before the agent answers
+
+
+SPLIT_MENU = ("For case status, press 1.", "For interview appointments, press 2.")
+
+
+def _option_one_first() -> FakeLlm:
+    """Option 1 fits on its own; option 2 fits better once it has been heard."""
+    return FakeLlm(_menu_by_text({"press 2": _press("2"), "press 1": _press("1")}))
+
+
+def _said(call: Call) -> list[Said]:
+    return [action for action in call.actions if isinstance(action, Said)]
+
+
+async def test_options_heard_in_pieces_are_answered_once_after_the_last() -> None:
+    llm = _option_one_first()
+    script = [
+        Step(2, AgencyAnswered()),
+        Step(1, Heard(text=SPLIT_MENU[0])),
+        Step(0.6, Heard(text=SPLIT_MENU[1])),
+    ]
+    call, _ = await _run(llm, script, _hang_up_after(Said("two")))
+
+    assert _said(call) == [Said("two")]
+    assert llm.menu_calls[-1] == " ".join(SPLIT_MENU)
+    assert _sent_step(call, "speech: two").at_s == pytest.approx(3.6 + 1.0)
+
+
+async def test_speech_starting_in_the_quiet_window_holds_the_answer() -> None:
+    llm = _option_one_first()
+    script = [
+        Step(2, AgencyAnswered()),
+        Step(1, Heard(text=SPLIT_MENU[0])),
+        Step(0.5, SpeechStarted()),  # inside the 1 s window after option 1
+        Step(2.5, Heard(text=SPLIT_MENU[1])),
+    ]
+    call, _ = await _run(llm, script, _hang_up_after(Said("two")))
+
+    assert _said(call) == [Said("two")]
+    assert _sent_step(call, "speech: two").at_s == pytest.approx(6 + 1.0)
+    assert any("held_dropped" in step.flags for step in call.steps)
+
+
+@pytest.mark.parametrize(
+    ("close", "sent_at"),
+    [
+        (Step(1, NonSpeech(sound="silence", seconds=1)), 3.5 + 1 + 1.0),
+        (None, 3.5 + 30 + 1.0),  # never closes: the backstop releases it
+    ],
+)
+async def test_a_turn_with_no_words_lets_the_held_answer_out(
+    close: Step | None, sent_at: float
+) -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    script = [*_opening(), Step(0.5, SpeechStarted())]
+    if close is not None:
+        script.append(close)
+    call, _ = await _run(llm, script, _hang_up_after(Said("two")))
+
+    assert _said(call) == [Said("two")]
+    assert _sent_step(call, "speech: two").at_s == pytest.approx(sent_at)
+    assert llm.menu_calls == [MENU]
+    flags = [flag for step in call.steps for flag in step.flags]
+    assert ("turn_never_closed" in flags) is (close is None)
+
+
+async def test_the_applicants_choice_waits_for_the_line_to_go_quiet() -> None:
+    reprompt = "Sorry, I didn't get that. " + ASK_MENU
+    script = [
+        *_opening(ASK_MENU),  # heard at 3 s; asked at 4 s
+        Step(5.5, SpeechStarted()),  # a reprompt starts at 8.5 s
+        Step(3.5, Heard(text=reprompt)),  # and ends at 12 s
+    ]
+    llm = FakeLlm(_menu_by_text({"press 4": _ask()}))
+    call, _ = await _run(
+        llm,
+        script,
+        _hang_up_after(Said("six")),
+        replies=[Answer(choice=2, after_s=5)],  # at 9 s, mid-reprompt
+    )
+
+    assert _said(call) == [Said("six")]
+    assert _sent_step(call, "speech: six").at_s == pytest.approx(12 + 1.0)
+    assert len(llm.menu_calls) == 1  # the reprompt wasn't decided, or asked, again
+    assert any("reprompt_while_held" in step.flags for step in call.steps)
+
+
+async def test_leaving_the_menu_drops_a_held_answer() -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    script = [
+        *_opening(),
+        Step(0.5, NonSpeech(sound="music", seconds=6)),  # hold, before the answer
+        Step(10, AgencyHungUp()),
+    ]
+    call, _ = await _run(llm, script)
+
+    assert _said(call) == []
+    assert S.HOLD in call.record.states
+    assert any("held_dropped" in step.flags for step in call.steps)

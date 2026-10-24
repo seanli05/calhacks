@@ -46,6 +46,10 @@ class Settings(BaseSettings):
 
     # Cartesia
     cartesia_api_key: str = ""
+    # The phone agent's voice on calls (Sonic) and its speech-to-text (Ink)
+    cartesia_agent_voice_id: str = ""
+    cartesia_stt_model: str = "ink-whisper"
+    cartesia_tts_model: str = "sonic-3.6"
 
     # Twilio
     twilio_account_sid: str = ""

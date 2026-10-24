@@ -201,6 +201,10 @@ class CallSession:
             case HeardStep():
                 await self._advance(step.after_s)
                 await self._push(Heard(text=step.text), start)
+                # The line goes quiet while you type the next step, so a held menu
+                # answer goes out, as it would on a real line.
+                await self._settle()
+                await self._advance(self.config.menu_quiet_s)
             case SoundStep():
                 await self._advance(step.seconds)
                 await self._push(

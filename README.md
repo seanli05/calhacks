@@ -115,6 +115,8 @@ The call runner (`phone/runner.py`) runs a whole call on fakes. To watch one aga
 
 To play the line yourself, run the playground from `backend/`: `python -m app.phone.playground`. Each line you paste is what the agency says; the real runner answers, and each step shows the 1c reading, the state change, the 1b action, what went out, and latency. Add `--fake` to run without Claude (you type the menu decision). `/help` lists the commands; `/save <name>` records a session, and `python -m app.phone.playground --replay app/phone/playground/scripts/<name>.json` replays it with a pass/fail table (add `--fake` to replay the recorded answers for free). In a new worktree, copy the main checkout's `.env` first, or export `ANTHROPIC_API_KEY`.
 
+The real phone line (Twilio + Pipecat + Cartesia) lives in the backend as two routes, `POST /phone/calls/{call_id}/status` and `WS /phone/calls/{call_id}/stream`, so a live call needs ngrok and `PUBLIC_BASE_URL` like WhatsApp does, plus `CARTESIA_API_KEY` and `CARTESIA_AGENT_VOICE_ID` (any Cartesia voice). How it works: [docs/specs/phone-ports.md → The real line](docs/specs/phone-ports.md#the-real-line-phase-2). A script to place a live test call comes next.
+
 ### The research agent
 
 Research runs inside the backend: a worker started with the app claims `research_fast`, `research_deep` and `research_question` jobs from Postgres. It starts when `RESEARCH_WORKER=true` (the default) and `ANTHROPIC_API_KEY` is set; set `RESEARCH_WORKER=false` to run the backend without it. Don't call `POST /dev/fake-research` while the worker runs: both claim the same jobs.
