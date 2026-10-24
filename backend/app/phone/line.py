@@ -63,16 +63,28 @@ class UserAnswered(_LineEvent):
 
 
 class UserUnreachable(_LineEvent):
-    """The user's phone didn't pick up (Twilio's ring timeout), or rejected it."""
+    """The user's phone didn't pick up (Twilio's ring timeout), or rejected it, or
+    something picked up but pressed no key to join (`no_key_press`): usually the
+    carrier's voicemail, which Twilio reports as answered."""
 
     kind: Literal["user_unreachable"] = "user_unreachable"
-    reason: Literal["busy", "no_answer", "failed"]
+    reason: Literal["busy", "no_answer", "failed", "no_key_press"]
 
 
 class UserLeft(_LineEvent):
     """The user hung up after joining the conference."""
 
     kind: Literal["user_left"] = "user_left"
+
+
+class Overheard(_LineEvent):
+    """One finished utterance after the bridge, from a listen-only fork of one leg.
+    For the transcript only: the agent is silent once the applicant is on, so this
+    never feeds the classifier or the menu."""
+
+    kind: Literal["overheard"] = "overheard"
+    speaker: Literal["agency", "user"]
+    text: str
 
 
 LineEvent = Annotated[
@@ -84,6 +96,7 @@ LineEvent = Annotated[
     | NonSpeech
     | UserAnswered
     | UserUnreachable
-    | UserLeft,
+    | UserLeft
+    | Overheard,
     Field(discriminator="kind"),
 ]

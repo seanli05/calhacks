@@ -15,7 +15,7 @@ from app.contracts.common import CallId, CallState, JobId
 from app.phone import phase
 from app.phone.call_events import CallEvents
 from app.phone.executor import MenuExecutor, Sent
-from app.phone.line import Heard, NonSpeech
+from app.phone.line import Heard, NonSpeech, Overheard
 from app.phone.llm import LlmClient
 from app.phone.menu import MenuTurn
 from app.phone.observe import Observer, StepRecord
@@ -104,6 +104,9 @@ class RunnerBase:
         self.hold_overdue = False
         self.holding_said = 0
         self.last_holding_s: float | None = None
+        self.speaking: asyncio.Future[None] | None = None
+        """A fixed line playing to the rep in the background while the applicant's
+        phone rings (the intro, a holding line)."""
 
     def now_s(self) -> float:
         return (self.clock.now() - self.started).total_seconds()
@@ -160,7 +163,7 @@ class RunnerBase:
         self.step.logged.append(event_type)
         await self.events.append(event_type, summary_en, **data)
 
-    def _said(self, speaker: Literal["agent", "agency"], text: str) -> None:
+    def _said(self, speaker: Literal["agent", "agency", "user"], text: str) -> None:
         self.transcript.append(
             TranscriptLine(at=self.clock.now(), speaker=speaker, text=text)
         )
@@ -179,6 +182,8 @@ class RunnerBase:
         match item:
             case LineInput(event=Heard(text=text)):
                 self._begin("heard", text)
+            case LineInput(event=Overheard(speaker=speaker, text=text)):
+                self._begin(f"overheard:{speaker}", text)
             case LineInput(event=NonSpeech(sound=sound, seconds=seconds)):
                 self._begin("non_speech", f"{sound} {seconds:.0f} s")
             case LineInput(event=event):

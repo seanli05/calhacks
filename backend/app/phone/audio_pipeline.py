@@ -3,6 +3,9 @@
     transport.input → VAD (Silero) → speech-to-text (Cartesia Ink) → LineListener
                     → text-to-speech (Cartesia Sonic) → transport.output
 
+After the bridge, each leg also runs a listen-only fork (`run_fork`): the same ears
+with no mouth, whose finished turns become `Overheard` lines for the transcript.
+
 No model decides anything here; the call runner does. Learned from
 `spikes/dtmf/server.py`, not imported from it. What the source taught us:
 
@@ -21,6 +24,7 @@ import asyncio
 import json
 import logging
 from itertools import count
+from typing import Literal
 
 from fastapi import WebSocket
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -29,6 +33,7 @@ from pipecat.frames.frames import Frame, OutputTransportMessageFrame, TTSSpeakFr
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.audio.vad_processor import VADProcessor
+from pipecat.processors.frame_processor import FrameProcessor
 from pipecat.serializers.twilio import TwilioFrameSerializer
 from pipecat.services.cartesia.stt import CartesiaSTTService
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -39,7 +44,7 @@ from pipecat.transports.websocket.fastapi import (
 from pipecat.workers.runner import WorkerRunner
 from pydantic import BaseModel
 
-from app.phone.listener import LineListener, PlaybackMarkFrame
+from app.phone.listener import LineListener, PlaybackMarkFrame, overheard
 from app.phone.twilio_line import TwilioTelephony
 from app.settings import Settings
 
@@ -131,17 +136,14 @@ class PipecatStream:
         await self._runner.cancel()
 
 
-async def run_stream(
-    websocket: WebSocket, start: TwilioStart, line: TwilioTelephony, settings: Settings
-) -> None:
-    """Run the pipeline for one stream until the websocket closes or the line
-    closes it."""
-    listener = LineListener(line.emit)
-    transport = FastAPIWebsocketTransport(
+def _transport(
+    websocket: WebSocket, start: TwilioStart, *, speaks: bool
+) -> FastAPIWebsocketTransport:
+    return FastAPIWebsocketTransport(
         websocket,
         FastAPIWebsocketParams(
             audio_in_enabled=True,
-            audio_out_enabled=True,
+            audio_out_enabled=speaks,
             add_wav_header=False,
             serializer=MarkingTwilioSerializer(
                 stream_sid=start.stream_sid,
@@ -150,20 +152,73 @@ async def run_stream(
             ),
         ),
     )
-    pipeline = Pipeline(
+
+
+def _ears(settings: Settings) -> list[FrameProcessor]:
+    """Voice activity, then speech-to-text."""
+    return [
+        VADProcessor(
+            vad_analyzer=SileroVADAnalyzer(
+                params=VADParams(start_secs=VAD_START_S, stop_secs=VAD_STOP_S)
+            )
+        ),
+        CartesiaSTTService(
+            api_key=settings.cartesia_api_key,
+            settings=CartesiaSTTService.Settings(
+                model=settings.cartesia_stt_model, language="en"
+            ),
+        ),
+    ]
+
+
+def _worker(processors: list[FrameProcessor]) -> PipelineWorker:
+    return PipelineWorker(
+        Pipeline(processors),
+        params=PipelineParams(
+            audio_in_sample_rate=TWILIO_SAMPLE_RATE,
+            audio_out_sample_rate=TWILIO_SAMPLE_RATE,
+        ),
+        idle_timeout_secs=None,
+        enable_rtvi=False,
+    )
+
+
+def _runner_for(transport: FastAPIWebsocketTransport) -> WorkerRunner:
+    """A runner that stops when Twilio closes the websocket."""
+    runner = WorkerRunner(handle_sigint=False)
+
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(
+        _transport: FastAPIWebsocketTransport, _client: object
+    ) -> None:
+        await runner.cancel()
+
+    return runner
+
+
+async def _run(runner: WorkerRunner, worker: PipelineWorker) -> None:
+    try:
+        await runner.add_workers(worker)
+        await runner.run()
+    except asyncio.CancelledError:
+        # `PipecatStream.close` cancels the runner, which raises here; that's the
+        # normal end of a stream. Only a cancel of this task itself goes on.
+        task = asyncio.current_task()
+        if task is not None and task.cancelling():
+            raise
+
+
+async def run_stream(
+    websocket: WebSocket, start: TwilioStart, line: TwilioTelephony, settings: Settings
+) -> None:
+    """Run the pipeline for one stream until the websocket closes or the line
+    closes it."""
+    listener = LineListener(line.emit)
+    transport = _transport(websocket, start, speaks=True)
+    worker = _worker(
         [
             transport.input(),
-            VADProcessor(
-                vad_analyzer=SileroVADAnalyzer(
-                    params=VADParams(start_secs=VAD_START_S, stop_secs=VAD_STOP_S)
-                )
-            ),
-            CartesiaSTTService(
-                api_key=settings.cartesia_api_key,
-                settings=CartesiaSTTService.Settings(
-                    model=settings.cartesia_stt_model, language="en"
-                ),
-            ),
+            *_ears(settings),
             listener,
             CartesiaTTSService(
                 api_key=settings.cartesia_api_key,
@@ -175,23 +230,7 @@ async def run_stream(
             transport.output(),
         ]
     )
-    worker = PipelineWorker(
-        pipeline,
-        params=PipelineParams(
-            audio_in_sample_rate=TWILIO_SAMPLE_RATE,
-            audio_out_sample_rate=TWILIO_SAMPLE_RATE,
-        ),
-        idle_timeout_secs=None,
-        enable_rtvi=False,
-    )
-    runner = WorkerRunner(handle_sigint=False)
-
-    @transport.event_handler("on_client_disconnected")
-    async def on_client_disconnected(
-        _transport: FastAPIWebsocketTransport, _client: object
-    ) -> None:
-        await runner.cancel()
-
+    runner = _runner_for(transport)
     seq = line.attach_stream(
         PipecatStream(worker, runner, listener, start.stream_sid), start.call_sid
     )
@@ -200,13 +239,31 @@ async def run_stream(
         await websocket.close()
         return
     try:
-        await runner.add_workers(worker)
-        await runner.run()
-    except asyncio.CancelledError:
-        # `PipecatStream.close` cancels the runner, which raises here; that's the
-        # normal end of a stream. Only a cancel of this task itself goes on.
-        task = asyncio.current_task()
-        if task is not None and task.cancelling():
-            raise
+        await _run(runner, worker)
     finally:
         line.detach_stream(seq)
+
+
+async def run_fork(
+    websocket: WebSocket,
+    start: TwilioStart,
+    line: TwilioTelephony,
+    speaker: Literal["agency", "user"],
+    settings: Settings,
+) -> None:
+    """Run a listen-only fork of one leg after the bridge, until Twilio ends it.
+    The line owns nothing of it: the legs' status callbacks say when the call ends,
+    and Twilio closes the fork with its leg."""
+    if not line.attach_fork(speaker, start.call_sid):
+        logger.warning("fork refused by its line (sid=%s)", start.call_sid)
+        await websocket.close()
+        return
+    transport = _transport(websocket, start, speaks=False)
+    worker = _worker(
+        [
+            transport.input(),
+            *_ears(settings),
+            LineListener(overheard(line.emit, speaker)),
+        ]
+    )
+    await _run(_runner_for(transport), worker)

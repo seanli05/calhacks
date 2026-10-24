@@ -297,7 +297,9 @@ type Responder = Callable[[Action], Iterable[Step]]
 class FakeTelephony:
     """A scripted line. `script` plays after `dial_agency`. `responder`, if given,
     sees every action and returns the steps that follow it; that's how the
-    simulator plugs in a phone tree. `push` injects an event directly."""
+    simulator plugs in a phone tree. `push` injects an event directly.
+    `say_s_per_word` makes `say` take that long per word on the clock, as speech
+    does on a real line; by default it returns at once."""
 
     def __init__(
         self,
@@ -305,11 +307,14 @@ class FakeTelephony:
         clock: Clock,
         script: Iterable[Step] = (),
         responder: Responder | None = None,
+        *,
+        say_s_per_word: float = 0.0,
     ) -> None:
         self._numbers = numbers
         self._clock = clock
         self._script = list(script)
         self._responder = responder
+        self._say_s_per_word = say_s_per_word
         self._queue: asyncio.Queue[LineEvent | None] = asyncio.Queue()
         self._tasks: set[asyncio.Task[None]] = set()
         self._dialed = False
@@ -328,6 +333,8 @@ class FakeTelephony:
     async def say(self, text: str) -> None:
         self._require_agency()
         self._act(Said(text))
+        if self._say_s_per_word:
+            await self._clock.sleep(len(text.split()) * self._say_s_per_word)
 
     async def press_keys(self, digits: str) -> None:
         self._require_agency()

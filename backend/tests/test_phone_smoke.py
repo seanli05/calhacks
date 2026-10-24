@@ -1,5 +1,6 @@
 """The live smoke test's guard rails (`phone/smoke.py`): it dials only the mock
-line or your own phone, never rings anyone else, and the app never imports it."""
+line or your own phone, rings only your own phone and only with `--bridge`, and
+the app never imports it."""
 
 import ast
 import json
@@ -23,6 +24,7 @@ from app.phone.smoke import (
 )
 
 MOCK = "+15672298566"
+YOU = "+15555550123"
 APP = Path(__file__).resolve().parents[1] / "app"
 
 
@@ -50,10 +52,25 @@ async def test_no_mock_number_set_means_nothing_is_dialed() -> None:
         await numbers.official_dial_number("case_1")
 
 
-async def test_the_smoke_test_never_rings_anyone() -> None:
+async def test_without_bridge_the_smoke_test_never_rings_anyone() -> None:
     for numbers in (MockLineOnly(FakeNumberSource(), MOCK), SmokeNumberSource(MOCK)):
         with pytest.raises(SmokeRefused):
             await numbers.user_number("user_9")
+
+
+async def test_with_bridge_it_rings_only_your_own_phone() -> None:
+    db_users = FakeNumberSource(users={"user_9": "+15550000001"})
+    for numbers in (
+        MockLineOnly(db_users, MOCK, applicant=YOU),
+        SmokeNumberSource(MOCK, applicant=YOU),
+    ):
+        assert await numbers.user_number("user_9") == YOU
+
+
+def test_your_applicant_number_must_be_e164_and_isnt_echoed() -> None:
+    with pytest.raises(SmokeRefused) as refused:
+        MockLineOnly(FakeNumberSource(), MOCK, applicant="555-1234")
+    assert "555-1234" not in str(refused.value)
 
 
 def test_your_own_number_must_be_e164() -> None:
