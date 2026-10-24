@@ -1,11 +1,22 @@
 """FastAPI app: webhooks, dashboard API, and every agent as async background tasks."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from app.db.engine import ping
+from app.db.schema import create_all
 from app.relay.webhook import router as whatsapp_router
 
-app = FastAPI(title="calhacks")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    await create_all()
+    yield
+
+
+app = FastAPI(title="calhacks", lifespan=lifespan)
 app.include_router(whatsapp_router)
 
 
