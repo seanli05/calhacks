@@ -162,6 +162,53 @@
   color: var(--h-muted);
 }
 
+/* The pill row; the Details toggle sits at its right end during the call. */
+.bar {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toggle {
+  border: 1px solid color-mix(in srgb, var(--h-fg) 35%, transparent);
+  background: transparent;
+  color: var(--h-fg);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.toggle:hover,
+.toggle:focus-visible {
+  border-color: var(--lime);
+}
+
+/* On the call: smaller than the "person answered" moment, bigger than a strip. */
+.compact {
+  padding: 14px 24px 16px;
+  gap: 10px;
+}
+
+.compact .headline {
+  gap: 4px;
+}
+
+.compact .headline h1 {
+  font-size: clamp(22px, 1.6vw, 30px);
+}
+
+.compact .headline p {
+  font-size: var(--fs-md);
+}
+
+.compact .t {
+  font-size: clamp(24px, 1.8vw, 34px);
+}
+
 @media (max-width: 640px) {
   .hero {
     padding: 18px 16px;

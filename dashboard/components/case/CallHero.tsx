@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { Tracker } from "@/components/Tracker";
 import { useNow } from "@/lib/api/hooks";
 import type { CallSummary, CaseDetail } from "@/lib/api/types";
@@ -43,12 +45,25 @@ function heroCopy(t: CaseStrings, detail: CaseDetail, call: CallSummary | null, 
   }
 }
 
+/** How long the full "person answered" moment stays up once the user is on the call. */
+const COLLAPSE_AFTER_MS = 3000;
+
 /**
  * The top of the live column: what's happening right now, the hold timer, and the
  * tracker. When a person answers it turns solid forest, the big moment in the demo.
- * After the call it becomes the call report.
+ * While the user is on the call (`bridged`) it shrinks to a bar after a moment, to
+ * leave room for the live translation; "Details" opens it again. After the call it
+ * becomes the call report.
  */
-export function CallHero({ detail, onOpenTranscript }: { detail: CaseDetail; onOpenTranscript: (callId: string) => void }) {
+export function CallHero({
+  detail,
+  bridged = false,
+  onOpenTranscript,
+}: {
+  detail: CaseDetail;
+  bridged?: boolean;
+  onOpenTranscript: (callId: string) => void;
+}) {
   const { lang } = useLang();
   const t = stringsFor(lang).case;
   const en = stringsFor("en").case;
@@ -61,14 +76,38 @@ export function CallHero({ detail, onOpenTranscript }: { detail: CaseDetail; onO
   const warning = isWarning(detail.stage);
   const showTimer = detail.stage === "on_hold" && call?.hold_started_at;
   const report = detail.stage === "call_ended" ? call?.report : null;
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    setCollapsed(false);
+    if (!bridged) return;
+    const timer = setTimeout(() => setCollapsed(true), COLLAPSE_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [bridged]);
+
+  const compact = bridged && collapsed;
 
   return (
-    <div className={`${styles.hero} ${moment ? styles.moment : ""} ${warning ? styles[warning] : ""}`}>
+    <div
+      className={`${styles.hero} ${moment ? styles.moment : ""} ${warning ? styles[warning] : ""} ${compact ? styles.compact : ""}`}
+    >
       {isLive(detail.stage) && (
-        <span className={`pill ${styles.pill}`}>
-          <span className={styles.dot} />
-          {t.liveCall}
-        </span>
+        <div className={styles.bar}>
+          <span className={`pill ${styles.pill}`}>
+            <span className={styles.dot} />
+            {t.liveCall}
+          </span>
+          {bridged && (
+            <button
+              type="button"
+              className={styles.toggle}
+              aria-expanded={!compact}
+              onClick={() => setCollapsed(!compact)}
+            >
+              {compact ? `${t.live.details} ▾` : `${t.live.hide} ▴`}
+            </button>
+          )}
+        </div>
       )}
       {report && <span className={`pill ${report.outcome === "resolved" ? "" : "warn"}`}>{t.outcome[report.outcome]}</span>}
 
@@ -83,6 +122,12 @@ export function CallHero({ detail, onOpenTranscript }: { detail: CaseDetail; onO
             </p>
           )}
         </div>
+        {bridged && call && (
+          <div className={styles.timer}>
+            <span className={styles.t}>{duration((now - new Date(call.started_at).getTime()) / 1000)}</span>
+            <span className={styles.tl}>{t.live.onCall}</span>
+          </div>
+        )}
         {showTimer && (
           <div className={styles.timer}>
             <span className={styles.t}>{duration((now - new Date(call!.hold_started_at!).getTime()) / 1000)}</span>
@@ -133,7 +178,7 @@ export function CallHero({ detail, onOpenTranscript }: { detail: CaseDetail; onO
         </>
       )}
 
-      <Tracker stage={detail.stage} call={call} onDark={moment} />
+      {!compact && <Tracker stage={detail.stage} call={call} onDark={moment} />}
     </div>
   );
 }

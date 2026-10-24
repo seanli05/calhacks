@@ -9,21 +9,22 @@ import { api, ApiError } from "@/lib/api/client";
 import { useFeed, useLiveCall, usePoll } from "@/lib/api/hooks";
 import type { GlossaryEntry } from "@/lib/api/types";
 import { findTerms } from "@/lib/glossary";
-import { useLang, useStrings } from "@/lib/i18n";
+import { stringsFor, useLang, useStrings } from "@/lib/i18n";
 
 import { CallHero } from "./CallHero";
 import { GlossaryBook } from "./GlossaryBook";
 import { LetterPanel } from "./LetterPanel";
 import { LiveTips } from "./LiveTips";
 import { LiveTranscript } from "./LiveTranscript";
+import { SplitColumn } from "./SplitColumn";
 import { TranscriptSheet } from "./TranscriptSheet";
 import styles from "./CaseLiveView.module.css";
 
 /**
  * The screen on camera for the whole call segment of the demo:
  * letter | live call (hero + feed) | assistant. Once the user is bridged, the feed
- * gives way to the live translation and the translation book, and the assistant
- * rail gets tips for what to say.
+ * gives way to the live translation, the letter shrinks above the translation book
+ * (a resizable split), and the assistant rail gets tips for what to say.
  */
 export function CaseLiveView({ userId, caseId }: { userId: string; caseId: string }) {
   const { lang } = useLang();
@@ -41,6 +42,11 @@ export function CaseLiveView({ userId, caseId }: { userId: string; caseId: strin
   const userLang = usePoll(() => api.user(userId), userId, 60_000).data?.language ?? null;
   const glossary = usePoll(() => api.glossary(userLang ?? "en"), `glossary:${userLang}`, 300_000).data ?? [];
   const [query, setQuery] = useState("");
+  const [flash, setFlash] = useState<GlossaryEntry | null>(null);
+  const pickTerm = useCallback((entry: GlossaryEntry) => {
+    setQuery(entry.translation);
+    setFlash(entry);
+  }, []);
   const seen = useMemo(() => termsUsed(live.lines, glossary, lang), [live.lines, glossary, lang]);
 
   return (
@@ -49,15 +55,32 @@ export function CaseLiveView({ userId, caseId }: { userId: string; caseId: strin
       {!detail ? (
         <p className={styles.status}>{notFound ? t.notFound : error ? t.loadError : t.loading}</p>
       ) : (
-        <main className={styles.grid}>
-          <LetterPanel detail={detail} />
+        <main className={`${styles.grid} ${bridged ? styles.onCall : ""}`}>
+          {bridged ? (
+            <SplitColumn
+              storageKey="dashboard.bookShare"
+              label={stringsFor(lang).case.live.resize}
+              top={<LetterPanel detail={detail} compact />}
+              bottom={
+                <GlossaryBook
+                  entries={glossary}
+                  seen={seen}
+                  query={query}
+                  flash={flash}
+                  onQuery={(q) => {
+                    setQuery(q);
+                    setFlash(null);
+                  }}
+                />
+              }
+            />
+          ) : (
+            <LetterPanel detail={detail} />
+          )}
           <section className={`card ${styles.live}`}>
-            <CallHero detail={detail} onOpenTranscript={setTranscriptCallId} />
+            <CallHero detail={detail} bridged={bridged} onOpenTranscript={setTranscriptCallId} />
             {bridged ? (
-              <>
-                <LiveTranscript lines={live.lines} glossary={glossary} onTerm={(e) => setQuery(e.translation)} />
-                <GlossaryBook entries={glossary} seen={seen} query={query} onQuery={setQuery} />
-              </>
+              <LiveTranscript lines={live.lines} glossary={glossary} onTerm={pickTerm} />
             ) : (
               <FeedList items={caseItems} className={styles.feed} />
             )}

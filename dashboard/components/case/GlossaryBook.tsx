@@ -6,8 +6,6 @@ import { stringsFor, useLang } from "@/lib/i18n";
 
 import styles from "./GlossaryBook.module.css";
 
-const MAX_ROWS = 6;
-
 function domain(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -17,24 +15,27 @@ function domain(url: string): string {
 }
 
 /**
- * The translation book under the live call: search it in either language, or see
+ * The translation book beside the live call: search it in either language, or see
  * the words the call has used so far, newest first. Each entry says where its
- * translation comes from, so an official USCIS wording reads as one.
+ * translation comes from, so an official USCIS wording reads as one. `flash` marks
+ * the entry the user just picked in the transcript.
  */
 export function GlossaryBook({
   entries,
   seen,
   query,
+  flash,
   onQuery,
 }: {
   entries: GlossaryEntry[];
   seen: GlossaryEntry[];
   query: string;
+  flash: GlossaryEntry | null;
   onQuery: (query: string) => void;
 }) {
   const { lang } = useLang();
   const t = stringsFor(lang).case.live;
-  const rows = (query.trim() ? searchGlossary(entries, query) : seen).slice(0, MAX_ROWS);
+  const rows = query.trim() ? searchGlossary(entries, query) : seen;
 
   return (
     <section className={styles.book} aria-labelledby="book-title">
@@ -55,7 +56,7 @@ export function GlossaryBook({
       {query.trim() && rows.length === 0 && <p className={styles.sub}>{t.none}</p>}
       <ul className={styles.rows}>
         {rows.map((e) => (
-          <li key={e.term} className={styles.row}>
+          <li key={e.term} className={`${styles.row} ${e === flash ? styles.flash : ""}`}>
             <b>{e.translation}</b>
             <span className={styles.term}>{e.term}</span>
             <span className={`${styles.trust} ${styles[e.trust_level]}`}>

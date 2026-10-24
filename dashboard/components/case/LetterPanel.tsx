@@ -20,9 +20,11 @@ const LETTER_HEADS: Record<string, { agency: string[]; form: string; title: stri
 /**
  * Left column of the case view: the letter as a marked-up paper object (the
  * "document-native" detail), then the same facts in plain language with matching
- * numbered pins, the verdict, and masked refs.
+ * numbered pins, the verdict, and masked refs. `compact` (during the call, above the
+ * translation book) keeps only the paper's header, the stamp and the facts: enough
+ * to see which case this is.
  */
-export function LetterPanel({ detail }: { detail: CaseDetail }) {
+export function LetterPanel({ detail, compact = false }: { detail: CaseDetail; compact?: boolean }) {
   const { lang } = useLang();
   const s = useStrings();
   const t = s.case;
@@ -34,7 +36,7 @@ export function LetterPanel({ detail }: { detail: CaseDetail }) {
   const firstChecklistPin = appt?.location ? 3 : 2;
 
   return (
-    <section className={`card ${styles.panel}`} aria-labelledby="letter-title">
+    <section className={`${compact ? styles.compact : "card"} ${styles.panel}`} aria-labelledby="letter-title">
       <div className={styles.top}>
         <div className="label" id="letter-title">
           {t.yourLetter}
@@ -145,7 +147,7 @@ export function LetterPanel({ detail }: { detail: CaseDetail }) {
         ))}
       </ol>
 
-      {detail.verification && (
+      {!compact && detail.verification && (
         <div className={styles.verdict}>
           <span
             className={`pill ${detail.verification.status === "suspicious" ? "bad" : detail.verification.status === "verified" ? "" : "warn"}`}
@@ -164,7 +166,7 @@ export function LetterPanel({ detail }: { detail: CaseDetail }) {
         </div>
       )}
 
-      {detail.refs.length > 0 && (
+      {!compact && detail.refs.length > 0 && (
         <dl className={styles.refs}>
           {detail.refs.map((r) => (
             <div key={r.name}>

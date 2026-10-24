@@ -1,26 +1,24 @@
 .book {
-  flex: none;
-  border-top: 1px solid var(--line);
+  flex: 1;
+  min-height: 0;
   background: var(--sunk);
-  padding: 12px 26px 14px;
+  padding: 12px 16px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-height: 150px;
 }
 
 .head {
   display: flex;
-  align-items: center;
-  gap: 14px;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .search {
-  flex: 1;
   min-width: 0;
   border: 1px solid var(--line-strong);
   background: var(--card);
-  padding: 8px 12px;
+  padding: 9px 12px;
   font: inherit;
   font-size: var(--fs-md);
 }
@@ -37,11 +35,14 @@
 }
 
 .rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 6px;
 }
 
@@ -49,13 +50,23 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0 10px;
-  padding: 8px 10px;
+  padding: 9px 12px;
   background: var(--card);
   border: 1px solid var(--line);
   animation: rise 300ms ease both;
+  transition:
+    background-color 300ms ease,
+    border-color 300ms ease;
+}
+
+/* The entry just picked in the transcript. */
+.flash {
+  background: var(--lime-soft);
+  border-color: var(--forest-2);
 }
 
 .row b {
+  font-size: var(--fs-lg);
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -89,20 +100,4 @@
 
 .machine {
   color: var(--amber);
-}
-
-@media (max-width: 640px) {
-  .book {
-    padding: 12px 16px;
-  }
-
-  .head {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-
-  .rows {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }

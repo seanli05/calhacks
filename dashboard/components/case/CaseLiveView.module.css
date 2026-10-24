@@ -19,6 +19,11 @@
   gap: var(--gap);
 }
 
+/* On the call the side columns hold the book and the tips, so they get a bit more. */
+.onCall {
+  grid-template-columns: minmax(320px, 400px) minmax(0, 1fr) minmax(300px, 390px);
+}
+
 .live {
   display: flex;
   flex-direction: column;
