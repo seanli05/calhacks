@@ -87,13 +87,23 @@ def demo_fast_result(case_id: str) -> dict:
                 "citation": "p1 §II",
             },
         ],
+        "key_dates": [
+            {
+                "type": "appointment",
+                "raw": f"{DEMO_INTERVIEW_DATE:%B} {DEMO_INTERVIEW_DATE.day}, "
+                f"{DEMO_INTERVIEW_DATE.year} at 8:30 AM",
+                "iso": DEMO_INTERVIEW_DATE.isoformat(),
+            }
+        ],
         "key_facts": [
             {
-                "field": "receipt_number",
-                "ref": "<ref:receipt_number>",
-                "citation": "p1",
+                "field": "form_id",
+                "value": "I-797C",
+                "quote": "I-797C, Notice of Action",
+                "page": 1,
             },
-            {"field": "a_number", "ref": "<ref:a_number>", "citation": "p1"},
+            {"field": "receipt_number", "ref": "<ref:receipt_number>", "page": 1},
+            {"field": "a_number", "ref": "<ref:a_number>", "page": 1},
         ],
         "explanation_en": "This is a notice from USCIS scheduling your asylum interview.",
         "urgency": "high",
@@ -103,9 +113,7 @@ def demo_fast_result(case_id: str) -> dict:
 
 
 def demo_brief(case_id: str, brief_id: str) -> dict:
-    """A case brief for the demo call, in the shape of `CaseBrief` in
-    research/models.py (branch research_agent). Provisional: the shared contract is
-    still a dict until persons 3 and 4 agree on the shape.
+    """A case brief for the demo call, as a `CaseBrief` (app.contracts.brief).
 
     Written as research would write it for the real USCIS Contact Center, not from
     the mock line's tree (CLAUDE.md → the mock agency is a test target): the menu

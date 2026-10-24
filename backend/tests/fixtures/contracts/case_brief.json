@@ -1,0 +1,81 @@
+{
+  "brief_id": "brief_7",
+  "case_id": "case_123",
+  "doc_type": "uscis_i797c_asylum_interview",
+  "issuer": "USCIS",
+  "deadline": "2026-11-12",
+  "appointment": {
+    "date": "2026-11-12",
+    "time": "08:30",
+    "location_ref": "<ref:interview_location>",
+    "citation": "p1"
+  },
+  "call_goal_en": "Confirm the asylum interview is still scheduled; ask what to do if the interpreter can't come",
+  "expected_menu_path": [
+    "If offered a language choice, choose English",
+    "Choose the option for an existing case, or for an interview or appointment notice",
+    "If asked for a receipt number, A-Number, or date of birth, don't give it (C35): say the caller doesn't have it, or pick the option for callers without one. Don't stay silent; menus hang up on silence",
+    "If asked why you're calling, state the call goal plainly",
+    "If a choice would commit the applicant to something (such as rescheduling), ask the user first",
+    "Ask for a representative when the menu allows it; hold until a person answers, then bring in the user"
+  ],
+  "questions_to_ask": [
+    "Is the interview on November 12 at 8:30 AM still scheduled?",
+    "If the interpreter can't come, what should the applicant do before the interview?"
+  ],
+  "must_not_do": [
+    "Never give the A-Number, receipt number, or date of birth",
+    "Never discuss the asylum claim"
+  ],
+  "glossary_terms": [
+    "asylum interview",
+    "interpreter",
+    "dependent"
+  ],
+  "facts": [
+    {
+      "field": "receipt_number",
+      "value": null,
+      "ref": "<ref:receipt_number>",
+      "quote": null,
+      "page": 1
+    },
+    {
+      "field": "a_number",
+      "value": null,
+      "ref": "<ref:a_number>",
+      "quote": null,
+      "page": 1
+    },
+    {
+      "field": "interview_location",
+      "value": null,
+      "ref": "<ref:interview_location>",
+      "quote": null,
+      "page": 1
+    }
+  ],
+  "handoff_note": "Calling the USCIS Contact Center to confirm an asylum interview and ask about the interpreter. The applicant answers all identity questions in their own voice once bridged.",
+  "likely_rep_questions": [
+    {
+      "question": "What is the applicant's full name and date of birth?",
+      "answer_source": "user, once bridged"
+    },
+    {
+      "question": "What is the receipt number or A-Number?",
+      "answer_source": "user, once bridged"
+    },
+    {
+      "question": "What is the mailing address on file?",
+      "answer_source": "user, once bridged"
+    }
+  ],
+  "contingencies": [
+    "If the representative asks identity questions before the user joins, say the applicant will answer them and bring the user in",
+    "If the interview was moved, ask for the new date and time",
+    "If the representative says interview questions go to the local asylum office, ask how to contact that office"
+  ],
+  "open_uncertainties": [
+    "Whether the applicant's interpreter is available"
+  ]
+}

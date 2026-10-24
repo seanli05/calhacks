@@ -13,6 +13,8 @@ from app.contracts.common import (
     FactSource,
     LanguageCode,
     MessageId,
+    PhoneE164,
+    Sensitivity,
     UserId,
 )
 
@@ -20,6 +22,9 @@ from app.contracts.common import (
 class ProposedFact(Contract):
     fact: str
     source: FactSource
+    sensitivity: Sensitivity = Sensitivity.NORMAL
+    """Research marks immigration facts `sensitive`; the memory writer holds those
+    until the user consents (C15)."""
 
 
 class ResearchFastJob(Contract):
@@ -33,11 +38,39 @@ class ResearchFastJob(Contract):
     user_note_en: str | None = None
 
 
+class LetterPhone(Contract):
+    number: PhoneE164
+    label: str | None = None
+    quote: str
+
+
+class LegitimacySignals(Contract):
+    """What the deep pass may see of the letter. Never names, case numbers, or the
+    user's address."""
+
+    letterhead: str | None = None
+    sub_agency: str | None = None
+    county: str | None = None
+    return_address: str | None = None
+    phones: list[LetterPhone] = Field(default_factory=list)
+    urls: list[str] = Field(default_factory=list)
+    form_ids: list[str] = Field(default_factory=list)
+    case_number_format: str | None = None
+    """The shape of the case number (e.g. 3 letters + 10 digits), never the value."""
+    payment_instructions: str | None = None
+    signature_block: str | None = None
+
+
 class ResearchDeepJob(Contract):
+    """Queued by the fast pass. It carries the fast pass's signals so the deep pass
+    needs nothing else from the case."""
+
     job: Literal["research_deep"] = "research_deep"
     case_id: CaseId
     user_id: UserId
     document_ids: list[DocumentId]
+    signals: LegitimacySignals = Field(default_factory=LegitimacySignals)
+    call_purpose: str | None = None
 
 
 class CallJob(Contract):
@@ -72,7 +105,23 @@ class GlossaryLookupJob(Contract):
     case_id: CaseId
 
 
+class ResearchQuestionJob(Contract):
+    """A user's factual question, answered from official sources (C38). The
+    orchestrator sends it already in English; with `case_id`, research reads only
+    that case's R1 and refs."""
+
+    job: Literal["research_question"] = "research_question"
+    user_id: UserId
+    case_id: CaseId | None = None
+    question_en: str = Field(min_length=1, max_length=2000)
+
+
 JobPayload = Annotated[
-    ResearchFastJob | ResearchDeepJob | CallJob | MemoryWriteJob | GlossaryLookupJob,
+    ResearchFastJob
+    | ResearchDeepJob
+    | CallJob
+    | MemoryWriteJob
+    | GlossaryLookupJob
+    | ResearchQuestionJob,
     Field(discriminator="job"),
 ]

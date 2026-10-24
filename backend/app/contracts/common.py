@@ -16,6 +16,7 @@ class JobType(StrEnum):
     CALL = "call"
     MEMORY_WRITE = "memory_write"
     GLOSSARY_LOOKUP = "glossary_lookup"
+    RESEARCH_QUESTION = "research_question"
 
 
 class JobStatus(StrEnum):
@@ -77,6 +78,36 @@ class QuestionStatus(StrEnum):
 class FastResultStatus(StrEnum):
     OK = "ok"
     NEEDS_BETTER_IMAGE = "needs_better_image"
+    NEEDS_USER_INPUT = "needs_user_input"
+    """The pages look like different letters; `question_en` asks which one (C39)."""
+
+
+class KeyDateType(StrEnum):
+    NOTICE_DATE = "notice_date"
+    RECEIVED_DATE = "received_date"
+    DEADLINE = "deadline"
+    APPOINTMENT = "appointment"
+    OTHER = "other"
+
+
+class SignalState(StrEnum):
+    """How one legitimacy signal from the letter compared with the official source."""
+
+    MATCH = "match"
+    NOT_FOUND = "not_found"
+    CONFLICT = "conflict"
+    UNCERTAIN = "uncertain"
+
+
+class ResearchQuestionStatus(StrEnum):
+    """Outcome of a `research_question` job (C38). Distinct from `QuestionStatus`,
+    which tracks ask_user questions."""
+
+    ANSWERED = "answered"
+    NOT_CONFIRMED = "not_confirmed"
+    DECLINED_LEGAL_ADVICE = "declined_legal_advice"
+    DECLINED_ASYLUM_CLAIM = "declined_asylum_claim"
+    OUT_OF_SCOPE = "out_of_scope"
 
 
 class Urgency(StrEnum):
@@ -125,7 +156,7 @@ LanguageCode = Annotated[str, StringConstraints(pattern=r"^[a-z]{2}$")]
 
 PhoneE164 = Annotated[str, StringConstraints(pattern=r"^\+[1-9]\d{6,14}$")]
 
-RefPlaceholder = Annotated[str, StringConstraints(pattern=r"^<ref:[a-z_]+>$")]
+RefPlaceholder = Annotated[str, StringConstraints(pattern=r"^<ref:[a-z0-9_]+>$")]
 """A sensitive value's stand-in, resolved within its case via `case_refs` (C11)."""
 
 # Plain aliases with no pattern: Plan.md's examples (`case_123`) are shorter than

@@ -26,6 +26,17 @@ class EventType(StrEnum):
     RESEARCH_FAST_DONE = "research.fast_done"
     RESEARCH_DEEP_STARTED = "research.deep_started"
     RESEARCH_DEEP_DONE = "research.deep_done"
+    RESEARCH_FAST_SLOW = "research.fast_slow"
+    RESEARCH_FAST_FAILED = "research.fast_failed"
+    RESEARCH_DEEP_FAILED = "research.deep_failed"
+    RESEARCH_NEEDS_USER_INPUT = "research.needs_user_input"
+    # The deep pass's step log: debugging only, kept out of the dashboard feed.
+    RESEARCH_SEARCH = "research.search"
+    RESEARCH_FETCH = "research.fetch"
+    RESEARCH_CHECK = "research.check"
+    RESEARCH_QUESTION_STARTED = "research.question_started"
+    RESEARCH_QUESTION_DONE = "research.question_done"
+    RESEARCH_QUESTION_FAILED = "research.question_failed"
 
     VERIFICATION_VERIFIED = "verification.verified"
     VERIFICATION_SUSPICIOUS = "verification.suspicious"

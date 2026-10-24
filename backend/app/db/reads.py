@@ -32,7 +32,7 @@ from app.db.errors import NotFound, UnverifiedNumber
 from app.db.events import from_row
 from app.db.progress import CaseStage, compute_stage
 
-_REF = re.compile(r"^<ref:([a-z_]+)>$")
+_REF = re.compile(r"^<ref:([a-z0-9_]+)>$")
 
 
 async def _get(model: type[Any], key: Any) -> Any:

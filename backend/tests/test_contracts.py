@@ -19,6 +19,7 @@ from app.contracts import (
     AskUserRequest,
     CallJob,
     CallReport,
+    CaseBrief,
     DeepResult,
     Event,
     EventType,
@@ -27,10 +28,13 @@ from app.contracts import (
     GlossaryLookupJob,
     JobPayload,
     JobType,
+    KeyFact,
     MemoryWriteJob,
     ResearchDeepJob,
     ResearchFastJob,
+    ResearchQuestionJob,
 )
+from app.contracts.results import QuestionAnswer
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
 FIXTURES = Path(__file__).parent / "fixtures" / "contracts"
@@ -41,8 +45,11 @@ FIXTURE_MODELS: dict[str, type[BaseModel]] = {
     "call_job": CallJob,
     "memory_write_job": MemoryWriteJob,
     "glossary_lookup_job": GlossaryLookupJob,
+    "research_question_job": ResearchQuestionJob,
     "fast_result": FastResult,
     "deep_result": DeepResult,
+    "question_answer": QuestionAnswer,
+    "case_brief": CaseBrief,
     "call_report": CallReport,
     "ask_user_request": AskUserRequest,
     "ask_user_reply": AskUserReply,
@@ -162,7 +169,7 @@ def test_needs_better_image_needs_only_the_tip() -> None:
 def test_fast_result_refs_must_be_placeholders() -> None:
     """C34: receipt number, A-Number, and location are always refs, never raw values."""
     data = load("fast_result")
-    data["key_facts"][0]["ref"] = "IOE0912345678"
+    data["key_facts"][1]["ref"] = "IOE0912345678"
     with pytest.raises(ValidationError):
         FastResult.model_validate(data)
 
@@ -188,3 +195,71 @@ def test_user_messaging_events_are_the_four_from_p2() -> None:
         EventType.CALL_HUMAN_DETECTED,
         EventType.CALL_USER_UNREACHABLE,
     }
+
+
+def test_key_fact_holds_exactly_one_of_value_or_ref() -> None:
+    with pytest.raises(ValidationError):
+        KeyFact.model_validate({"field": "form_id", "page": 1})
+    with pytest.raises(ValidationError):
+        KeyFact.model_validate(
+            {"field": "a_number", "value": "A1", "ref": "<ref:a_number>", "page": 1}
+        )
+
+
+def test_refd_key_fact_never_quotes_the_letter() -> None:
+    """C11: the quote would hold the sensitive value the ref stands in for."""
+    with pytest.raises(ValidationError):
+        KeyFact.model_validate(
+            {"field": "a_number", "ref": "<ref:a_number>", "quote": "A#", "page": 1}
+        )
+
+
+def test_needs_user_input_requires_a_question() -> None:
+    data = {"case_id": "case_123", "status": "needs_user_input"}
+    with pytest.raises(ValidationError):
+        FastResult.model_validate(data)
+    result = FastResult.model_validate({**data, "question_en": "Which letter first?"})
+    assert result.status is FastResultStatus.NEEDS_USER_INPUT
+
+
+def test_appointment_may_have_only_a_date() -> None:
+    data = load("fast_result")
+    data["appointment"] = {"date": "2026-11-18", "citation": "p1"}
+    assert FastResult.model_validate(data).appointment.time is None
+
+
+def test_suspicious_letter_has_no_brief() -> None:
+    data = load("deep_result")
+    data["verification"]["status"] = "suspicious"
+    data.update(call_recommended=False, brief_id=None)
+    assert DeepResult.model_validate(data).brief_id is None
+
+
+def test_call_recommended_needs_a_verified_number() -> None:
+    """Rule 2: research never recommends a call it couldn't dial."""
+    data = load("deep_result")
+    data["verification"]["status"] = "unknown"
+    data["call_recommended"] = True
+    with pytest.raises(ValidationError):
+        DeepResult.model_validate(data)
+
+
+def test_brief_must_keep_the_required_must_not_do() -> None:
+    """C34, C35: the agent never gives identifiers or discusses the claim."""
+    data = load("case_brief")
+    data["must_not_do"] = ["Be polite"]
+    with pytest.raises(ValidationError):
+        CaseBrief.model_validate(data)
+
+
+def test_answered_question_needs_sources() -> None:
+    data = load("question_answer")
+    with pytest.raises(ValidationError):
+        QuestionAnswer.model_validate({**data, "sources": []})
+
+
+def test_declined_question_carries_no_answer() -> None:
+    with pytest.raises(ValidationError):
+        QuestionAnswer.model_validate(
+            {"status": "declined_legal_advice", "answer_en": "You should appeal."}
+        )
