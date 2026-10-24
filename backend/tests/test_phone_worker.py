@@ -44,7 +44,15 @@ from app.phone.llm import LlmError
 from app.phone.menu import MenuDecision, PressAction, WaitAction
 from app.phone.phase import PhaseJudgment
 from app.phone.report import ReportDraft
-from app.phone.worker import PhoneDeps, PhoneWorker, handle_call_job
+from app.phone.twilio_line import TwilioTelephony
+from app.phone.worker import (
+    PhoneDeps,
+    PhoneWorker,
+    handle_call_job,
+    missing_settings,
+    twilio_lines,
+)
+from app.settings import Settings
 from pydantic import BaseModel
 from sqlalchemy.exc import OperationalError
 
@@ -413,3 +421,39 @@ async def test_worker_claims_calls_and_survives_a_failed_claim(
 
 def _raise_db_error() -> tables.Job | None:
     raise OperationalError("select", {}, ConnectionError("db down"))
+
+
+# Wiring into the app
+
+
+def _live_settings(**overrides: str) -> Settings:
+    values = {
+        "anthropic_api_key": "fake",
+        "twilio_account_sid": "ACfake",
+        "twilio_auth_token": "fake",
+        "twilio_agent_number": "+15555550100",
+        "cartesia_api_key": "fake",
+        "cartesia_agent_voice_id": "voice_fake",
+        "public_base_url": "https://agent.example.test",
+    }
+    return Settings(_env_file=None, **(values | overrides))  # type: ignore[call-arg]
+
+
+def test_missing_settings_names_each_env_var() -> None:
+    assert missing_settings(_live_settings()) == []
+    missing = missing_settings(_live_settings(public_base_url="", twilio_auth_token=""))
+    assert missing == ["TWILIO_AUTH_TOKEN", "PUBLIC_BASE_URL"]
+
+
+def test_phone_worker_is_off_by_default() -> None:
+    """Only the deployed backend claims jobs on the shared database."""
+    assert Settings(_env_file=None).phone_worker is False  # type: ignore[call-arg]
+
+
+def test_twilio_lines_makes_a_fresh_line_per_call_in_the_jobs_language() -> None:
+    lines = twilio_lines(_live_settings())
+    first, second = lines(_call_job()), lines(_call_job())
+
+    assert isinstance(first, TwilioTelephony)
+    assert first is not second
+    assert first._user_language == "es"

@@ -13,7 +13,9 @@ a report, so its job is `done` with that outcome. A job is `failed` only when
 there's no report: the payload didn't parse, or the call couldn't be created or
 its report saved.
 
-Not started by `main.py` yet: there's no real `Telephony` adapter until Phase 2.
+`main.py` starts it when `PHONE_WORKER` is true and the live-call settings are
+set (`missing_settings`). Only the deployed backend runs it on the shared database,
+and never beside the dev fake phone, which claims the same jobs.
 """
 
 import asyncio
@@ -37,6 +39,7 @@ from app.phone.adapters import (
     DbCallStore,
     DbCaseReader,
     DbEventLog,
+    DbNumberSource,
     RelayAskUser,
     load_blocked_values,
 )
@@ -55,6 +58,10 @@ from app.phone.ports import (
 from app.phone.report import LlmReportBuilder
 from app.phone.report_llm import AnthropicReportClient
 from app.phone.runner import RunnerConfig, run_call
+from app.phone.twilio_line import TwilioTelephony
+from app.phone.twilio_rest import TwilioCalls
+from app.phone.twilio_urls import LineUrls
+from app.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +70,21 @@ POLL_S = 1.0
 type LineFactory = Callable[[CallJob], Telephony]
 """A new, undialed line for one call. The worker wraps it in `GuardedTelephony`."""
 type BlockedValues = Callable[[CaseId], Awaitable[list[str]]]
+
+LIVE_CALL_SETTINGS = (
+    "anthropic_api_key",
+    "twilio_account_sid",
+    "twilio_auth_token",
+    "twilio_agent_number",
+    "cartesia_api_key",
+    "cartesia_agent_voice_id",
+    "public_base_url",
+)
+
+
+def missing_settings(settings: Settings) -> list[str]:
+    """The env vars a real call needs that aren't set."""
+    return [name.upper() for name in LIVE_CALL_SETTINGS if not getattr(settings, name)]
 
 
 @dataclass
@@ -194,11 +216,29 @@ class PhoneWorker:
             )
 
 
-def real_deps(line_factory: LineFactory) -> PhoneDeps:
-    """The live clients and DB adapters around a real line. Needs
-    ANTHROPIC_API_KEY; the line comes with Phase 2."""
+def twilio_lines(settings: Settings) -> LineFactory:
+    """A new Twilio line per call. It dials only `official_dial_number` (rule 2,
+    with C40's demo swap inside it), and its join gate speaks the job's language."""
+    numbers = DbNumberSource()
+    calls = TwilioCalls(settings)
+    urls = LineUrls.from_settings(settings)
+
+    def line(job: CallJob) -> Telephony:
+        return TwilioTelephony(numbers, calls, urls, user_language=job.user_language)
+
+    return line
+
+
+def real_deps(settings: Settings) -> PhoneDeps:
+    """The live clients and DB adapters around real Twilio lines. Check
+    `missing_settings` first; `close_deps` closes them on shutdown."""
     return PhoneDeps(
-        line_factory=line_factory,
+        line_factory=twilio_lines(settings),
         menu_llm=AnthropicLlmClient(),
         report_llm=AnthropicReportClient(),
     )
+
+
+async def close_deps(deps: PhoneDeps) -> None:
+    if isinstance(deps.report_llm, AnthropicReportClient):
+        await deps.report_llm.close()

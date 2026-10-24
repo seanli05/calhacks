@@ -82,6 +82,11 @@ class Settings(BaseSettings):
     # Run the memory writer's job worker in this process (needs ANTHROPIC_API_KEY).
     memory_worker: bool = True
 
+    # Run the phone agent's job worker in this process: it places real calls. Off by
+    # default: only the deployed backend claims jobs on the shared database, and the
+    # dev fake phone (POST /dev/fake-phone) must not run beside it.
+    phone_worker: bool = False
+
     @field_validator("demo_dial_number")
     @classmethod
     def _e164(cls, value: str) -> str:

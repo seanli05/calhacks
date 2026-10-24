@@ -121,6 +121,8 @@ To play the line yourself, run the playground from `backend/`: `python -m app.ph
 
 The real phone line (Twilio + Pipecat + Cartesia) lives in the backend as routes under `/phone/calls/{call_id}/`: the agency leg's `status` and `stream`, and for the bridge the applicant leg's `user/status`, `user/joined` and `user/missed`, plus the listen-only `fork/{speaker}` streams. A live call needs ngrok and `PUBLIC_BASE_URL` like WhatsApp does, plus `CARTESIA_API_KEY` and `CARTESIA_AGENT_VOICE_ID` (any Cartesia voice). How it works: [docs/specs/phone-ports.md → The real line](docs/specs/phone-ports.md#the-real-line-phase-2) and [→ The bridge](docs/specs/phone-ports.md#the-bridge-phase-3).
 
+For real calls from WhatsApp, the backend runs the phone agent's job worker (`phone/worker.py`): it claims the `call` jobs the orchestrator queues after a YES, places each call, and finishes the job with the call report. It starts only when `PHONE_WORKER=true` (default false) and the vars above plus `ANTHROPIC_API_KEY` are set; the startup log names any that are missing. Only the deployed backend turns it on against the shared database (it places real calls; keep `DEMO_DIAL_NUMBER` set for rehearsals), and never together with the dev fake phone, which claims the same jobs.
+
 To place a live test call (`phone/smoke.py`):
 
 1. Stop the backend: the smoke test serves the phone routes itself, on `--port` (default 8000).
