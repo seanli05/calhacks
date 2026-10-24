@@ -1,0 +1,96 @@
+.actions {
+  --a-fg: var(--ink);
+  --a-muted: var(--faint);
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.dark {
+  --a-fg: #fff;
+  --a-muted: #9dbbac;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.big {
+  font-size: var(--fs-lg);
+  padding: 14px 22px;
+}
+
+.ghost {
+  background: transparent;
+  color: var(--a-fg);
+  border-color: currentColor;
+}
+
+.dark :global(.btn.primary) {
+  background: var(--lime);
+  border-color: var(--lime);
+  color: var(--forest);
+}
+
+.dark .ghost:hover {
+  border-color: var(--lime);
+}
+
+.scan {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.qr {
+  padding: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  flex: none;
+}
+
+.qr svg {
+  display: block;
+}
+
+.scanText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--a-fg);
+}
+
+.scanLabel {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+.then {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--a-muted);
+}
+
+.code {
+  align-self: flex-start;
+  margin: 0;
+  padding: 3px 10px;
+  background: var(--lime-soft);
+  color: var(--forest);
+  font-size: var(--fs-md);
+}
+
+/* You can't scan your own screen: on a phone the button is the way in. */
+@media (max-width: 640px) {
+  .scan {
+    display: none;
+  }
+
+  .buttons > * {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}

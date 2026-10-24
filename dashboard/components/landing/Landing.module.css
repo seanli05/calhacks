@@ -1,48 +1,40 @@
 .page {
   min-height: 100vh;
-  max-width: 1880px;
+}
+
+.wrap {
+  max-width: 1600px;
   margin: 0 auto;
   padding-left: max(20px, env(safe-area-inset-left, 0px));
   padding-right: max(20px, env(safe-area-inset-right, 0px));
-  /* Room for the fixtures bar. */
-  padding-bottom: 80px;
 }
 
-.main {
-  max-width: 1320px;
-  margin: 0 auto;
-  padding-top: clamp(40px, 9vh, 120px);
-  display: flex;
-  flex-direction: column;
-  gap: clamp(48px, 9vh, 104px);
-}
-
+/* The hero fills the first screen at 1080p, so the fold lands on the feature rows. */
 .hero {
+  min-height: calc(100vh - var(--header-h));
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 600px);
   align-items: center;
-  gap: 56px;
+  gap: clamp(40px, 5vw, 96px);
+  padding-top: 40px;
+  padding-bottom: 72px;
 }
 
 .copy {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 22px;
+  gap: 28px;
   animation: rise 500ms ease-out both;
 }
 
 .headline {
   margin: 0;
-  font-size: clamp(40px, 4.6vw, 84px);
+  font-size: clamp(44px, 4.6vw, 88px);
   font-weight: 650;
   line-height: 1.02;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.04em;
   text-wrap: balance;
-}
-
-.headline span {
-  display: inline;
 }
 
 .sub {
@@ -50,191 +42,36 @@
   font-size: var(--fs-xl);
   line-height: 1.4;
   color: var(--muted);
-  max-width: 40ch;
+  max-width: 42ch;
 }
 
-.cta {
-  font-size: var(--fs-lg);
-  padding: 12px 20px;
-  margin-top: 6px;
+.demo {
+  /* Room for the lime offset behind the card. */
+  padding: 0 14px 14px 0;
+  animation: rise 500ms 150ms ease-out both;
 }
 
-.try {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
-  padding: 24px 24px 22px;
-  width: 300px;
-  animation: rise 500ms 120ms ease-out both;
+.section {
+  padding-top: clamp(72px, 12vh, 140px);
+  padding-bottom: clamp(72px, 12vh, 140px);
+  border-top: 1px solid var(--line);
 }
 
-.qr {
-  width: 232px;
-  height: 232px;
-  background: var(--sunk);
-}
-
-.qr svg {
-  display: block;
-}
-
-.tryText {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  text-align: center;
-}
-
-.scan {
-  margin: 0;
-  font-size: var(--fs-lg);
-  font-weight: 600;
-}
-
-.then {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--faint);
-}
-
-.code {
-  margin: 0;
-  padding: 4px 10px;
-  background: var(--lime-soft);
-  color: var(--forest);
-  font-size: var(--fs-md);
-}
-
-.phone {
-  display: none;
-  margin-top: 6px;
-}
-
-.steps {
-  margin: 14px 0 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border-top: 1px solid var(--line-strong);
-}
-
-.step {
-  position: relative;
-  padding: 26px 32px 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.num {
-  position: absolute;
-  top: -15px;
-  left: 0;
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  background: var(--forest);
-  color: #fff;
-  font-weight: 700;
-  font-size: var(--fs-md);
-}
-
-.step:first-child .num {
-  background: var(--lime);
-  color: var(--forest);
-}
-
-.step h2 {
-  margin: 10px 0 0;
-  font-size: var(--fs-xl);
-  font-weight: 650;
-  letter-spacing: -0.015em;
-  line-height: 1.2;
-}
-
-.step p {
-  margin: 0;
-  font-size: var(--fs-lg);
-  color: var(--muted);
-  max-width: 34ch;
-}
-
-.privacy {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: var(--fs-md);
-  color: var(--faint);
-}
-
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .hero {
     grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding-top: 28px;
+    padding-bottom: 48px;
     gap: 36px;
   }
 
-  .try {
-    width: 100%;
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-start;
-  }
-
-  .tryText {
-    align-items: flex-start;
-    text-align: left;
-  }
-}
-
-/* On a phone the QR is useless (you can't scan your own screen): lead with the button. */
-@media (max-width: 640px) {
-  .main {
-    padding-top: 32px;
-  }
-
-  .try {
-    flex-direction: column;
-    align-items: stretch;
-    padding: 18px 16px;
-  }
-
-  .qr {
-    display: none;
-  }
-
-  .phone {
-    display: inline-flex;
-    justify-content: center;
-    background: var(--forest);
-    border-color: var(--forest);
-    color: #fff;
-    font-size: var(--fs-md);
-    padding: 12px 16px;
-  }
-
-  .steps {
-    grid-template-columns: minmax(0, 1fr);
-    border-top: 0;
-    border-left: 1px solid var(--line-strong);
-    margin-left: 15px;
-    gap: 28px;
-  }
-
-  .step {
-    padding: 0 0 0 30px;
-  }
-
-  .num {
-    top: 0;
-    left: -15px;
-  }
-
-  .step h2 {
-    margin-top: 2px;
+  .sub {
+    font-size: var(--fs-lg);
   }
 }

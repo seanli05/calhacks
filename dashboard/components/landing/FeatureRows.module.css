@@ -1,0 +1,259 @@
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(72px, 12vh, 140px);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  align-items: center;
+  gap: clamp(32px, 6vw, 112px);
+}
+
+.flip .copy {
+  order: 2;
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kicker {
+  margin: 0;
+  font-family: var(--font-code);
+  font-size: var(--fs-md);
+  color: var(--forest-2);
+}
+
+.copy h2 {
+  margin: 0;
+  font-size: clamp(32px, 3vw, 56px);
+  font-weight: 650;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.body {
+  margin: 0;
+  font-size: var(--fs-xl);
+  line-height: 1.45;
+  color: var(--muted);
+  max-width: 38ch;
+}
+
+/* Every picture sits on the same sunk panel, so the three rows read as one set. */
+.visual {
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  padding: clamp(28px, 4vw, 56px);
+  min-height: 340px;
+  display: grid;
+  place-items: center;
+}
+
+/* 1. Explain */
+.chat {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.photo {
+  align-self: flex-end;
+  padding: 8px;
+  background: var(--lime-soft);
+  border: 1px solid var(--line);
+}
+
+.reply {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 18px 20px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  max-width: 440px;
+}
+
+.replyText {
+  margin: 0;
+  font-size: var(--fs-xl);
+  line-height: 1.35;
+}
+
+.replyEn {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--faint);
+}
+
+/* 2. Verify */
+.verify {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.verdict {
+  align-self: flex-start;
+  font-size: var(--fs-md);
+  padding: 6px 12px;
+  margin-bottom: 4px;
+}
+
+.number {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+}
+
+.badge {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+}
+
+.good .badge {
+  background: var(--lime);
+  color: var(--forest);
+}
+
+.bad {
+  background: var(--coral-soft);
+  border-color: transparent;
+}
+
+.bad .badge {
+  background: var(--coral);
+  color: #fff;
+}
+
+.numLabel {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--faint);
+}
+
+.num {
+  display: block;
+  font-size: var(--fs-xl);
+  color: var(--ink);
+}
+
+.bad .num {
+  text-decoration: line-through;
+  text-decoration-color: var(--coral);
+  color: var(--muted);
+}
+
+.note {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--forest);
+}
+
+.bad .note {
+  color: var(--coral);
+}
+
+/* 3. Hold */
+.hold {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.waited {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bigTime {
+  font-size: clamp(64px, 6vw, 112px);
+  font-weight: 650;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.answered {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  background: var(--forest);
+  color: #fff;
+}
+
+.answered strong {
+  display: block;
+  font-size: var(--fs-xl);
+  font-weight: 650;
+}
+
+.answered span span {
+  color: #cfe3d8;
+}
+
+.ringSmall {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--lime);
+  color: var(--forest);
+}
+
+@media (max-width: 900px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .flip .copy {
+    order: 0;
+  }
+
+  .visual {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .visual {
+    padding: 20px 16px;
+  }
+
+  .number {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .badge {
+    width: 36px;
+    height: 36px;
+  }
+
+  .note {
+    grid-column: 2;
+  }
+}
