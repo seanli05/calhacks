@@ -16,8 +16,18 @@ from typing import TYPE_CHECKING, Any
 
 from anthropic import beta_async_tool
 from anthropic.lib.tools import BetaAsyncFunctionTool
+from pydantic import ValidationError
 
-from app.contracts import Component, Event, EventType, FactStatus
+from app.contracts import (
+    CallReport,
+    Component,
+    Event,
+    EventType,
+    FactStatus,
+    FastResult,
+    FastResultStatus,
+    Verification,
+)
 from app.contracts.common import CaseId
 from app.db import reads, tables
 from app.db.events import append_event
@@ -37,6 +47,9 @@ logger = logging.getLogger(__name__)
 # R1 fields the orchestrator may explain; `proposed_facts` and `key_facts` values
 # aren't the user's to read here.
 _LETTER_FIELDS = ("doc_type", "issuer", "deadline", "what_is_asked", "urgency")
+# In place of stored data that no longer validates (rows from before a contract
+# change): the turn goes on without it.
+NOT_AVAILABLE = "not available"
 
 
 class CaseTools:
@@ -78,7 +91,7 @@ class CaseTools:
             {
                 "case_id": case.id,
                 "stage": str(await reads.case_progress(case.id)),
-                "letter": _letter(case.fast_result),
+                "letter": _letter(case),
                 "verification": _verification(verification),
                 "last_call": _call(calls[-1]) if calls else None,
             }
@@ -252,28 +265,29 @@ def build_tools(tools: CaseTools) -> list[BetaAsyncFunctionTool[Any]]:
     ]
 
 
-def _letter(fast_result: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not fast_result:
+def _letter(case: tables.Case) -> dict[str, Any] | str | None:
+    if not case.fast_result:
         return None
-    if fast_result.get("status") == "needs_better_image":
-        return {"status": "needs_better_image", "tip": fast_result.get("image_issue")}
-    letter = {field: fast_result.get(field) for field in _LETTER_FIELDS}
-    letter["explanation"] = fast_result.get("explanation_en")
-    appointment = fast_result.get("appointment")
-    if appointment:
+    try:
+        result = FastResult.model_validate(case.fast_result)
+    except ValidationError:
+        logger.exception("Bad stored R1 case_id=%s", case.id)
+        return NOT_AVAILABLE
+    if result.status == FastResultStatus.NEEDS_BETTER_IMAGE:
+        return {"status": str(result.status), "tip": result.image_issue}
+    letter = result.model_dump(mode="json", include=set(_LETTER_FIELDS))
+    letter["explanation"] = result.explanation_en
+    if result.appointment is not None:
         letter["appointment"] = {
-            "date": appointment.get("date"),
-            "time": appointment.get("time"),
-            "location": appointment.get("location_ref"),
+            "date": result.appointment.date.isoformat(),
+            "time": result.appointment.time,
+            "location": result.appointment.location_ref,
         }
     letter["checklist"] = [
-        {"kind": item.get("kind"), "item": item.get("item")}
-        for item in fast_result.get("checklist_en", [])
+        {"kind": str(item.kind), "item": item.item} for item in result.checklist_en
     ]
     letter["identifiers_on_letter"] = [
-        fact.get("field")
-        for fact in fast_result.get("key_facts", [])
-        if fact.get("ref")
+        fact.field for fact in result.key_facts if fact.ref
     ]
     return letter
 
@@ -281,20 +295,40 @@ def _letter(fast_result: dict[str, Any] | None) -> dict[str, Any] | None:
 def _verification(row: tables.Verification | None) -> dict[str, Any]:
     if row is None:
         return {"status": "pending"}
-    result = row.result or {}
-    return {"status": str(row.status), "red_flags": result.get("red_flags", [])}
+    try:
+        result = Verification.model_validate(row.result)
+    except ValidationError:
+        logger.exception("Bad stored verification case_id=%s", row.case_id)
+        return {"status": str(row.status), "red_flags": NOT_AVAILABLE}
+    return {"status": str(row.status), "red_flags": result.red_flags}
 
 
 def _call(call: tables.Call) -> dict[str, Any]:
     """The call's state and, once it has ended, what the report says to tell the
     user (P3)."""
-    report = call.report or {}
-    return {
-        "state": str(call.state),
-        "outcome": report.get("outcome"),
-        "reference_number": report.get("reference_number"),
-        "next_steps": report.get("next_steps_en", []),
-        "new_deadlines": report.get("new_deadlines", []),
+    status: dict[str, Any] = {"state": str(call.state)}
+    if call.report is None:
+        return status | {
+            "outcome": None,
+            "reference_number": None,
+            "next_steps": [],
+            "new_deadlines": [],
+        }
+    try:
+        report = CallReport.model_validate(call.report)
+    except ValidationError:
+        logger.exception(
+            "Bad stored call report case_id=%s call_id=%s job_id=%s",
+            call.case_id,
+            call.id,
+            call.job_id,
+        )
+        return status | {"report": NOT_AVAILABLE}
+    return status | {
+        "outcome": str(report.outcome),
+        "reference_number": report.reference_number,
+        "next_steps": report.next_steps_en,
+        "new_deadlines": [d.isoformat() for d in report.new_deadlines],
     }
 
 

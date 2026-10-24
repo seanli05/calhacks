@@ -216,6 +216,23 @@ async def test_needs_user_input_asks_research_question_and_waits(
     assert not verdicts.is_watching("case_1")
 
 
+async def test_research_question_survives_a_payload_that_no_longer_validates(
+    db: FakeDB, letter_results: LetterResults
+) -> None:
+    user = await use_spanish(db)
+    result = FastResult(
+        case_id="case_1", status="needs_user_input", question_en="Which letter first?"
+    )
+    job = await finished_fast_job(db, user, "case_1", result)
+    job.payload = {"job": "research_fast", "document_ids": ["doc_1"]}
+
+    await letter_results.fast_done(job)
+
+    assert db.messages[-1].body_en == "Which letter first?"
+    question = letter_results.question(user.id)
+    assert question is not None and question.document_ids == []
+
+
 # R2 (6.2)
 
 
@@ -392,6 +409,24 @@ async def test_request_consent_tool_only_asks(
     assert tools.consent_requested  # the turn sends no reply of its own
     assert db.outbound_templates() == ["consent.request"]
     assert db.jobs_of(JobType.CALL) == []
+
+
+async def test_consent_request_survives_rows_that_no_longer_validate(
+    db: FakeDB, consent: ConsentGate
+) -> None:
+    """A brief or R1 written before a contract change: the generic request, to
+    USCIS, and the YES still works."""
+    user = await use_spanish(db)
+    case = db.add_verified_case(user)
+    case.fast_result = {"status": "ok", "issuer": "Asylum Office"}
+    db.briefs[case.id].brief = {"call_goal_en": "Confirm the interview is still on"}
+
+    assert await consent.request(user, case.id) is None
+
+    assert db.outbound_templates() == ["consent.request_generic"]
+    [requested] = [e for e in db.events if e.type == EventType.CONSENT_REQUESTED]
+    assert requested.data == {"agency": "USCIS"}
+    assert consent.pending(user.id) is not None
 
 
 # The post-call summary (6.4)

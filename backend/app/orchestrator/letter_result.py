@@ -17,9 +17,9 @@ from dataclasses import dataclass
 
 from pydantic import ValidationError
 
-from app.contracts import ChecklistKind, FastResult, FastResultStatus
+from app.contracts import ChecklistKind, FastResult, FastResultStatus, ResearchFastJob
 from app.contracts.common import CaseId, DocumentId, LanguageCode, UserId
-from app.db import reads, tables
+from app.db import jobs, reads, tables
 from app.orchestrator.dates import format_date, format_time
 from app.orchestrator.verdicts import Verdicts
 from app.relay.outbound import send_template, send_text
@@ -181,7 +181,7 @@ class LetterResults:
         The verdict isn't watched yet: research hasn't read the letter."""
         question_en = result.question_en or ""
         question = await self._localize(question_en, user.language or "en")
-        document_ids = list((job.payload or {}).get("document_ids", []))
+        document_ids = _document_ids(job)
         self._questions[user.id] = LetterQuestion(result.case_id, document_ids)
         try:
             if question:
@@ -210,6 +210,24 @@ class LetterResults:
         if not text_en:
             return ""
         return await localize(self._translator, text_en, language)
+
+
+def _document_ids(job: tables.Job) -> list[DocumentId]:
+    """The fast job's documents, or none if its stored payload no longer validates
+    (the user's answer then re-runs the pass without them)."""
+    try:
+        payload = jobs.payload_of(job)
+    except ValidationError:
+        logger.exception(
+            "Bad fast job payload case_id=%s job_id=%s", job.case_id, job.id
+        )
+        return []
+    if not isinstance(payload, ResearchFastJob):
+        logger.error(
+            "Not a fast job case_id=%s job_id=%s: %s", job.case_id, job.id, payload.job
+        )
+        return []
+    return list(payload.document_ids)
 
 
 def _join(*parts: str | None) -> str:

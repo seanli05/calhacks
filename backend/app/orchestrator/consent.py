@@ -25,9 +25,11 @@ from app.contracts import (
     CallJob,
     CallOutcome,
     CallReport,
+    CaseBrief,
     Component,
     Event,
     EventType,
+    FastResult,
     JobStatus,
     MessageDirection,
     VerificationStatus,
@@ -49,6 +51,7 @@ logger = logging.getLogger(__name__)
 
 # H2's example value; Plan.md → Failure rules: past this, hang up and report failed.
 MAX_HOLD_MINUTES = 60
+DEFAULT_AGENCY = "USCIS"
 
 
 @dataclass(frozen=True)
@@ -90,7 +93,7 @@ class ConsentGate:
         brief = await reads.latest_brief(case_id)
         if brief is None:
             return "The call plan isn't ready yet."
-        goal_en = goal_en or brief.brief.get("call_goal_en")
+        goal_en = goal_en or _call_goal_en(brief)
         language = user.language or "en"
         goal = await localize(self._translator, goal_en, language) if goal_en else None
         if goal is not None and goal_en is not None:
@@ -112,7 +115,7 @@ class ConsentGate:
             user.id,
             case_id,
             "Asked the user for permission to call",
-            agency=(case.fast_result or {}).get("issuer") or "USCIS",
+            agency=_agency(case),
         )
         logger.info("Consent requested user_id=%s case_id=%s", user.id, case_id)
         return None
@@ -243,6 +246,30 @@ class ConsentGate:
             await send_template(
                 self._whatsapp, user, "summary.suggest_close", case_id=case_id
             )
+
+
+def _call_goal_en(brief: tables.CaseBrief) -> str | None:
+    """The brief's call goal, or None (the generic request) if the stored brief no
+    longer validates."""
+    try:
+        return CaseBrief.model_validate(brief.brief).call_goal_en
+    except ValidationError:
+        logger.exception(
+            "Bad stored brief case_id=%s brief_id=%s", brief.case_id, brief.id
+        )
+        return None
+
+
+def _agency(case: tables.Case) -> str:
+    """Who the call is to, from R1; USCIS if R1 is missing or no longer validates."""
+    if case.fast_result is None:
+        return DEFAULT_AGENCY
+    try:
+        issuer = FastResult.model_validate(case.fast_result).issuer
+    except ValidationError:
+        logger.exception("Bad stored R1 case_id=%s", case.id)
+        return DEFAULT_AGENCY
+    return issuer or DEFAULT_AGENCY
 
 
 def _is_yes_to(
