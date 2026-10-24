@@ -8,15 +8,23 @@ Context for a conversation about finishing task C: what happens next, what perso
 - Speed is done. The case page loads in about 1.0s (it was 4.2s), after concurrent reads and a connection-pool fix in `backend/app/db/engine.py`.
 - Deployment steps are in the README ("Deploying for the demo").
 - Fixed today: the hold timer would have reset every time the phone agent repeated `call.on_hold`; it now counts from the first one. The landing page no longer scrolls sideways or leaves empty space at the bottom.
-- Not on `main` yet: the phone agent (person 4), research on the contract models (person 3, on branch `research_agent`), the orchestrator's Claude turn, translation, and the memory writer (person 2).
+- Landed later on Oct 24:
+  - person 4's call state machine (`phone/state.py`) and menu decider (`phone/menu.py`), but not yet the part that places the call, waits on hold, bridges the user and writes the report;
+  - person 2's orchestrator now queues research for each letter, plus `/dev/fake-research`.
+- Not on `main` yet:
+  - the rest of the phone agent;
+  - research on the contract models (person 3, on branch `research_agent`);
+  - the orchestrator's Claude turn, translation and the memory writer (person 2).
 
 ## The two questions
 
 **Does making live data the default mean we start practice runs?** No, they're separate.
 - "Live default" (item 2) only changes what `npm run dev` shows when no setting is given: the real database instead of fake data. It's a 10-minute change and starts nothing.
-- Practice runs can already happen today, two ways:
-  1. **Fake call:** person 2's `POST /dev/fake-call` plays a scripted call (dialing, menu, a real WhatsApp question, hold, a person answers, the call ends) through the real tables. It sends real WhatsApp messages to the number you give it. Watch it on the dashboard with `NEXT_PUBLIC_DATA=live`. Good for checking that the case view moves and the feed reads well, without the phone agent.
-  2. **Real call (item 6):** only once person 4's phone agent is on `main`.
+- Practice runs can already happen today, with person 2's dev stand-ins. Turn them on with `DEV_ENDPOINTS=true`, run the backend, and watch with `NEXT_PUBLIC_DATA=live`. Use your own Neon branch, not the shared database.
+  1. **Fake research:** `POST /dev/fake-research` finishes research jobs from the contract fixtures. Send a letter photo on WhatsApp and the case appears on the dashboard: explanation, verdict, brief, masked refs. It takes research jobs from the shared queue, so don't run it while person 3's real research worker is running.
+  2. **Fake call:** `POST /dev/fake-call` plays a scripted call through the real tables: dialing, menu, a real WhatsApp question, hold, a person answers, the call ends. It sends real WhatsApp messages to the number you give it. It makes its own throwaway case and closes it at the end, so open that case's page while it runs.
+  3. **Real call (item 6):** once person 4's call runner is on `main`.
+  - Runs 1 and 2 together cover the whole demo except the real call, without persons 3 and 4. That's the best practice run available now.
 
 **Is everything above the data layer done, so that correct data means a correct dashboard?** Yes, with one caveat.
 - The dashboard reads only the database and has no logic tied to any other component. If each component writes its rows through its writer module with the contract models, the pages show it.
@@ -43,7 +51,7 @@ The real order:
 2. Each person's agent checks their component against it while they build.
 3. Merge.
 4. Reset the database (item 5).
-5. Rehearse with a fake call first, then a real one (item 6).
+5. Rehearse with fake research plus the fake call first (possible now), then a real call (item 6).
 6. Fix whatever looked wrong.
 7. Reset again, then record.
 8. Run the final checks (item 7).
@@ -61,11 +69,11 @@ What each person's agent will find, so you can talk it through with them:
   - the `consent.requested` event with `agency`;
   - `memory.fact_*` events with `fact_id`, once the memory writer exists;
   - the translation interface (decision below).
-- **Person 3 (research).** The biggest integration risk. Their branch uses its own models instead of `app.contracts`, so nothing they produce shows up until they write R1, the verification and the brief through `writes.research` with the contract models. They also need:
+- **Person 3 (research).** The biggest integration risk. Their branch uses its own models instead of `app.contracts`, so nothing they produce shows up until they write R1, the verification and the brief through `writes.research` with the contract models. `app/dev/fake_research.py` already writes exactly what the dashboard reads, so it's a working example to match. They also need:
   - the brief keys `call_goal_en` and `questions_to_ask`;
   - the official URL first in `evidence`;
   - sensitive values through `put_ref`.
-- **Person 4 (phone).** Mostly the order of states and the events:
+- **Person 4 (phone).** The state machine on `main` already guarantees the order of states. What's left is the call runner writing the right things:
   - `human_detected` set at once when a person answers;
   - `call.on_hold` when hold starts (repeats are fine);
   - `call.ended` with `minutes`;
