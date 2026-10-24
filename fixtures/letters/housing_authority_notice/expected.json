@@ -1,0 +1,29 @@
+{
+  "status": "ok",
+  "issuer_contains": [
+    "Oakland Housing"
+  ],
+  "deadline": "2026-11-04",
+  "appointment_date": "2026-11-04",
+  "appointment_time": "10:00",
+  "url_domains": [
+    "oakha.org"
+  ],
+  "phones_e164": [
+    "+15105550163"
+  ],
+  "checklist_min": {
+    "who_must_come": 1,
+    "bring": 2
+  },
+  "sensitive_fields": [
+    "interview_location"
+  ],
+  "forbidden_strings": [
+    "T-0098812",
+    "0098812",
+    "ROSA PRUEBA MUESTRA",
+    "455 TEST BLVD UNIT 12"
+  ],
+  "payment_instructions_present": false
+}
