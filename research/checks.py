@@ -248,3 +248,63 @@ def name_on_page(name: str, html: str) -> bool:
     needle = " ".join(name.lower().replace("&", "and").split())
     haystack = text_of(html).lower().replace("&", "and")
     return bool(needle) and needle in haystack
+
+
+def _heading_level(tag_name: str | None) -> int | None:
+    match = re.fullmatch(r"h([1-6])", tag_name or "")
+    return int(match.group(1)) if match else None
+
+
+def registry_entry(html: str, name: str, require: str | None = None) -> str | None:
+    """HTML of the entry for `name` on a list page with one heading per entry.
+
+    The entry runs from the first heading containing `name` (as whole words) to
+    the next heading of the same or a higher level; with `require`, the first
+    such entry that also contains it. None if no entry qualifies, so nothing
+    from another entry on the page can be attributed to `name`.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    for heading in soup.find_all(re.compile(r"^h[1-6]$")):
+        if not words_in(name, heading.get_text(" ")):
+            continue
+        level = _heading_level(heading.name)
+        parts = [str(heading)]
+        for sibling in heading.find_next_siblings():
+            sibling_level = _heading_level(sibling.name)
+            if sibling_level is not None and sibling_level <= level:
+                break
+            parts.append(str(sibling))
+        entry = "".join(parts)
+        if require is None or words_in(require, text_of(entry)):
+            return entry
+    return None
+
+
+def _normalized(text: str) -> str:
+    return " ".join(
+        re.sub(r"[^a-z0-9]+", " ", text.lower().replace("&", "and")).split()
+    )
+
+
+def words_in(needle: str, text: str) -> bool:
+    """True if `needle` appears in `text` as whole words, ignoring case, spacing
+    and punctuation ("Court of California, County of X" matches "... | County of X")."""
+    needle = _normalized(needle)
+    pattern = rf"(?<![a-z0-9]){re.escape(needle)}(?![a-z0-9])"
+    return bool(needle) and re.search(pattern, _normalized(text)) is not None
+
+
+def text_entry(
+    html: str, name: str, start: str, require: str | None = None
+) -> list[str] | None:
+    """Lines of the entry naming `name` on a plain-text list (e.g. a PDF) where
+    each entry begins on a line matching the `start` regex; with `require`, the
+    first such entry that also contains it. None if no entry qualifies."""
+    lines = BeautifulSoup(html, "html.parser").get_text().splitlines()
+    starts = [i for i, line in enumerate(lines) if re.match(start, line)]
+    for begin, end in zip(starts, [*starts[1:], len(lines)], strict=False):
+        entry = lines[begin:end]
+        text = " ".join(entry)
+        if words_in(name, text) and (require is None or words_in(require, text)):
+            return entry
+    return None

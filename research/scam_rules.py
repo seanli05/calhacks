@@ -32,9 +32,64 @@ _URGENCY = (
 _SENSITIVE = r"social security|\bssn\b|bank account|routing number|card number|debit card|credit card"
 _BY_PHONE = r"\b(phone|call|text|sms|whatsapp)\b"
 
+# Category rules: they run only for hints of that category, on top of the rules above.
+_UNRECOVERABLE = (
+    r"wire|zelle|cash ?app|venmo|bitcoin|crypto|gift ?cards?|western union|moneygram"
+)
+_HOUSING_RULES: tuple[tuple[str, str], ...] = (
+    (
+        (
+            rf"\b(deposit|first month|application fee|holding fee)\b.{{0,80}}({_UNRECOVERABLE})"
+            rf"|({_UNRECOVERABLE}).{{0,80}}\b(deposit|first month|application fee|holding fee)\b"
+        ),
+        (
+            "This letter asks for a rental deposit or fee by wire, payment app, gift card, "
+            "or crypto. Scammers ask for deposits this way because the money can't be recovered."
+        ),
+    ),
+    (
+        r"\b(abroad|out of the country|overseas|missionary)\b|mail (you )?the keys",
+        (
+            "This letter says the landlord is away and can't show the home in person. "
+            "This is a common rental scam."
+        ),
+    ),
+    (
+        (
+            r"(section 8|voucher|wait(ing)? ?list)\b.{0,40}"
+            r"\b(application|registration|sign.?up|processing|placement) fee\b"
+            r"|\b(pay|fee)\b.{0,40}\b(join|get on|be added to|be placed on|move up)\b"
+            r".{0,40}(section 8|voucher|wait(ing)? ?list)"
+        ),
+        (
+            "This letter asks for a fee to join a Section 8 or housing waitlist. "
+            "Applying for Section 8 is free."
+        ),
+    ),
+)
+_MEDICAL_RULES: tuple[tuple[str, str], ...] = (
+    (
+        r"\bfree\b.{0,40}\b(tests?|testing|genetic|dna|screenings?|kits?|braces?|equipment)\b",
+        (
+            "This letter offers free medical tests or equipment. Offers like this are a "
+            "common way to steal Medicare or insurance numbers."
+        ),
+    ),
+)
+_MEDICAL_ID = (
+    r"medicare (number|card|id)|\bmbi\b|member (id|number)|policy number"
+    r"|insurance (id|card|number)"
+)
+_CATEGORY_WHO = {
+    "housing": "a real landlord or housing agency",
+    "medical": "a real hospital, health plan, or Medicare",
+}
+
 
 def _issuer(hint: Hint) -> str:
-    who = hint.issuer_short or "a real government agency"
+    who = hint.issuer_short or _CATEGORY_WHO.get(
+        hint.category or "", "a real government agency"
+    )
     return who[0].upper() + who[1:]
 
 
@@ -88,5 +143,21 @@ def scam_red_flags(signals: LegitimacySignals, hint: Hint) -> list[str]:
                 "or bank details by phone or text. Do not share them."
             )
             break
+
+    rules = {"housing": _HOUSING_RULES, "medical": _MEDICAL_RULES}.get(
+        hint.category or "", ()
+    )
+    for pattern, flag in rules:
+        if re.search(pattern, text):
+            flags.append(flag)
+
+    if hint.category == "medical":
+        for chunk in re.split(r"[.\n!?]", text):
+            if re.search(_MEDICAL_ID, chunk) and re.search(_BY_PHONE, chunk):
+                flags.append(
+                    "This letter asks for your Medicare or insurance number by phone "
+                    "or text. Medicare and real insurers don't ask for it that way."
+                )
+                break
 
     return flags

@@ -1,0 +1,18 @@
+{
+  "doc_type": "medi_cal_renewal",
+  "call_purpose": "Ask whether the Medi-Cal renewal packet was received",
+  "signals": {
+    "letterhead": "Alameda County Social Services Agency",
+    "county": "Alameda",
+    "return_address": "2000 San Pablo Ave, Oakland, CA 94612",
+    "urls": [],
+    "form_ids": [],
+    "phones": [
+      {
+        "number": "+15102632420",
+        "label": "Medi-Cal questions",
+        "quote": "Questions? Call (510) 263-2420"
+      }
+    ]
+  }
+}

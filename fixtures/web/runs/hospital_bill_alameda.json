@@ -1,0 +1,33 @@
+{
+ "doc_type": "hospital_bill_statement",
+ "call_purpose": "Ask for an itemized bill and about financial assistance",
+ "fetched_urls": [
+  "https://npiregistry.cms.hhs.gov/api/?version=2.1&enumeration_type=NPI-2&organization_name=Alameda Health System&city=Oakland&state=CA"
+ ],
+ "submission": {
+  "issuer_official_domain": "alamedahealthsystem.org",
+  "official_phone": "510-437-4800",
+  "phone_source_url": "https://npiregistry.cms.hhs.gov/api/?version=2.1&enumeration_type=NPI-2&organization_name=Alameda Health System&city=Oakland&state=CA",
+  "phone_label": "Practice location phone (NPI Registry, Alameda Health System / Highland General Hospital, 1411 E 31st St, Oakland CA)",
+  "phone_purpose": "Main number for Alameda Health System (Highland Hospital), Oakland",
+  "alternative_contacts": [],
+  "evidence": [
+   {
+    "signal": "issuer",
+    "url": "https://npiregistry.cms.hhs.gov/api/?version=2.1&enumeration_type=NPI-2&organization_name=Alameda Health System&city=Oakland&state=CA",
+    "note": "Several active NPI-2 entries for ALAMEDA HEALTH SYSTEM (e.g., NPI 1083815872 DBA Highland General Hospital) in Oakland, CA."
+   },
+   {
+    "signal": "return_address",
+    "url": "https://npiregistry.cms.hhs.gov/api/?version=2.1&enumeration_type=NPI-2&organization_name=Alameda Health System&city=Oakland&state=CA",
+    "note": "Practice location 1411 E 31st St, Oakland, CA 94602 matches the letter's return address."
+   },
+   {
+    "signal": "letter_phone",
+    "url": "https://npiregistry.cms.hhs.gov/api/?version=2.1&enumeration_type=NPI-2&organization_name=Alameda Health System&city=Oakland&state=CA",
+    "note": "Practice location phone 510-437-4800 in the registry entries matches the letter's printed (510) 437-4800."
+   }
+  ],
+  "notes": "NPI Registry API fetched OK; entries list practice location phone 510-437-4800 at 1411 E 31st St Oakland, matching letter's phone and return address. Entries have no website/endpoints listed. Search showed alamedahealthsystem.org (Patient FAQ PDF mentions customer service 510-895-7291 for billing questions), but every fetch of alamedahealthsystem.org (https and http, HTML and PDF) failed with SSL CERTIFICATE_VERIFY_FAILED, so billing-specific number could not be confirmed and is not submitted."
+ }
+}

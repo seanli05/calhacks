@@ -1,0 +1,17 @@
+{
+  "doc_type": "hospital_bill_statement",
+  "call_purpose": "Ask for an itemized bill and about financial assistance",
+  "signals": {
+    "letterhead": "Alameda Health System",
+    "return_address": "1411 East 31st Street, Oakland, CA 94602",
+    "urls": [],
+    "form_ids": [],
+    "phones": [
+      {
+        "number": "+15104374800",
+        "label": "Questions",
+        "quote": "Questions? Call (510) 437-4800"
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "doc_type": "housing_authority_recertification",
+  "call_purpose": "Ask to reschedule the annual recertification appointment",
+  "signals": {
+    "letterhead": "Oakland Housing Authority",
+    "return_address": "1619 Harrison St., Oakland, CA 94612",
+    "urls": [
+      "www.oakha.org"
+    ],
+    "form_ids": [],
+    "phones": [
+      {
+        "number": "+15108741500",
+        "label": "Main office",
+        "quote": "Call (510) 874-1500"
+      }
+    ]
+  }
+}

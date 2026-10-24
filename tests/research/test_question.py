@@ -8,12 +8,14 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
+from research.fake import fake_fast_pass_output
 from research.fetch_tool import replay_resolver
 from research.jobs import handle_research_question
 from research.models import QuestionAnswer, QuestionSource
 from research.question import answer_question, scrub_question
 from research.sim.memory import InMemoryStore
 from research.sim.run import fake_deps
+from research.sim.store import CaseRecord
 
 GOV = "https://www.uscis.gov/interview"
 NOT_GOV = "https://immigration-help.example.com/interview"
@@ -280,3 +282,42 @@ async def test_sim_report_summarizes_a_question_job() -> None:
     await handle_research_question(store.jobs[job_id], store, fake_deps())
 
     assert job_summary(store.jobs[job_id]) == "answer status=answered sources=1"
+
+
+async def test_question_about_a_letter_gets_its_context_without_sensitive_values() -> (
+    None
+):
+    seen: dict[str, Any] = {}
+
+    async def capture(question_en: str, **kwargs: Any) -> QuestionAnswer:
+        seen.update(kwargs)
+        return QuestionAnswer(status="not_confirmed", reason_en="x")
+
+    out = fake_fast_pass_output("case_1")
+    store = InMemoryStore()
+    store.cases["case_1"] = CaseRecord(
+        case_id="case_1",
+        user_id="user_1",
+        document_ids=["doc_1"],
+        r1=out.r1,
+        signals=out.signals,
+    )
+    for sv in out.sensitive_values:
+        await store.insert_case_ref("case_1", sv.field, sv.value)
+    job_id = await store.create_job(
+        "research_question",
+        {
+            "job": "research_question",
+            "user_id": "user_1",
+            "case_id": "case_1",
+            "question_en": "Can my kids come?",
+        },
+        "case_1",
+    )
+    deps = fake_deps()
+    deps.question_fn = capture
+    await handle_research_question(store.jobs[job_id], store, deps)
+
+    assert f"Document type: {out.r1.doc_type}" in seen["letter"]
+    for sv in out.sensitive_values:
+        assert sv.value not in seen["letter"]

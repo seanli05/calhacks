@@ -16,6 +16,7 @@ pillow==13.0.0
 phonenumbers==9.0.41
 tldextract==5.4.0
 beautifulsoup4==4.15.0
+pypdf==6.21.2
 
 # Database
 sqlmodel==0.0.48

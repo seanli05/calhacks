@@ -2,17 +2,16 @@
 
 The model only discovers. Every conclusion is decided by code against pages our
 fetch tool fetched: the official number is accepted only if `phone_on_page`
-finds it on a trusted page from the issuer's own domain (rule 2, C32).
+finds it on a trusted page from the issuer's own domain (rule 2, C32). This
+module runs discovery and the cache fallbacks; `deep_verify` decides.
 """
 
 import asyncio
 import json
 import logging
-import re
 from collections.abc import Awaitable, Callable
-from datetime import date
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import anthropic
 import httpx
@@ -21,31 +20,35 @@ from pydantic import BaseModel, ValidationError
 
 from research import checks
 from research.deep_prompts import DEEP_SYSTEM, FETCH_PAGE_TOOL, SUBMIT_FINDINGS_TOOL
+from research.deep_verify import (  # noqa: F401 (question.py imports _same_url here)
+    Discovery,
+    Submission,
+    _same_url,
+    issuer_domains_for,
+    issuer_site_unavailable,
+    offline_signals,
+    page_for,
+    registry_entries,
+    verify,
+)
 from research.fetch_tool import (
+    MODEL_MAX_LINKS,
     FetchedPage,
     FetchRefused,
     Resolver,
     fetch_page,
-    is_gov,
     page_text_for_model,
     registered_domain,
     system_resolver,
 )
 from research.hints import (
     BLOCKED_DOMAINS,
-    SECONDARY_LINE_WORDS,
     Hint,
     guess_doc_type,
     purpose_key,
     where_to_look,
 )
-from research.models import (
-    AlternativeContact,
-    DeepFindings,
-    LegitimacySignals,
-    SignalResult,
-    Verification,
-)
+from research.models import DeepFindings, LegitimacySignals
 from research.scam_rules import scam_red_flags
 from research.verify_cache import CachedVerification, VerifyCache
 
@@ -66,47 +69,6 @@ MAX_BLOCKS_PER_DOMAIN = 2
 """After this many bot-wall responses from a domain, stop fetching it."""
 
 
-class _Evidence(BaseModel):
-    signal: Literal[
-        "issuer",
-        "form_id",
-        "return_address",
-        "letter_phone",
-        "letter_phone_other_owner",
-        "url_domains",
-    ]
-    url: str
-    note: str
-
-
-class _Contact(BaseModel):
-    name: str
-    purpose: str
-    phone: str | None
-    source_url: str | None
-
-
-class Submission(BaseModel):
-    """What the model claims via submit_findings. Nothing here is trusted yet."""
-
-    issuer_official_domain: str | None = None
-    official_phone: str | None = None
-    phone_source_url: str | None = None
-    phone_label: str | None = None
-    phone_purpose: str | None = None
-    alternative_contacts: list[_Contact] = []
-    evidence: list[_Evidence] = []
-    notes: str = ""
-
-
-class _Discovery(BaseModel):
-    pages: list[FetchedPage] = []
-    submission: Submission | None = None
-    failures: list[str] = []
-    blocked: dict[str, int] = {}
-    """Registered domain -> count of 401/403/429 responses."""
-
-
 class RunRecord(BaseModel):
     """What the model claimed and which URLs it fetched; replayed offline with fixtures/web."""
 
@@ -123,22 +85,6 @@ async def _log(
         await log(event, summary, data)
 
 
-def _same_url(a: str, b: str) -> bool:
-    def norm(u: str) -> str:
-        return u.split("#")[0].rstrip("/").replace("://www.", "://").lower()
-
-    return norm(a) == norm(b)
-
-
-def _page_for(url: str | None, pages: list[FetchedPage]) -> FetchedPage | None:
-    if not url:
-        return None
-    for page in pages:
-        if _same_url(url, page.url) or _same_url(url, page.final_url):
-            return page
-    return None
-
-
 # --- Code checks that need no model ---
 
 
@@ -153,7 +99,7 @@ async def _early_checks(
         f"Scam rules: {len(red_flags)} red flag(s)",
         {"check": "scam_rules", "red_flags": red_flags},
     )
-    for result in _offline_signals(signals, hint, []):
+    for result in offline_signals(signals, hint, []):
         await _log(
             log,
             "research.check",
@@ -165,125 +111,6 @@ async def _early_checks(
             },
         )
     return red_flags
-
-
-def _offline_signals(
-    signals: LegitimacySignals, hint: Hint, pages: list[FetchedPage]
-) -> list[SignalResult]:
-    return [
-        _url_domains_signal(signals, hint, pages, hint.issuer_domains),
-        *_case_number_signal(signals, hint),
-        _form_signal(signals, hint, pages),
-    ]
-
-
-def _url_domains_signal(
-    signals: LegitimacySignals,
-    hint: Hint,
-    pages: list[FetchedPage],
-    issuer_domains: list[str],
-) -> SignalResult:
-    if not signals.urls:
-        return SignalResult(
-            signal="url_domains",
-            state="not_found",
-            evidence=["The letter prints no web address"],
-        )
-    anchors = list(dict.fromkeys([*issuer_domains, *hint.anchor_domains]))
-    states: list[str] = []
-    evidence: list[str] = []
-    for url in signals.urls:
-        target = url if "//" in url else f"https://{url}"
-        domain = registered_domain(target)
-        if issuer_domains and checks.host_in(target, issuer_domains):
-            states.append("match")
-            evidence.append(f"{domain} is the issuer's official domain")
-            continue
-        similar = checks.lookalike(target, anchors)
-        if similar is not None:
-            states.append(similar.state)
-            evidence.extend(similar.evidence)
-        elif is_gov(target):
-            states.append("match")
-            evidence.append(f"{domain} is a .gov domain")
-        elif checks.domain_trust(target, pages) == "linked_from_anchor":
-            states.append("match")
-            evidence.append(f"{domain} is linked from an official .gov page")
-        elif hint.federal:
-            states.append("conflict")
-            evidence.append(f"{domain} is not a .gov domain on a federal notice")
-        else:
-            states.append("not_found")
-            evidence.append(f"{domain} could not be tied to an official site")
-    evidence = list(dict.fromkeys(evidence))
-    for state in ("conflict", "uncertain", "not_found"):
-        if state in states:
-            return SignalResult(signal="url_domains", state=state, evidence=evidence)
-    return SignalResult(signal="url_domains", state="match", evidence=evidence)
-
-
-def _case_number_signal(signals: LegitimacySignals, hint: Hint) -> list[SignalResult]:
-    if hint.case_number_shape is None:
-        return []
-    expected = hint.case_number_shape
-    shape = checks.case_number_shape(signals.case_number_format)
-    if shape is None:
-        state, note = "not_found", "No case number format was read from the letter"
-    elif shape == expected:
-        state, note = (
-            "match",
-            f"{expected[0]} letters + {expected[1]} digits, as expected",
-        )
-    else:
-        state, note = (
-            "uncertain",
-            f"Read as {shape[0]} letters + {shape[1]} digits; expected "
-            + f"{expected[0]} letters + {expected[1]} digits (may be misread)",
-        )
-    return [SignalResult(signal="case_number_format", state=state, evidence=[note])]
-
-
-def _form_signal(
-    signals: LegitimacySignals, hint: Hint, pages: list[FetchedPage]
-) -> SignalResult:
-    # One entry per form; the header and footer often print the same one.
-    raws_by_form: dict[str, list[str]] = {}
-    for raw in signals.form_ids:
-        if (form := checks.form_number(raw)) is not None:
-            raws_by_form.setdefault(form, []).append(raw)
-    if not raws_by_form:
-        return SignalResult(
-            signal="form_id",
-            state="not_found",
-            evidence=["No form number on the letter"],
-        )
-    anchor_pages = [p for p in pages if is_gov(p.final_url)]
-    issuer = hint.issuer_short or "issuer"
-    today = date.today()
-    matched: list[str] = []
-    evidence: list[str] = []
-    for form, raws in raws_by_form.items():
-        # A form off the known list proves nothing either way: ignore it.
-        if hint.known_forms and form not in hint.known_forms:
-            evidence.append(f"{form} ignored: not on the known {issuer} form list")
-            continue
-        page = next(
-            (p for p in anchor_pages if checks.form_on_page(form, p.html)), None
-        )
-        editions = [checks.edition_date(raw, today) for raw in raws]
-        edition = next((e for e in editions if e), None) if hint.known_forms else None
-        if page is not None:
-            matched.append(form)
-            evidence.append(page.final_url)
-        elif edition is not None:
-            matched.append(form)
-            evidence.append(
-                f"{form} (edition {edition.isoformat()}): known {issuer} form (config)"
-            )
-        else:
-            evidence.append(f"{form} was not found on a fetched official page")
-    state = "match" if matched else "not_found"
-    return SignalResult(signal="form_id", state=state, evidence=evidence)
 
 
 # --- Discovery loop ---
@@ -310,6 +137,23 @@ def _user_prompt(
             for t in hint.search_terms
         ],
     }
+    if hint.trust_model == "unverifiable_private":
+        hint_view["goal"] = (
+            "This kind of sender can't be verified from public sources, so do not "
+            "look for its number. Instead find official .gov help for the person: "
+            + "; ".join(name for name, _ in hint.alternatives)
+            + ". Give each as an alternative contact, with the fetched .gov page "
+            "that shows its number."
+        )
+    if hint.registries:
+        hint_view["official_lists"] = [
+            {"name": r.name, "where": r.url or r.domain} for r in hint.registries
+        ]
+        hint_view["how_lists_vouch"] = (
+            "Fetch the official list and find this organization's own entry. A number "
+            "counts if it is in that entry, or on a fetched page of the website that "
+            "entry links to. Give that website as issuer_official_domain."
+        )
     return (
         "<signals>\n"
         + signals.model_dump_json(indent=1, exclude_none=True)
@@ -323,7 +167,7 @@ def _user_prompt(
 
 
 async def _discover(
-    discovery: _Discovery,
+    discovery: Discovery,
     *,
     signals: LegitimacySignals,
     hint: Hint,
@@ -483,6 +327,7 @@ async def _discover(
                     resolve=resolve,
                     related=related,
                     log=log,
+                    registry_view=lambda page: _registry_view(page, signals, hint),
                 )
                 results.append(_tool_result(block.id, text, error=not ok))
             else:
@@ -508,11 +353,12 @@ def _tool_result(tool_use_id: str, text: str, *, error: bool = False) -> dict[st
 async def _run_fetch(
     url: str,
     *,
-    discovery: _Discovery,
+    discovery: Discovery,
     http: httpx.AsyncClient,
     resolve: Resolver,
     related: list[str],
     log: LogFn | None,
+    registry_view: Callable[[FetchedPage], str] | None = None,
 ) -> tuple[str, bool]:
     try:
         page = await fetch_page(url, http=http, resolve=resolve)
@@ -545,370 +391,34 @@ async def _run_fetch(
             )
     elif page.status_code >= 400:
         discovery.failures.append(f"{page.final_url} returned HTTP {page.status_code}")
-    return page_text_for_model(page, related), page.status_code < 400
+    text = page_text_for_model(page, related)
+    if registry_view is not None:
+        text += registry_view(page)
+    return text, page.status_code < 400
 
 
-# --- Code verification of the model's claims ---
-
-
-def _issuer_domains(hint: Hint, submission: Submission | None) -> list[str]:
-    if hint.issuer_domains:
-        return hint.issuer_domains
-    if submission and submission.issuer_official_domain:
-        domain = registered_domain(submission.issuer_official_domain.strip().lower())
-        return [domain] if domain else []
-    return []
-
-
-def _directory_page_for_issuer(
-    page: FetchedPage, hint: Hint, issuer_domains: list[str]
-) -> bool:
-    """True if `page` is an official directory's page about this issuer.
-
-    It must be on a configured .gov directory, name the issuer by one of its
-    official names, and link to the issuer's own domain.
-    """
-    return bool(
-        hint.directory_domains
-        and hint.issuer_names
-        and issuer_domains
-        and page.status_code < 400
-        and is_gov(page.final_url)
-        and checks.host_in(page.final_url, hint.directory_domains)
-        and any(checks.name_on_page(n, page.html) for n in hint.issuer_names)
-        and any(
-            link.startswith("http") and checks.host_in(link, issuer_domains)
-            for link in page.links
-        )
-    )
-
-
-def _issuer_site_unavailable(
-    discovery: _Discovery, ok_pages: list[FetchedPage], issuer_domains: list[str]
-) -> bool:
-    """The issuer's own site blocked us or never yielded a page."""
-    blocked = any(d in issuer_domains for d in discovery.blocked)
-    fetched = any(checks.host_in(p.final_url, issuer_domains) for p in ok_pages)
-    return blocked or not fetched
-
-
-def _accept_phone(
-    submission: Submission | None,
-    pages: list[FetchedPage],
-    issuer_domains: list[str],
-    *,
-    hint: Hint,
-    issuer_unavailable: bool,
-) -> tuple[str | None, FetchedPage | None, str]:
-    """(E.164, source page, reason). The number is None unless every check holds.
-
-    The page must be on the issuer's own domain, or, only when that site is
-    unavailable, on an official directory's page for this issuer.
-    """
-    if submission is None or not submission.official_phone:
-        return None, None, "No official number was found"
-    phone = checks.normalize_phone(submission.official_phone)
-    if phone is None:
-        return None, None, "The proposed number is not a valid phone number"
-    label = f"{submission.phone_label or ''} {submission.phone_purpose or ''}".lower()
-    secondary = [
-        w for w in SECONDARY_LINE_WORDS if re.search(rf"\b{re.escape(w)}\b", label)
+def _registry_view(page: FetchedPage, signals: LegitimacySignals, hint: Hint) -> str:
+    """Extra model text for an official list page: the letter's org's own entry
+    (a long list is truncated in the page text) and the list's links out."""
+    domains = [r.domain for r in hint.registries]
+    if not checks.host_in(page.final_url, domains):
+        return ""
+    parts = [
+        "This organization's entry on the list:\n" + checks.text_of(entry.html)
+        for entry in registry_entries(signals, hint, [page])
     ]
-    if secondary:
-        return (
-            None,
-            None,
-            f"The proposed number is a special-purpose line ({secondary[0]}), not the main line",
-        )
-    page = _page_for(submission.phone_source_url, pages)
-    if page is None:
-        return None, None, "The proposed number's page was not fetched by our tool"
-    if page.status_code >= 400:
-        return None, None, f"{page.final_url} returned HTTP {page.status_code}"
-    # Bot-wall and error pages are not evidence, so their links vouch for nothing.
-    ok_pages = [p for p in pages if p.status_code < 400]
-    if checks.domain_trust(page.final_url, ok_pages) == "untrusted":
-        return (
-            None,
-            None,
-            f"{registered_domain(page.final_url)} is not a trusted domain",
-        )
-    on_issuer = bool(issuer_domains) and checks.host_in(page.final_url, issuer_domains)
-    via_directory = (
-        not on_issuer
-        and issuer_unavailable
-        and _directory_page_for_issuer(page, hint, issuer_domains)
-    )
-    if not on_issuer and not via_directory:
-        return (
-            None,
-            None,
-            f"{registered_domain(page.final_url)} is not the issuer's domain",
-        )
-    if not checks.phone_on_page(phone, page.html):
-        return None, None, f"The proposed number does not appear on {page.final_url}"
-    if via_directory:
-        return (
-            phone,
-            page,
-            f"Official number found on {page.final_url}, the "
-            + f"{registered_domain(page.final_url)} federal directory's page for "
-            + f"{hint.issuer_short or 'the issuer'}; {', '.join(issuer_domains)} "
-            + "could not be fetched directly",
-        )
-    return phone, page, f"Official number found on {page.final_url}"
-
-
-def _trust_chain(source: FetchedPage, pages: list[FetchedPage]) -> list[str]:
-    if checks.domain_trust(source.final_url, pages) == "anchor":
-        parent = next(
-            (
-                p
-                for p in pages
-                if p is not source
-                and registered_domain(p.final_url)
-                == registered_domain(source.final_url)
-                and any(_same_url(link, source.final_url) for link in p.links)
-            ),
-            None,
-        )
-        return [parent.final_url, source.final_url] if parent else [source.final_url]
-    domain = registered_domain(source.final_url)
-    anchor = next(
-        p
-        for p in pages
-        if is_gov(p.final_url)
-        and any(
-            link.startswith("http") and registered_domain(link) == domain
-            for link in p.links
-        )
-    )
-    return [anchor.final_url, source.final_url]
-
-
-def _verify(
-    signals: LegitimacySignals,
-    hint: Hint,
-    call_purpose: str | None,
-    red_flags: list[str],
-    discovery: _Discovery,
-) -> tuple[DeepFindings, FetchedPage | None, list[str]]:
-    """Decide the result from fetched pages alone. Returns findings, the source page, issuer domains."""
-    # Error and bot-wall pages are not evidence of anything.
-    pages = [p for p in discovery.pages if p.status_code < 400]
-    submission = discovery.submission
-    issuer_domains = _issuer_domains(hint, submission)
-    trusted = [
-        p for p in pages if checks.domain_trust(p.final_url, pages) != "untrusted"
+    # On an official list, the links out to each listed org are the point.
+    outside = [
+        link
+        for link in page.links
+        if link.startswith("http") and not checks.host_in(link, domains)
     ]
-    evidence: list[str] = []
-
-    issuer_unavailable = _issuer_site_unavailable(discovery, pages, issuer_domains)
-    phone, source, reason = _accept_phone(
-        submission,
-        discovery.pages,
-        issuer_domains,
-        hint=hint,
-        issuer_unavailable=issuer_unavailable,
-    )
-    evidence.append(reason)
-
-    # Issuer: its domain is a .gov and the letterhead name appears on it.
-    names = [n for n in (signals.letterhead, signals.sub_agency) if n]
-    issuer_page = next(
-        (
-            p
-            for p in pages
-            if is_gov(p.final_url)
-            and checks.host_in(p.final_url, issuer_domains)
-            and any(checks.name_on_page(n, p.html) for n in names)
-        ),
-        None,
-    )
-    if issuer_page is None and issuer_unavailable:
-        # The issuer's site is unreachable: an official directory naming the
-        # issuer and linking to its domain confirms the issuer instead.
-        issuer_page = next(
-            (p for p in pages if _directory_page_for_issuer(p, hint, issuer_domains)),
-            None,
+    if outside:
+        parts.append(
+            "Links to other sites on this official list:\n"
+            + "\n".join(f"- {link}" for link in outside[:MODEL_MAX_LINKS])
         )
-    issuer_verified = issuer_page is not None
-    results = [
-        SignalResult(
-            signal="issuer",
-            state="match" if issuer_verified else "not_found",
-            evidence=[issuer_page.final_url]
-            if issuer_page
-            else ["The letterhead agency was not confirmed on an official .gov page"],
-        ),
-        _url_domains_signal(signals, hint, pages, issuer_domains),
-        _form_signal(signals, hint, pages),
-        *_case_number_signal(signals, hint),
-    ]
-
-    if signals.return_address:
-        address_page = next(
-            (
-                p
-                for p in trusted
-                if checks.address_on_page(signals.return_address, p.html)
-            ),
-            None,
-        )
-        results.append(
-            SignalResult(
-                signal="return_address",
-                state="match" if address_page else "not_found",
-                evidence=[address_page.final_url]
-                if address_page
-                else ["The return address was not found on a fetched official page"],
-            )
-        )
-
-    letter_phone_matches: bool | None = None
-    if signals.phones:
-        state, phone_evidence = "not_found", []
-        for letter_phone in signals.phones:
-            if phone and letter_phone.number == phone:
-                state, phone_evidence = "match", [source.final_url]
-                break
-            on_issuer = next(
-                (
-                    p
-                    for p in trusted
-                    if checks.host_in(p.final_url, issuer_domains)
-                    and checks.phone_on_page(letter_phone.number, p.html)
-                ),
-                None,
-            )
-            if on_issuer:
-                state, phone_evidence = "match", [on_issuer.final_url]
-                break
-            for item in submission.evidence if submission else []:
-                if item.signal != "letter_phone_other_owner":
-                    continue
-                page = _page_for(item.url, trusted)
-                if (
-                    page
-                    and not checks.host_in(page.final_url, issuer_domains)
-                    and checks.phone_on_page(letter_phone.number, page.html)
-                ):
-                    state = "conflict"
-                    phone_evidence = [
-                        f"The letter's number appears on {page.final_url}, "
-                        + "which is not the issuer's site"
-                    ]
-        results.append(
-            SignalResult(
-                signal="letter_phone",
-                state=state,
-                evidence=phone_evidence
-                or ["The letter's number was not found on an official page"],
-            )
-        )
-        letter_phone_matches = {"match": True, "conflict": False}.get(state)
-    else:
-        results.append(
-            SignalResult(
-                signal="letter_phone",
-                state="not_found",
-                evidence=["The letter prints no phone number"],
-            )
-        )
-
-    status = checks.decide_verdict(results, red_flags, issuer_verified)
-    for result in results:
-        if result.state == "conflict":
-            evidence.extend(result.evidence)
-    evidence.extend(discovery.failures)
-
-    issuer_name = hint.issuer_short or signals.letterhead or "Issuing agency"
-    purpose_text = (submission.phone_purpose if submission else None) or (
-        submission.phone_label if submission else None
-    )
-    alternatives = _verified_alternatives(
-        submission,
-        pages,
-        issuer_domains,
-        hint=hint,
-        issuer_unavailable=issuer_unavailable,
-    )
-    if phone and status != "verified":
-        alternatives.insert(
-            0,
-            AlternativeContact(
-                name=f"{issuer_name} official line",
-                purpose=purpose_text or "Official contact",
-                phone=phone,
-                url=source.final_url,
-            ),
-        )
-    if not phone or hint.depth == "unverifiable":
-        alternatives.extend(
-            AlternativeContact(name=name, purpose=purpose)
-            for name, purpose in hint.alternatives
-        )
-
-    findings = DeepFindings(
-        verification=Verification(
-            status=status,
-            official_phone=phone if status == "verified" else None,
-            letter_phone_matches=letter_phone_matches,
-            evidence=evidence,
-            red_flags=red_flags,
-            signals=results,
-        ),
-        official_phone_purpose=purpose_text if phone else None,
-        alternative_contacts=alternatives,
-        trust_chain=_trust_chain(source, pages) if source else [],
-        call_goal_en=_call_goal(call_purpose),
-    )
-    return findings, source, issuer_domains
-
-
-def _verified_alternatives(
-    submission: Submission | None,
-    pages: list[FetchedPage],
-    issuer_domains: list[str],
-    *,
-    hint: Hint,
-    issuer_unavailable: bool,
-) -> list[AlternativeContact]:
-    """Model-suggested contacts, keeping only what code can confirm.
-
-    A phone gets the same source bar as official_phone: a fetched page on the
-    issuer's own domain, or the configured directory's page for the issuer when
-    the issuer's site is unavailable. Any number may end up dialed. Other
-    trusted pages keep their URL only.
-    """
-    contacts: list[AlternativeContact] = []
-    for contact in submission.alternative_contacts if submission else []:
-        page = _page_for(contact.source_url, pages)
-        if page is None or checks.domain_trust(page.final_url, pages) == "untrusted":
-            continue
-        phone = checks.normalize_phone(contact.phone or "")
-        allowed_source = checks.host_in(page.final_url, issuer_domains) or (
-            issuer_unavailable
-            and _directory_page_for_issuer(page, hint, issuer_domains)
-        )
-        if phone and not (allowed_source and checks.phone_on_page(phone, page.html)):
-            phone = None
-        contacts.append(
-            AlternativeContact(
-                name=contact.name,
-                purpose=contact.purpose,
-                phone=phone,
-                url=page.final_url,
-            )
-        )
-    return contacts
-
-
-def _call_goal(call_purpose: str | None) -> str | None:
-    if not call_purpose or not call_purpose.strip():
-        return None
-    line = " ".join(call_purpose.split())
-    return line[:200]
+    return "".join(f"\n\n{part}" for part in parts)
 
 
 # --- Cache fallback ---
@@ -918,13 +428,13 @@ def _from_cache(
     cache: VerifyCache | None,
     issuer_domains: list[str],
     purpose: str,
-) -> tuple[_Discovery, CachedVerification] | None:
+) -> tuple[Discovery, CachedVerification] | None:
     if cache is None:
         return None
     for domain in issuer_domains:
         entry = cache.load(domain, purpose)
         if entry is not None:
-            discovery = _Discovery(
+            discovery = Discovery(
                 pages=entry.pages,
                 submission=Submission(
                     issuer_official_domain=entry.issuer_domain,
@@ -954,7 +464,7 @@ async def _apply_cache(
     if cached is None:
         return findings
     discovery, entry = cached
-    recheck, source, _ = _verify(signals, hint, call_purpose, red_flags, discovery)
+    recheck, source, _ = verify(signals, hint, call_purpose, red_flags, discovery)
     if source is None:
         await _log(
             log,
@@ -996,8 +506,8 @@ async def _offline_findings(
     cache: VerifyCache | None,
     log: LogFn | None,
 ) -> DeepFindings:
-    discovery = _Discovery(failures=[reason])
-    findings, _, issuer_domains = _verify(
+    discovery = Discovery(failures=[reason])
+    findings, _, issuer_domains = verify(
         signals, hint, call_purpose, red_flags, discovery
     )
     return await _apply_cache(
@@ -1081,7 +591,7 @@ async def run_deep_pass(
             log=log,
         )
 
-    discovery = _Discovery()
+    discovery = Discovery()
     try:
         async with asyncio.timeout(discovery_timeout_s):
             await _discover(
@@ -1142,7 +652,7 @@ async def replay_deep_pass(
     hint = where_to_look(record.doc_type or guess_doc_type(signals))
     purpose = purpose_key(hint, record.call_purpose)
     red_flags = await _early_checks(signals, hint, log)
-    discovery = _Discovery(submission=record.submission)
+    discovery = Discovery(submission=record.submission)
     related = list(dict.fromkeys([*hint.issuer_domains, *hint.anchor_domains]))
     for url in record.fetched_urls:
         await _run_fetch(
@@ -1167,7 +677,7 @@ async def replay_deep_pass(
 
 async def _add_seed_pages(
     seed: VerifyCache | None,
-    discovery: _Discovery,
+    discovery: Discovery,
     hint: Hint,
     purpose: str,
     log: LogFn | None,
@@ -1181,8 +691,8 @@ async def _add_seed_pages(
     if seed is None:
         return None
     ok_pages = [p for p in discovery.pages if p.status_code < 400]
-    issuer_domains = _issuer_domains(hint, discovery.submission)
-    if not _issuer_site_unavailable(discovery, ok_pages, issuer_domains):
+    issuer_domains = issuer_domains_for(hint, discovery.submission)
+    if not issuer_site_unavailable(discovery, ok_pages, issuer_domains):
         return None
     for domain in issuer_domains:
         entry = seed.load(domain, purpose)
@@ -1192,7 +702,7 @@ async def _add_seed_pages(
         discovery.pages = [
             p
             for p in discovery.pages
-            if _page_for(p.url, pages) is None and _page_for(p.final_url, pages) is None
+            if page_for(p.url, pages) is None and page_for(p.final_url, pages) is None
         ] + pages
         captured = entry.fetched_at.date().isoformat()
         await _log(
@@ -1211,7 +721,7 @@ async def _finish(
     purpose: str,
     call_purpose: str | None,
     red_flags: list[str],
-    discovery: _Discovery,
+    discovery: Discovery,
     *,
     cache: VerifyCache | None,
     log: LogFn | None,
@@ -1219,7 +729,7 @@ async def _finish(
 ) -> DeepFindings:
     """Verify by code, log the result, save to or fall back on the cache."""
     used_seed = await _add_seed_pages(seed, discovery, hint, purpose, log)
-    findings, source, issuer_domains = _verify(
+    findings, source, issuer_domains = verify(
         signals, hint, call_purpose, red_flags, discovery
     )
     if used_seed is not None:

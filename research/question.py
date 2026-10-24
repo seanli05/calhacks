@@ -28,7 +28,7 @@ from research.fetch_tool import (
     system_resolver,
 )
 from research.hints import BLOCKED_DOMAINS, ID_SHAPED_PATTERNS
-from research.models import QuestionAnswer, QuestionSource, QuestionStatus
+from research.models import R1, QuestionAnswer, QuestionSource, QuestionStatus
 from research.question_prompts import QUESTION_SYSTEM, SUBMIT_ANSWER_TOOL
 
 MAX_ITERATIONS = 8
@@ -90,9 +90,27 @@ def _norm(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip().lower()
 
 
+def letter_context(r1: R1) -> str:
+    """What the question model may know about the user's letter: R1's plain
+    fields only. R1 never holds sensitive values (they travel as refs)."""
+    lines = [
+        f"Document type: {r1.doc_type}" if r1.doc_type else "",
+        f"Issuer: {r1.issuer}" if r1.issuer else "",
+        f"What it asks: {r1.what_is_asked}" if r1.what_is_asked else "",
+        f"Deadline: {r1.deadline.isoformat()}" if r1.deadline else "",
+        f"Appointment date: {r1.appointment.date.isoformat()}"
+        if r1.appointment
+        else "",
+        *(f"Checklist ({c.kind}): {c.item}" for c in r1.checklist_en),
+        f"Explanation: {r1.explanation_en[:1500]}" if r1.explanation_en else "",
+    ]
+    return "\n".join(line for line in lines if line)
+
+
 async def answer_question(
     question_en: str,
     *,
+    letter: str | None = None,
     sensitive: Iterable[str] = (),
     client: AsyncAnthropic,
     model: str,
@@ -101,7 +119,8 @@ async def answer_question(
     log: LogFn | None = None,
     max_iterations: int = MAX_ITERATIONS,
 ) -> QuestionAnswer:
-    """Research one question. The caller enforces the overall time cap."""
+    """Research one question, optionally about the user's letter (`letter_context`).
+    The caller enforces the overall time cap."""
     question = scrub_question(question_en, sensitive)
     if mentions_asylum_claim(question):
         await _log(
@@ -112,6 +131,15 @@ async def answer_question(
         )
         return QuestionAnswer(status="declined_asylum_claim", reason_en=ASYLUM_REASON)
 
+    if letter:
+        # Context only: the letter is never a source, answers still need quotes
+        # found on official pages fetched here.
+        question = (
+            "The person is asking about a letter they received. Summary, for "
+            "context only (not a source):\n<letter>\n"
+            + scrub_question(letter, sensitive)
+            + f"\n</letter>\n\n<question>{question}</question>"
+        )
     pages: dict[str, str] = {}
     submission = await _ask_model(
         question,

@@ -35,7 +35,7 @@ from research.models import (
     Verification,
 )
 from research.preprocess import ContentBlock, UnsupportedMedia, to_content_blocks
-from research.question import answer_question
+from research.question import answer_question, letter_context
 from research.sim.settings import ResearchSettings
 from research.sim.store import CaseRecord, Job, JobType, Store
 from research.verify_cache import VerifyCache
@@ -317,8 +317,10 @@ async def _run_question(
     await store.update_job(job.job_id, "running")
     await log.emit(ev.QUESTION_STARTED, "Started researching a question")
     sensitive: list[str] = []
+    letter: str | None = None
     if payload.case_id:
         sensitive = list((await store.get_case_refs(payload.case_id)).values())
+        letter = letter_context((await store.get_case(payload.case_id)).r1)
     guard.add(sensitive)
 
     async def research_log(
@@ -332,6 +334,7 @@ async def _run_question(
         answer = await asyncio.wait_for(
             deps.question_fn(
                 payload.question_en,
+                letter=letter,
                 sensitive=sensitive,
                 client=deps.anthropic,
                 model=deps.settings.model_default,
