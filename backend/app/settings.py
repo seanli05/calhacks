@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     # Public URL from ngrok, used for Twilio webhooks
     public_base_url: str = ""
 
+    # Dev-only endpoints under /dev (e.g. the fake phone call); never on for the demo
+    dev_endpoints: bool = False
+
     @property
     def async_database_url(self) -> str:
         return to_asyncpg_url(self.database_url_unpooled or self.database_url)
