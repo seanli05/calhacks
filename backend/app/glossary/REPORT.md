@@ -99,3 +99,4 @@ Dropped from the starting list: `case number` (USCIS uses receipt number), `good
 - Phase 6 (Tier 2, official only): ps 9 (USCIS Pashto page), vi 9, ru 8, ar 6 (NYC MOIA Immigration Court 101). Russian rows use the dictionary form of inflected source phrases (locator gives the source form). Left out: Punjabi, Urdu, Hindi (see SOURCES.md).
 - Phase 7 (loader): `load.py` validates every row (Pydantic), refuses community rows and official rows without a source, lists all bad rows; `--dry-run` and `--language`. Dry run: 257 rows, 75 terms. Never run without --dry-run tonight.
 - Phase 8 (tests): `backend/tests/test_glossary.py`, 14 tests, offline (`add_term` faked; dry run asserts settings are never read).
+- Phase 9 (docs): `glossary/` row in backend/AGENTS.md (owner 2, contents, load command); one line in docs/whatsapp-pipe.md's file table.
