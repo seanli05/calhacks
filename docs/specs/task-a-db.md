@@ -74,5 +74,10 @@ Key behaviors:
 - `python -m app.db.reset --yes` builds and seeds the shared database (after Chris confirms nobody's mid-test).
 - Each step is merged to `main`. Report to Chris: what landed, and the one team message (helpers + `case_progress` values are on main).
 
-## After this
-Dashboard spec and build (`dashboard/`, Next.js, polling `list_events`), then deployment (ngrok). Chris starts those after tasks A and B are both done.
+## Last step: hand off to the dashboard
+Once tasks A and B are both merged, write `docs/specs/task-c-dashboard.md`, a self-contained task doc in the same style as this one, so a fresh agent can build the dashboard after Chris clears context. It covers:
+- What's on `main` by then: tables, helpers (especially `list_events`, `case_progress`, the deletes), contracts, and anything that changed from this doc.
+- The dashboard from Plan.md: live feed in the user's language (C23), case view (letter facts, verdict, brief), "What we know about you" page (view + delete, C26), WhatsApp mirror. Legible at 1080p screen-recording size.
+- The API it needs (FastAPI routes in `backend/app/api/` over the read and delete helpers), Next.js in `dashboard/`, polling about once a second.
+- Then deployment: ngrok for the Twilio webhooks.
+Merge it to `main` and tell Chris it's ready.
