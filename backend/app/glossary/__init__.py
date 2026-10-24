@@ -1,1 +1,1 @@
-"""Glossary seed and worker. Owner: person 3."""
+"""Preset glossary: `terms.csv` and its loader (`python -m app.glossary.load`). Owner: person 2."""

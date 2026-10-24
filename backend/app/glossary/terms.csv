@@ -1,0 +1,258 @@
+term,language,translation,trust_level,source_url,locator,note
+asylum,es,asilo,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,USCIS Preparing for Your Affirmative Asylum Interview (es twin): title,
+affirmative asylum,es,asilo afirmativo,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/el-proceso-de-asilo-afirmativo,USCIS The Affirmative Asylum Process (es twin): title,
+asylum interview,es,entrevista de asilo,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,USCIS Preparing for Your Affirmative Asylum Interview (es twin): title,Seed term
+asylum office,es,oficina de asilo,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): what to bring, ""in case the asylum office is missing""",
+asylum officer,es,oficial de asilo,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,USCIS Preparing for Your Affirmative Asylum Interview (es twin): What to Expect on the Day,
+asylum application,es,solicitud de asilo,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,USCIS Preparing for Your Affirmative Asylum Interview (es twin): what to bring,
+application for asylum and for withholding of removal,es,Solicitud de Asilo y de Suspensión de Remoción,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): what to bring, Form I-589 title",Form title; one USCIS page drops the second 'de'
+withholding of removal,es,suspensión de remoción,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/obtener-asilo-en-los-estados-unidos,"USCIS Obtaining Asylum in the United States (es twin): ""withholding of removal and protection under the Convention Against Torture""",
+convention against torture,es,Convención Contra la Tortura,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/obtener-asilo-en-los-estados-unidos,"USCIS Obtaining Asylum in the United States (es twin): ""protection under the Convention Against Torture (CAT)""",
+grant of asylum,es,concesión de asilo,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): What to Expect, ""qualify for a grant of asylum""",
+applicant,es,solicitante,official,https://www.uscis.gov/es/humanitarios/asilo,"USCIS Asylum (es twin): ""Affirmative asylum applicants""",Source has the plural 'solicitantes'
+principal applicant,es,solicitante principal,machine,,,USCIS Spanish I-589 page uses 'solicitante principal' where the English says 'principal'
+dependent,es,dependiente,official,https://languageaccess.courts.ca.gov/system/files/2025-05/Legal%20Glossary%20English%20Spanish.pdf,"Judicial Council of California Legal Glossary English-Spanish (2025), p. 5",Seed term. USCIS Spanish also uses 'dependiente' for 'dependent' (Affirmative Asylum Process step 3)
+derivative,es,derivado,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): what to bring, ""as derivatives""",Source has the plural 'derivados'
+spouse,es,cónyuge,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,USCIS Preparing for Your Affirmative Asylum Interview (es twin): what to bring,
+unmarried child,es,hijo soltero,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/tipos-de-decisiones-de-asilo-afirmativo,"USCIS Types of Asylum Decisions (es twin): ""your spouse and unmarried children under 21""",Source has the plural 'hijos solteros'
+family member,es,miembro de la familia,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/el-proceso-de-asilo-afirmativo,"USCIS The Affirmative Asylum Process (es twin): step 3, ""each family member""",
+interpreter,es,intérprete,official,https://languageaccess.courts.ca.gov/system/files/2025-05/Legal%20Glossary%20English%20Spanish.pdf,"Judicial Council of California Legal Glossary English-Spanish (2025), p. 7",Seed term. Same on the USCIS asylum interview page
+qualified interpreter,es,intérprete calificado,machine,,,USCIS Spanish says 'intérprete competente' for 'competent interpreter' (Preparing for Your Affirmative Asylum Interview)
+contract interpreter,es,intérprete contratado,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): Interpreters, ""the role of the contract interpreter""",
+interview notice,es,notificación de entrevista,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/el-proceso-de-asilo-afirmativo,"USCIS The Affirmative Asylum Process (es twin): step 4, ""Receive an Interview Notice""",
+appointment notice,es,notificación de cita,official,https://www.uscis.gov/es/formularios/guias-para-presentacion-de-formularios/como-prepararse-para-su-cita-de-servicios-biometricos,"USCIS Preparing for Your Biometric Services Appointment (es twin): ""Your appointment notice (Form I-797C, Notice of Action)""",
+notice of action,es,Notificación de Acción,official,https://www.uscis.gov/es/formularios/guias-para-presentacion-de-formularios/como-prepararse-para-su-cita-de-servicios-biometricos,"USCIS Preparing for Your Biometric Services Appointment (es twin): ""Form I-797C, Notice of Action""",Form title
+receipt notice,es,notificación de recibo,official,https://www.uscis.gov/es/humanitarios/asilo,"USCIS Asylum (es twin): ""Have your Form I-589 receipt notice available""",
+receipt number,es,número de recibo,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/el-proceso-de-asilo-afirmativo,"USCIS The Affirmative Asylum Process (es twin): last paragraph, ""All you need is the receipt number""",
+a-number,es,Número A,official,https://www.uscis.gov/es/herramientas/glosario,"USCIS Glossary (es twin): headword ""A-Number/Alien Registration Number/Alien Number (A-Number or A#)""",Full form 'Número de Registro de Extranjero'
+case status,es,estatus de caso,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/el-proceso-de-asilo-afirmativo,"USCIS The Affirmative Asylum Process (es twin): Tools menu, ""Case Status Online""",
+failure to appear,es,falta de comparecencia,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): Missing Your Interview, ""Dismissal of Asylum Application – Failure to Appear""",
+exceptional circumstances,es,circunstancias excepcionales,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,USCIS Preparing for Your Affirmative Asylum Interview (es twin): Rescheduling Your Interview,
+reschedule,es,reprogramar,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,USCIS Preparing for Your Affirmative Asylum Interview (es twin): Rescheduling Your Interview,
+reschedule request,es,solicitud de reprogramación,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/el-proceso-de-asilo-afirmativo,"USCIS The Affirmative Asylum Process (es twin): step 3, ""submit a reschedule request""",
+biometrics,es,datos biométricos,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/el-proceso-de-asilo-afirmativo,"USCIS The Affirmative Asylum Process (es twin): step 3, ""Biometrics Collection""",
+biometric services appointment,es,cita de servicios biométricos,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/el-proceso-de-asilo-afirmativo,USCIS The Affirmative Asylum Process (es twin): step 3,
+application support center,es,Centro de Asistencia en Solicitudes,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/el-proceso-de-asilo-afirmativo,USCIS The Affirmative Asylum Process (es twin): step 2-3 (ASC),
+fingerprints,es,huellas dactilares,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/el-proceso-de-asilo-afirmativo,"USCIS The Affirmative Asylum Process (es twin): step 2, ""fingerprint card""; ""for fingerprinting""",
+identity document,es,documento de identidad,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): what to bring, ""any identity, travel or other supporting documents""",
+passport,es,pasaporte,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,USCIS Preparing for Your Affirmative Asylum Interview (es twin): what to bring,Source has the plural 'pasaportes'
+travel document,es,documento de viaje,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): what to bring, ""Other travel or identification documents""",
+arrival-departure record,es,Documento de Entrada/Salida,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): what to bring, ""Form I-94, Arrival-Departure Record""",Form I-94 title
+original document,es,documento original,machine,,,USCIS Spanish says 'versiones originales' for 'the original versions' of documents
+birth certificate,es,certificado de nacimiento,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,USCIS Preparing for Your Affirmative Asylum Interview (es twin): what to bring,
+marriage certificate,es,certificado de matrimonio,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,USCIS Preparing for Your Affirmative Asylum Interview (es twin): what to bring,
+certified translation,es,traducción certificada,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,USCIS Preparing for Your Affirmative Asylum Interview (es twin): what to bring,
+evidence,es,evidencia,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): Rescheduling, ""any relevant evidence""",Court glossaries use 'pruebas' (Judicial Council 2025 p. 6); USCIS uses 'evidencia'
+oath,es,juramento,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): What to Expect, ""take an oath""",
+witness,es,testigo,official,https://languageaccess.courts.ca.gov/system/files/2025-05/Legal%20Glossary%20English%20Spanish.pdf,"Judicial Council of California Legal Glossary English-Spanish (2025), p. 14",Same on the USCIS asylum interview page
+confidential,es,confidencial,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,USCIS Preparing for Your Affirmative Asylum Interview (es twin): What to Expect,
+attorney,es,abogado,official,https://languageaccess.courts.ca.gov/system/files/2025-05/Legal%20Glossary%20English%20Spanish.pdf,"Judicial Council of California Legal Glossary English-Spanish (2025), p. 2",Same on the USCIS asylum interview page
+accredited representative,es,representante autorizado,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/el-proceso-de-asilo-afirmativo,"USCIS The Affirmative Asylum Process (es twin): step 5, ""an attorney or accredited representative""",Another USCIS heading uses 'representante acreditado'; Form G-28's Spanish title uses 'autorizado'
+free legal help,es,ayuda legal gratuita,machine,,,"USCIS Spanish uses 'servicios legales gratuitos' for 'free legal service(s)'; the court glossary has 'organizaciones de ayuda legal' for 'legal aid organizations'"
+legal advice,es,asesoría legal,official,https://www.uscis.gov/es/herramientas/glosario,"USCIS Glossary (es twin): ""… organization can give legal advice""",
+notario,es,notario,machine,,,USCIS Spanish (Estafas Comunes) writes 'notario público'; in the US a notary public may not give legal help. Scam red flag (Plan.md C32)
+fraud,es,fraude,official,https://languageaccess.courts.ca.gov/system/files/2025-05/Legal%20Glossary%20English%20Spanish.pdf,"Judicial Council of California Legal Glossary English-Spanish (2025), p. 6",
+scam,es,estafa,official,https://www.uscis.gov/es/fraude-estafas-y-fallas-en-el-desempeno/evite-las-estafas-de-inmigracion/estafas-comunes,"USCIS Common Scams (es twin): title ""Common Scams""",Source has the plural 'Estafas'
+contact center,es,Centro de Contacto,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): Rescheduling, ""call the USCIS Contact Center""",Full name 'Centro de Contacto de USCIS'
+field office,es,oficina local,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/el-proceso-de-asilo-afirmativo,"USCIS The Affirmative Asylum Process (es twin): step 7, ""Were interviewed at a USCIS field office""",
+immigration court,es,tribunal de inmigración,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,USCIS Preparing for Your Affirmative Asylum Interview (es twin): Bringing an Attorney,
+immigration judge,es,juez de inmigración,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,USCIS Preparing for Your Affirmative Asylum Interview (es twin): Missing Your Interview,
+hearing,es,audiencia,official,https://languageaccess.courts.ca.gov/system/files/2025-05/Legal%20Glossary%20English%20Spanish.pdf,"Judicial Council of California Legal Glossary English-Spanish (2025), p. 7",Same on the USCIS I-589 page ('next hearing date')
+referral to immigration court,es,referido al tribunal de inmigración,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): Attorney Is Unavailable, ""accept referral to the immigration court""",
+removal proceedings,es,procedimientos de remoción,official,https://www.uscis.gov/es/i-589,"USCIS I-589 page (es twin): ""in removal proceedings""",The Affirmative Asylum Process (es) also says 'proceso de deportación' once
+deportation,es,deportación,official,https://www.uscis.gov/es/herramientas/glosario,"USCIS Glossary (es twin): ""exclusion and deportation""",
+employment authorization document,es,Documento de Autorización de Empleo,official,https://www.uscis.gov/es/residencia-permanente-tarjeta-verde/procesos-y-procedimientos-para-la-residencia-permanente/documento-de-autorizacion-de-empleo,USCIS Employment Authorization Document (es twin): title,EAD
+work permit,es,permiso de trabajo,official,https://www.uscis.gov/es/fraude-estafas-y-fallas-en-el-desempeno/evite-las-estafas-de-inmigracion/estafas-comunes,"USCIS Common Scams (es twin): ""visa, Green Card, or work permit faster""",
+parole,es,permiso de permanencia temporal,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): Missing Your Interview, ""authorized period of parole""",Immigration parole. Never 'libertad condicional' (criminal parole in court glossaries)
+deadline,es,plazo límite,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/el-proceso-de-asilo-afirmativo,"USCIS The Affirmative Asylum Process (es twin): Bars, ""The 1-year deadline""",
+mailing address,es,dirección postal,machine,,,USCIS Spanish uses 'dirección postal' for the address notices are mailed to (Preparing for Your Affirmative Asylum Interview)
+change of address,es,cambio de dirección,official,https://www.uscis.gov/es/cambiodedireccion,"USCIS Change of Address (es twin): ""must report a change of address""",
+decision,es,decisión,official,https://languageaccess.courts.ca.gov/system/files/2025-05/Legal%20Glossary%20English%20Spanish.pdf,"Judicial Council of California Legal Glossary English-Spanish (2025), p. 4",Same on the USCIS asylum interview page
+approval,es,aprobación,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/tipos-de-decisiones-de-asilo-afirmativo,"USCIS Types of Asylum Decisions (es twin): ""Recommended Approval""",
+denial,es,denegación,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/tipos-de-decisiones-de-asilo-afirmativo,"USCIS Types of Asylum Decisions (es twin): ""Final Denial""",
+dismissal,es,desestimación,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): ""Dismissal of Asylum Application – Failure to Appear""",
+security check,es,verificación de seguridad,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/el-proceso-de-asilo-afirmativo,"USCIS The Affirmative Asylum Process (es twin): step 7, ""Have pending security checks""",Source has the plural 'verificaciones de seguridad'
+check-in,es,registro de llegada,machine,,,"Arriving and checking in at the asylum office; 'presentarse' is also natural"
+disability accommodation,es,acomodo por discapacidad,official,https://www.uscis.gov/es/programas-humanitarios/refugiados-y-asilo/asilo/como-prepararse-para-su-entrevista-de-asilo,"USCIS Preparing for Your Affirmative Asylum Interview (es twin): Interpreters, ""disability accommodation request""",
+asylum,fa,پناهندگی,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): Form I-589 title ""Application for Asylum""",Same in Farsi
+affirmative asylum,fa,پناهندگی ایجابی (affirmative asylum),machine,,,"Applying to USCIS directly, not in court. USCIS's Dari page renders the title 'Affirmative Asylum Interview Scheduling' as 'برنامه ریزی مصاحبه تایید پناهندگی عمومی' (reads as 'general asylum approval'), so it was not used. farsi: پناهندگی ایجابی / افیرمتیو"
+asylum interview,fa,مصاحبه پناهندگی,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""an urgent request for an asylum interview""",Seed term. Same in Farsi
+asylum office,fa,دفتر پناهندگی,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""contact the asylum office with jurisdiction""",Same in Farsi
+asylum officer,fa,افسر پناهندگی,machine,,,"Extraction uncertain: appears split across a line break in USCIS's Dari asylum guide (Applying for Asylum as an Afghan National, p. 1: 'the asylum officer who interviews you'). farsi: افسر پناهندگی / مأمور پناهندگی"
+asylum application,fa,درخواست پناهندگی,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): Form I-589 title ""Application for Asylum""",Same in Farsi
+application for asylum and for withholding of removal,fa,درخواست پناهندگی و عدم اخراج,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""Form I-589, Application for Asylum and for Withholding of Removal"" (EAD alert)","Form title. The same USCIS page also writes 'درخواست پناهندگی و حذف اخراج' and 'درخواست برای پناهندگی و حذف اخراج': USCIS's own Dari is inconsistent; checker to pick one. Same in Farsi"
+withholding of removal,fa,عدم اخراج,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): Form I-589 title (EAD alert)","Variant on the same page: 'حذف اخراج'. farsi (common legal usage, not from a source): منع اخراج"
+convention against torture,fa,کنوانسیون منع شکنجه,machine,,,Same in Farsi
+grant of asylum,fa,اعطای پناهندگی,machine,,,"USCIS Dari writes 'پناهندگی به شما اعطا شده است' for 'you were granted asylum' (I-730 section). Same in Farsi"
+applicant,fa,متقاضی,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""The law requires applicants for asylum""",Source has the plural 'متقاضیان'. Same in Farsi
+principal applicant,fa,متقاضی اصلی,machine,,,USCIS Dari uses 'متقاضیان اصلی' in the SIV section (English sentence not matched). Same in Farsi
+dependent,fa,وابسته,machine,,,"A family member included on the asylum application. Seed term. Same in Farsi"
+derivative,fa,مشتق,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""This is considered 'derivative' refugee or asylee status"" (I-730 section)","USCIS writes it in quotes; literally 'derived'. A family may not understand it alone; plain alternative 'عضو خانوادهٔ شامل درخواست'. Same in Farsi"
+spouse,fa,همسر,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""derivative family member (spouse or unmarried child younger than 21)""",Same in Farsi
+unmarried child,fa,فرزند مجرد,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""derivative family member (spouse or unmarried child younger than 21)""",Everyday Afghan usage also 'طفل مجرد' or 'اولاد مجرد'. Same in Farsi
+family member,fa,عضو خانواده,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""derivative family member (spouse or unmarried child younger than 21)""",Afghan everyday also 'عضو فامیل'. Same in Farsi
+interpreter,fa,ترجمان,machine,,,"Seed term. 'ترجمان' is the usual Afghan word for a spoken interpreter; USCIS's Dari page uses 'مترجم' for a written translator. farsi: مترجم (شفاهی)"
+qualified interpreter,fa,ترجمان واجد شرایط,machine,,,"Someone who meets USCIS's rules: fluent in English and the applicant's language, 18 or older, not the lawyer, a witness, or a home-government employee. farsi: مترجم واجد شرایط"
+contract interpreter,fa,ترجمان قراردادی,machine,,,"USCIS's own phone interpreter who only checks the family's interpreter; not the family's interpreter. farsi: مترجم قراردادی"
+interview notice,fa,اطلاعیه مصاحبه,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""Your interview notice will list the exact location""",Same in Farsi
+appointment notice,fa,اطلاعیه قرار ملاقات,machine,,,USCIS Dari uses 'قرار ملاقات' for 'appointment' (biometric services appointment). farsi: اطلاعیه وقت ملاقات
+notice of action,fa,اطلاعیه اقدام (Notice of Action),machine,,,Form I-797C title; English kept in parentheses so the family can match the printed letter. Same in Farsi
+receipt notice,fa,اطلاعیه رسید,machine,,,The earlier I-797C sent after filing. Same in Farsi
+receipt number,fa,شماره رسید,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""You will need the receipt number we provided you""",Same in Farsi
+a-number,fa,شماره A-Number,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""you can use your A-Number to retrieve your Form I-94""","USCIS keeps 'A-Number' in Latin letters. farsi: شماره A (A-number) (NYC MOIA Immigration Court 101, Farsi)"
+case status,fa,وضعیت دوسیه,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""you can check your Case Status Online""","'دوسیه' is the Afghan word for a case file. farsi: وضعیت پرونده"
+failure to appear,fa,عدم حضور,machine,,,Not attending the interview. Same in Farsi
+exceptional circumstances,fa,شرایط استثنایی,machine,,,"USCIS's standard for rescheduling a missed interview. USCIS's Dari asylum guide uses 'شرایط فوق العاده' for 'extraordinary circumstances', a different standard (one-year deadline); keep them apart. Same in Farsi"
+reschedule,fa,تعیین وقت مجدد,machine,,,farsi: زمان‌بندی مجدد / تغییر وقت
+reschedule request,fa,درخواست تعیین وقت مجدد,machine,,,farsi: درخواست زمان‌بندی مجدد
+biometrics,fa,معلومات بایومتریک,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""provide biometrics (fingerprints, photograph, and/or signature)"" (EAD section)","USCIS Dari spells it 'بایومتریک', 'بیومتریک' and 'بایومیتریک' on the same page. farsi: اطلاعات بیومتریک"
+biometric services appointment,fa,قرار ملاقات خدمات بیومتریک,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""if you need to attend a biometric services appointment""",farsi: وقت ملاقات خدمات بیومتریک
+application support center,fa,مرکز پشتیبانی درخواست (ASC),machine,,,Where biometrics are taken. Same in Farsi
+fingerprints,fa,اثر انگشت,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""biometrics (fingerprints, photograph, and/or signature)""",The same page also says 'نشان انگشت'. Same in Farsi
+identity document,fa,سند هویت,machine,,,"'تذکره' is the Afghan national ID specifically, not any ID. farsi: مدرک شناسایی"
+passport,fa,پاسپورت,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""Form I-94, passport, or other travel documents""",farsi: گذرنامه
+travel document,fa,سند سفر,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""Application for Travel Documents, Parole Documents, and Arrival/Departure Records""",Source has the plural 'اسناد سفر'. farsi: مدرک سفر
+arrival-departure record,fa,سوابق ورود و خروج,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""Application for Travel Documents, Parole Documents, and Arrival/Departure Records""",Form I-94. Plural as in the source; singular 'سابقهٔ ورود و خروج'. Same in Farsi
+original document,fa,سند اصلی,machine,,,farsi: مدرک اصلی
+birth certificate,fa,سند تولد,machine,,,"Afghan also 'تصدیق‌نامهٔ تولد'; the Afghan تذکره often stands in for it. farsi: شناسنامه / گواهی تولد"
+marriage certificate,fa,نکاح خط,machine,,,"'نکاح خط' is the Afghan marriage certificate. farsi: سند ازدواج / عقدنامه"
+certified translation,fa,ترجمهٔ تصدیق‌شده,machine,,,"USCIS Dari describes it as a translation 'که صحت و تکمیل بودن آن توسط یک مترجم تصدیق گردیده'. farsi: ترجمهٔ رسمی"
+evidence,fa,شواهد,machine,,,"USCIS Dari also uses 'مدارک' (documents) and 'اسناد'. Same in Farsi"
+oath,fa,سوگند,machine,,,Afghan also 'حلف'. Same in Farsi
+witness,fa,شاهد,machine,,,Same in Farsi
+confidential,fa,محرمانه,machine,,,"USCIS Dari uses 'محرمیت' for 'confidentiality' (""Confidentiality restrictions may apply""). Same in Farsi"
+attorney,fa,وکیل,official,https://www.uscis.gov/sites/default/files/document/flyers/AvoidScamsFlyerAfghanNationalsDr.pdf,"USCIS Avoid Scams flyer (Dari), p. 1: ""make sure the person helping you is an attorney or accredited representative""",Same in Farsi (NYC MOIA Farsi flyer also 'وکیل')
+accredited representative,fa,نماینده معتبر,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""Form G-28, Notice of Entry of Appearance as Attorney or Accredited Representative""",The scam flyer also says 'نماینده رسمی'. Same in Farsi
+free legal help,fa,کمک حقوقی رایگان,machine,,,"USCIS's Dari ILSAA flyer says 'خدمات قانونی مهاجرت را رایگان' (immigration legal services at no cost). farsi: خدمات حقوقی رایگان (NYC MOIA Farsi: 'خدمات حقوقی مهاجرتی رایگان')"
+legal advice,fa,مشوره حقوقی,official,https://www.uscis.gov/sites/default/files/document/flyers/AvoidScamsFlyerAfghanNationalsDr.pdf,"USCIS Avoid Scams flyer (Dari), p. 1: ""Only an attorney or an accredited representative … can give you legal advice""",farsi: مشاوره حقوقی (NYC MOIA Farsi)
+notario,fa,پابلک نوتری (notario),machine,,,"USCIS Dari scam flyer renders 'notario público' as 'دفاتر عمومی مهر اسناد یا پابلک نوتری'. A notario is not a lawyer and may not give legal help in the US. Same in Farsi"
+fraud,fa,تقلب,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""force, fraud, or coercion"" (forced marriage section)",The scam flyer uses 'جعلکاری' for 'Social Security fraud'. Same in Farsi
+scam,fa,کلاهبرداری,machine,,,"Extraction uncertain: in USCIS's Dari Avoid Scams flyer (PDF) the word comes out as 'کالهبرداری' (split lam-alef). The flyer also uses 'فریبکاری'. Same in Farsi"
+contact center,fa,مرکز تماس,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""may contact the USCIS Contact Center at 800-375-5283""",Same in Farsi
+field office,fa,دفتر ساحوی,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""your asylum interview might take place at a USCIS field office""",farsi: دفتر محلی
+immigration court,fa,محکمهٔ مهاجرت,machine,,,"'محکمه' is the Afghan word for court. farsi: دادگاه مهاجرت (NYC MOIA Immigration Court 101, Farsi)"
+immigration judge,fa,قاضی مهاجرت,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Farsi-Persian.pdf,"NYC MOIA Immigration Court 101 (Farsi-Persian, 2026), p. 1: ""There will be an Immigration Judge""","From a Farsi government source; the Dari words are the same (Same in Farsi). Word order rebuilt from the PDF's visual (right-to-left) order; letters extracted clean"
+hearing,fa,جلسهٔ محکمه,machine,,,farsi: جلسهٔ رسیدگی (NYC MOIA Farsi)
+referral to immigration court,fa,ارجاع به محکمهٔ مهاجرت,machine,,,farsi: ارجاع به دادگاه مهاجرت
+removal proceedings,fa,مراحل قانونی اخراج,machine,,,"A case in immigration court that can end in removal. farsi: دادرسی اخراج"
+deportation,fa,اخراج (دیپورت),official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Farsi-Persian.pdf,"NYC MOIA Immigration Court 101 (Farsi-Persian, 2026), p. 1: ""You could be deported""","From a Farsi government source; Afghans use the same words, often just 'دیپورت' (Same in Farsi). Letters extracted clean"
+employment authorization document,fa,سند جواز کار,official,https://www.uscis.gov/sites/default/files/document/flyers/AvoidScamsFlyerAfghanNationalsDr.pdf,"USCIS Avoid Scams flyer (Dari), p. 2: ""an Employment Authorization Document (EAD)""",EAD. farsi: مجوز کار
+work permit,fa,مجوز کار,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""USCIS will mail your work permit to the address you provided""",The scam flyer says 'جواز کار'. Same in Farsi
+parole,fa,پیرول,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""re-parole (an additional period of parole)""","USCIS Dari also uses 'اقامت مشروط' (asylum guide) and 'اقامه موقت' (ILSAA flyer, for humanitarian parole); Afghan parolees widely say 'پیرول'. Never criminal parole. farsi: پارول"
+deadline,fa,مهلت,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""the 1-year filing deadline to apply for asylum""",Same in Farsi
+mailing address,fa,آدرس پستی,machine,,,USCIS Dari uses 'آدرس' for address. farsi: نشانی پستی
+change of address,fa,تغییر آدرس,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""Form AR-11, Alien's Change of Address Card""",farsi: تغییر نشانی
+decision,fa,تصمیم,machine,,,"USCIS Dari writes 'منتظر تصمیم ادارهٔ USCIS' for 'pending with USCIS'. Same in Farsi"
+approval,fa,تایید,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""if your application is approved""","Afghan also 'منظوری'. Same in Farsi"
+denial,fa,رد,machine,,,As in 'رد درخواست' (application denied). Same in Farsi
+dismissal,fa,لغو درخواست (dismissal),machine,,,"USCIS closes the application without deciding it, e.g. after a missed interview; different from a denial ('رد'). Checker: pick the clearest Dari word. Same in Farsi"
+security check,fa,بررسی امنیتی,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""conduct additional background and security checks""",Source has the plural 'بررسی های امنیتی'. Same in Farsi
+check-in,fa,ثبت حضور,machine,,,Arriving and checking in at the asylum office. farsi: پذیرش
+disability accommodation,fa,تسهیلات برای افراد دارای معلولیت,machine,,,"The one case where USCIS provides the interpreter (deaf or hard of hearing). Same in Farsi"
+asylum,ne,शरण,machine,,,
+affirmative asylum,ne,अफर्मेटिभ शरण (affirmative asylum),machine,,,"Means applying to USCIS directly, not in court. A literal 'सकारात्मक' would read as 'positive', so the English is kept"
+asylum interview,ne,शरण अन्तर्वार्ता,machine,,,Seed term
+asylum office,ne,शरण कार्यालय,machine,,,
+asylum officer,ne,शरण अधिकृत,machine,,,
+asylum application,ne,शरण आवेदन,machine,,,
+application for asylum and for withholding of removal,ne,शरण तथा निष्कासन रोक्काका लागि आवेदन,machine,,,Form I-589 title
+withholding of removal,ne,निष्कासन रोक्का,machine,,,A protection that stops the US from sending someone back to a country where they would be harmed
+convention against torture,ne,यातनाविरुद्धको महासन्धि,machine,,,Short form of the UN convention's Nepali name
+grant of asylum,ne,शरण प्रदान,machine,,,
+applicant,ne,आवेदक,machine,,,
+principal applicant,ne,मुख्य आवेदक,machine,,,
+dependent,ne,आश्रित,machine,,,Seed term. A family member included on the asylum application
+derivative,ne,आश्रित सदस्य (derivative),machine,,,USCIS's word for a spouse or child included on the application who gets status through the main applicant
+spouse,ne,पति/पत्नी,machine,,,'जीवनसाथी' also possible
+unmarried child,ne,अविवाहित सन्तान,machine,,,Under 21 in this context
+family member,ne,परिवारको सदस्य,machine,,,
+interpreter,ne,दोभाषे,machine,,,"Seed term. The NYC MOIA Nepali flyer writes 'दोभासे सेवा' for 'interpretation is available'; both spellings are used"
+qualified interpreter,ne,योग्य दोभाषे,machine,,,"Someone who meets USCIS's rules: fluent in English and the applicant's language, 18 or older, not the lawyer, a witness, or a home-government employee"
+contract interpreter,ne,करार दोभाषे,machine,,,USCIS's own phone interpreter who only checks the family's interpreter; not the family's interpreter
+interview notice,ne,अन्तर्वार्ता सूचना,machine,,,
+appointment notice,ne,भेटघाट सूचना,machine,,,Nepali speakers in the US often say 'अपोइन्टमेन्ट'
+notice of action,ne,कारबाही सूचना (Notice of Action),machine,,,Form I-797C title; English kept so the family can match the printed letter
+receipt notice,ne,प्राप्ति सूचना,machine,,,The earlier notice USCIS sends after an application is filed
+receipt number,ne,रसिद नम्बर,machine,,,
+a-number,ne,A-नम्बर (A-number),official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 1: ""you will need your A-number""",Word extracted clean
+case status,ne,केसको स्थिति,machine,,,'मुद्दा' would suggest a lawsuit; 'केस' is how Nepali speakers in the US refer to an immigration application
+failure to appear,ne,उपस्थित नहुनु,machine,,,Not attending the interview
+exceptional circumstances,ne,असाधारण परिस्थिति,machine,,,USCIS's standard for rescheduling a missed interview
+reschedule,ne,समय पुनः निर्धारण गर्नु,machine,,,
+reschedule request,ne,समय पुनर्निर्धारण अनुरोध,machine,,,
+biometrics,ne,बायोमेट्रिक विवरण,machine,,,"Fingerprints, photo and signature"
+biometric services appointment,ne,बायोमेट्रिक सेवा भेटघाट,machine,,,
+application support center,ne,आवेदन सहायता केन्द्र (ASC),machine,,,Where biometrics are taken
+fingerprints,ne,औँलाको छाप,machine,,,'औँठाछाप' means thumbprint only
+identity document,ne,परिचयपत्र,machine,,,Any document that proves identity
+passport,ne,राहदानी,machine,,,Colloquially 'पासपोर्ट'
+travel document,ne,यात्रा कागजात,machine,,,
+arrival-departure record,ne,आगमन-प्रस्थान अभिलेख,machine,,,Form I-94
+original document,ne,सक्कल कागजात,machine,,,
+birth certificate,ne,जन्मदर्ता प्रमाणपत्र,machine,,,
+marriage certificate,ne,विवाह दर्ता प्रमाणपत्र,machine,,,
+certified translation,ne,प्रमाणित अनुवाद,machine,,,A translation the translator certifies as complete and correct
+evidence,ne,प्रमाण,machine,,,
+oath,ne,शपथ,machine,,,
+witness,ne,साक्षी,machine,,,
+confidential,ne,गोप्य,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 2: ""free and confidential immigration legal help""",Word extracted clean
+attorney,ne,कानुन व्यवसायी,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 1: ""The government will not provide you with an attorney""",'वकिल' is also common
+accredited representative,ne,मान्यताप्राप्त प्रतिनिधि,machine,,,Works for a Department of Justice-recognized organization; may give legal help
+free legal help,ne,निःशुल्क कानुनी सहायता,machine,,,"Extraction uncertain: the NYC MOIA Nepali flyer (p. 2) has 'free and confidential immigration legal help' as 'निःःशुल्क र गोप्य अध्यागमन कानुनी सहायता', with a doubled visarga"
+legal advice,ne,कानुनी सल्लाह,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 1: ""It is not legal advice""",Words extracted clean
+notario,ne,नोटारियो (notario),machine,,,A notary (notario) is not a lawyer and may not give legal help in the US; a common scam
+fraud,ne,जालसाजी,machine,,,
+scam,ne,ठगी,machine,,,
+contact center,ne,सम्पर्क केन्द्र,machine,,,USCIS Contact Center
+field office,ne,क्षेत्रीय कार्यालय,machine,,,
+immigration court,ne,अध्यागमन अदालत,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 1: title ""Immigration Court 101""",Words extracted clean
+immigration judge,ne,अध्यागमन न्यायाधीश,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 1: ""There will be an Immigration Judge""",Words extracted clean
+hearing,ne,सुनुवाइ,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 1: ""Check information for your hearing""",Word extracted clean
+referral to immigration court,ne,अध्यागमन अदालतमा प्रेषण,machine,,,USCIS sends the case to an immigration judge instead of deciding it
+removal proceedings,ne,निष्कासन कारबाही,machine,,,A case in immigration court that can end in removal from the US
+deportation,ne,देश निकाला,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 1: ""You could be deported""",Words extracted clean
+employment authorization document,ne,रोजगारी अनुमति कागजात (EAD),machine,,,
+work permit,ne,कार्य अनुमतिपत्र,machine,,,"Avoid 'श्रम स्वीकृति', which in Nepal means a permit to work abroad"
+parole,ne,प्यारोल (अस्थायी प्रवेश अनुमति),machine,,,"Immigration parole: permission to be in the US for a time. In Nepali 'प्यारोल' can also mean release from prison; the parenthesis makes the meaning clear"
+deadline,ne,अन्तिम म्याद,machine,,,
+mailing address,ne,हुलाक ठेगाना,machine,,,
+change of address,ne,ठेगाना परिवर्तन,machine,,,
+decision,ne,निर्णय,machine,,,
+approval,ne,स्वीकृति,machine,,,"The NYC MOIA Nepali flyer uses 'स्वीकृत' for 'approved' (adjective)"
+denial,ne,अस्वीकृति,machine,,,"The NYC MOIA Nepali flyer uses 'अस्वीकृत' for 'denied' (adjective)"
+dismissal,ne,खारेजी,machine,,,"USCIS closes the application without deciding it, e.g. after a missed interview; different from a denial"
+security check,ne,सुरक्षा जाँच,machine,,,
+check-in,ne,उपस्थिति दर्ता,machine,,,Arriving and checking in at the asylum office
+disability accommodation,ne,अपाङ्गताका लागि उचित व्यवस्था,machine,,,The one case where USCIS provides the interpreter (deaf or hard of hearing)
+application for asylum and for withholding of removal,ps,د پناه غوښتنې او د اخراج څخه د مخنوې لپاره غوښتنلیک,official,https://www.uscis.gov/humanitarian/information-for-afghans-pashto-translation,"USCIS Information for Afghan Nationals (Pashto page): ""Form I-589, Application for Asylum and for Withholding of Removal"" (EAD alert)",Form title as written on the page
+asylum interview,ps,د پناهندګۍ مرکه,official,https://www.uscis.gov/humanitarian/information-for-afghans-pashto-translation,"USCIS Information for Afghan Nationals (Pashto page): ""your asylum interview might take place at a USCIS field office""",
+field office,ps,ساحوي دفتر,official,https://www.uscis.gov/humanitarian/information-for-afghans-pashto-translation,"USCIS Information for Afghan Nationals (Pashto page): ""your asylum interview might take place at a USCIS field office""",
+biometrics,ps,بایومتریک,official,https://www.uscis.gov/humanitarian/information-for-afghans-pashto-translation,"USCIS Information for Afghan Nationals (Pashto page): ""provide biometrics (fingerprints, photograph, and/or signature)"" (EAD section)",The same page also spells it 'بایومیټریک'
+fingerprints,ps,د ګوتو نښان,official,https://www.uscis.gov/humanitarian/information-for-afghans-pashto-translation,"USCIS Information for Afghan Nationals (Pashto page): ""biometrics (fingerprints, photograph, and/or signature)""",
+parole,ps,پېرول,official,https://www.uscis.gov/humanitarian/information-for-afghans-pashto-translation,"USCIS Information for Afghan Nationals (Pashto page): ""re-parole (an additional period of parole)""",Immigration parole
+attorney,ps,وکیل,official,https://www.uscis.gov/humanitarian/information-for-afghans-pashto-translation,"USCIS Information for Afghan Nationals (Pashto page): ""Form G-28, Notice of Entry of Appearance as Attorney or Accredited Representative""",
+accredited representative,ps,باوري استازي,official,https://www.uscis.gov/humanitarian/information-for-afghans-pashto-translation,"USCIS Information for Afghan Nationals (Pashto page): ""Form G-28, Notice of Entry of Appearance as Attorney or Accredited Representative""","Exact form as in the source, inside 'د وکیل یا باوري استازي په توګه'; possibly an inflected form. Not normalized (no Pashto reader on the team)"
+contact center,ps,د اړیکو مرکز,official,https://www.uscis.gov/humanitarian/information-for-afghans-pashto-translation,"USCIS Information for Afghan Nationals (Pashto page): ""may contact the USCIS Contact Center at 800-375-5283""",
+immigration court,ru,иммиграционный суд,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Russian.pdf,"NYC MOIA Immigration Court 101 (Russian, 2026), p. 1: ""In immigration court"" (source form 'в иммиграционном суде')",Dictionary form of the source's inflected phrase
+immigration judge,ru,иммиграционный судья,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Russian.pdf,"NYC MOIA Immigration Court 101 (Russian, 2026), p. 1: ""There will be an Immigration Judge""",
+attorney,ru,адвокат,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Russian.pdf,"NYC MOIA Immigration Court 101 (Russian, 2026), p. 1: ""If you have an attorney""",The flyer uses 'юрист' for 'attorney' in 'consult an attorney'
+legal advice,ru,юридическая консультация,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Russian.pdf,"NYC MOIA Immigration Court 101 (Russian, 2026), p. 1: ""It is not legal advice"" (source form 'юридической консультацией')",Dictionary form of the source's inflected phrase
+a-number,ru,A-номер,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Russian.pdf,"NYC MOIA Immigration Court 101 (Russian, 2026), p. 1: ""you will need your A-number""",
+hearing,ru,заседание,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Russian.pdf,"NYC MOIA Immigration Court 101 (Russian, 2026), p. 2: ""the hearing will be online""",
+decision,ru,решение,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Russian.pdf,"NYC MOIA Immigration Court 101 (Russian, 2026), p. 2: ""notify you or your attorney of the decision""",
+confidential,ru,конфиденциальный,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Russian.pdf,"NYC MOIA Immigration Court 101 (Russian, 2026), p. 2: ""free and confidential immigration legal help"" (source form 'конфиденциальной')",Dictionary form of the source's inflected adjective
+immigration court,vi,tòa án di trú,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Vietnamese.pdf,"NYC MOIA Immigration Court 101 (Vietnamese, 2026), p. 1: ""In immigration court""",
+immigration judge,vi,thẩm phán di trú,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Vietnamese.pdf,"NYC MOIA Immigration Court 101 (Vietnamese, 2026), p. 1: ""There will be an Immigration Judge""",
+attorney,vi,luật sư,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Vietnamese.pdf,"NYC MOIA Immigration Court 101 (Vietnamese, 2026), p. 1: ""Consult an attorney""",
+legal advice,vi,tư vấn pháp lý,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Vietnamese.pdf,"NYC MOIA Immigration Court 101 (Vietnamese, 2026), p. 1: ""It is not legal advice""",
+deportation,vi,trục xuất,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Vietnamese.pdf,"NYC MOIA Immigration Court 101 (Vietnamese, 2026), p. 1: ""You could be deported""",
+a-number,vi,Số Đăng Ký Người Nước Ngoài (A-number),official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Vietnamese.pdf,"NYC MOIA Immigration Court 101 (Vietnamese, 2026), p. 1: ""you will need your A-number""",The phrase wraps across a line in the PDF
+hearing,vi,phiên điều trần,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Vietnamese.pdf,"NYC MOIA Immigration Court 101 (Vietnamese, 2026), p. 1: ""Check information for your hearing""",
+decision,vi,quyết định,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Vietnamese.pdf,"NYC MOIA Immigration Court 101 (Vietnamese, 2026), p. 2: ""notify you or your attorney of the decision""",
+confidential,vi,bảo mật,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Vietnamese.pdf,"NYC MOIA Immigration Court 101 (Vietnamese, 2026), p. 2: ""free and confidential immigration legal help""",
+immigration court,ar,محكمة الهجرة,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Arabic.pdf,"NYC MOIA Immigration Court 101 (Arabic, 2026), p. 1: title ""Immigration Court 101""","Letters extracted clean (after Unicode normalization of presentation forms); phrase in natural reading order"
+immigration judge,ar,قاضي الهجرة,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Arabic.pdf,"NYC MOIA Immigration Court 101 (Arabic, 2026), p. 2: ""The immigration judge will review the request""",Letters extracted clean
+attorney,ar,محامٍ,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Arabic.pdf,"NYC MOIA Immigration Court 101 (Arabic, 2026), p. 1: ""you may hire an attorney""",Letters extracted clean
+legal advice,ar,مشورة قانونية,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Arabic.pdf,"NYC MOIA Immigration Court 101 (Arabic, 2026), p. 1: ""It is not legal advice""",Letters extracted clean
+a-number,ar,رقم تعريف الأجنبي,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Arabic.pdf,"NYC MOIA Immigration Court 101 (Arabic, 2026), p. 1: ""you will need your A-number""",Letters extracted clean
+hearing,ar,جلسة الاستماع,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Arabic.pdf,"NYC MOIA Immigration Court 101 (Arabic, 2026), p. 1: ""Check information for your hearing""",Letters extracted clean

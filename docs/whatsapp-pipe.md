@@ -65,6 +65,7 @@ This page is the record for the WhatsApp side (relay, orchestrator pipe, call st
 | The Claude turn, its tools, its prompt | `orchestrator/turn.py`, `tools.py`, `prompts.py` |
 | Official-source answers to the user's questions (C38) | `orchestrator/research_questions.py` |
 | Translation to and from English | `translation/translate.py` |
+| Preset glossary (person 2 owns it): `terms.csv`, loaded with `python -m app.glossary.load` | `glossary/` |
 | Fake phone agent and `POST /dev/fake-call`; fake research and `POST /dev/fake-research`; fake phone worker and `POST /dev/fake-phone` (dev only) | `backend/app/dev/` |
 | Test fakes and fixtures for all of the above | `backend/tests/whatsapp_fakes.py`, `conftest.py` |
 
