@@ -69,6 +69,7 @@ Files: `runner.py` (lifecycle, dispatch, hold, the person, the bridge), `runner_
 - **Acting on part of a menu.** A decision is dropped only if the next utterance arrives while Claude is still deciding. When options come as separate utterances, the agent can press an early option before hearing a better one (seen in the simulator). The fix needs a "speech started" line event (from voice activity detection) so the runner can hold a choice until the menu goes quiet. That's a change to `line.py`.
 - `say` should return once the audio has played; the adapter must pin this.
 - No `bridging → hold`: a "person" who transfers after the ring can't be undone (state.py).
+- **How the user joins the bridge is not settled.** Carriers send declined and unanswered calls to voicemail, and Twilio reports that as answered, so a plain `ring_user` bridges the rep into voicemail. The bridge spike uses a "Press 1 to join" key-press gate as a stopgap. Whether the product should have a bot asking the user to press a key is still open (alternatives: a WhatsApp heads-up before ringing, answering-machine detection, detecting voicemail after bridging). It also changes what "answered" means in the Plan.md failure rules, so it's a team decision. See [spikes/bridge/README.md](../../spikes/bridge/README.md).
 
 ## Open, with person 2 (`relay/ask_user.py`)
 
