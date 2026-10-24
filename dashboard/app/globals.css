@@ -1,0 +1,215 @@
+/* Design tokens (docs/specs/task-c-dashboard.md → Design): light money-brand canvas,
+   forest green primary, bright green only as a highlighter fill, square corners, flat
+   hairline cards. Sized for a 1080p screen recording. */
+:root {
+  --canvas: #f3f5f0;
+  --card: #ffffff;
+  --sunk: #f7f8f5;
+  --line: #e6e9e3;
+  --line-strong: #d3d9cf;
+  --ink: #0f1a14;
+  --muted: #4f5c54;
+  --faint: #66726b;
+  --forest: #0e3b2c;
+  --forest-2: #17573f;
+  --lime: #a3ee73;
+  --lime-soft: #e5f8d5;
+  --amber: #9a5b00;
+  --amber-mark: #ffd98a;
+  --amber-soft: #fff3dc;
+  --coral: #b3402e;
+  --coral-soft: #fde7e2;
+  --paper: #fffefa;
+  --paper-ink: #2c3530;
+
+  --font-ui: var(--font-sans), "Noto Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-code: var(--font-mono), ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  /* Type scale */
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 15px;
+  --fs-lg: 17px;
+  --fs-xl: 22px;
+  --fs-hero: clamp(28px, 2.4vw, 42px);
+  --fs-timer: clamp(34px, 2.8vw, 50px);
+
+  --header-h: 56px;
+  --gap: 14px;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--forest-2);
+  outline-offset: 2px;
+}
+
+img {
+  max-width: 100%;
+}
+
+/* Shared primitives. Components add layout in their own CSS modules. */
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.mono {
+  font-family: var(--font-code);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  background: var(--lime-soft);
+  color: var(--forest);
+}
+
+.pill.warn {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.pill.bad {
+  background: var(--coral-soft);
+  color: var(--coral);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  padding: 8px 14px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.btn:hover {
+  border-color: var(--forest-2);
+}
+
+.btn.primary {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: #fff;
+}
+
+.btn.danger {
+  color: var(--coral);
+}
+
+.btn.danger:hover {
+  border-color: var(--coral);
+}
+
+/* Highlighter marks on the letter (the "document-native" detail). */
+.mark {
+  background: linear-gradient(transparent 12%, var(--lime) 12%, var(--lime) 88%, transparent 88%);
+  padding: 0 2px;
+}
+
+.mark.warn {
+  background: linear-gradient(
+    transparent 12%,
+    var(--amber-mark) 12%,
+    var(--amber-mark) 88%,
+    transparent 88%
+  );
+}
+
+.pin {
+  display: inline-grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--forest);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-ui);
+  vertical-align: 1px;
+  flex: none;
+}
+
+.pin.warn {
+  background: var(--amber);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0.2;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

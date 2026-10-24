@@ -1,0 +1,74 @@
+/* One screen at 1080p: the three columns fill the viewport and scroll inside. */
+.page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  max-width: 1880px;
+  margin: 0 auto;
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+  padding-bottom: 14px;
+}
+
+.grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(300px, 340px) minmax(0, 1fr) minmax(300px, 360px);
+  gap: var(--gap);
+}
+
+.live {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.feed {
+  flex: 1;
+  padding: 16px 26px 20px;
+}
+
+.status {
+  color: var(--faint);
+}
+
+.offline {
+  position: fixed;
+  top: calc(var(--header-h) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 6px 12px;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-size: var(--fs-sm);
+  z-index: 30;
+}
+
+@media (max-width: 1100px) {
+  .page {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .live {
+    order: -1;
+  }
+
+  .feed {
+    max-height: 520px;
+  }
+}
+
+@media (max-width: 640px) {
+  .feed {
+    padding: 14px 16px;
+  }
+}

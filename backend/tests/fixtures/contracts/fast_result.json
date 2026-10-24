@@ -1,0 +1,63 @@
+{
+  "case_id": "case_123",
+  "status": "ok",
+  "image_issue": null,
+  "doc_type": "uscis_i797c_asylum_interview",
+  "issuer": "USCIS",
+  "deadline": "2026-11-18",
+  "what_is_asked": "Attend asylum interview with dependents and a qualified interpreter",
+  "appointment": {
+    "date": "2026-11-18",
+    "time": "08:30",
+    "location_ref": "<ref:interview_location>",
+    "citation": "p1"
+  },
+  "checklist_en": [
+    {
+      "kind": "who_must_come",
+      "item": "All dependents listed on the I-589",
+      "citation": "p1 §I"
+    },
+    {
+      "kind": "who_must_come",
+      "item": "An interpreter if you are not fluent in English: 18 or older, not your attorney or a witness, not working for your country's government, no pending asylum case of their own",
+      "citation": "p1 §I"
+    },
+    {
+      "kind": "bring",
+      "item": "ID for you and each dependent (name, date of birth, place of birth, nationality)",
+      "citation": "p1 §II"
+    },
+    {
+      "kind": "bring",
+      "item": "Original and one copy of relationship documents (marriage or birth certificates)",
+      "citation": "p1 §II"
+    },
+    {
+      "kind": "deadline",
+      "item": "If your attorney will join remotely, their election form is due 10 days before the interview",
+      "citation": "p1 §I"
+    }
+  ],
+  "key_facts": [
+    {
+      "field": "receipt_number",
+      "ref": "<ref:receipt_number>",
+      "citation": "p1"
+    },
+    {
+      "field": "a_number",
+      "ref": "<ref:a_number>",
+      "citation": "p1"
+    }
+  ],
+  "explanation_en": "This is a notice from USCIS scheduling your asylum interview...",
+  "urgency": "high",
+  "verification": "pending",
+  "proposed_facts": [
+    {
+      "fact": "Has an asylum interview scheduled",
+      "source": "from_document"
+    }
+  ]
+}

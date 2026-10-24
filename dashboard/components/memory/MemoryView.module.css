@@ -1,0 +1,183 @@
+.page {
+  min-height: 100vh;
+  max-width: 1880px;
+  margin: 0 auto;
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+  /* Room for the Fixtures bar. */
+  padding-bottom: 80px;
+}
+
+.main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding-top: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.intro h1 {
+  margin: 0;
+  font-weight: 650;
+  font-size: var(--fs-hero);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+
+.intro p {
+  margin: 8px 0 0;
+  font-size: var(--fs-lg);
+  color: var(--muted);
+}
+
+.status {
+  color: var(--faint);
+}
+
+.empty {
+  margin: 0;
+  padding: 28px 26px;
+  font-size: var(--fs-lg);
+  color: var(--muted);
+}
+
+.sheet {
+  padding: 4px 26px;
+}
+
+/* Label column on the left, the things we keep on the right (the approved mockup). */
+.section {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 20px;
+  padding: 18px 0;
+  transition: opacity 300ms ease;
+}
+
+.section + .section {
+  border-top: 1px solid var(--line);
+}
+
+.section h2 {
+  margin: 0;
+  padding-top: 16px;
+}
+
+.fading {
+  opacity: 0;
+}
+
+.none {
+  margin: 0;
+  padding: 14px 0;
+  color: var(--faint);
+}
+
+.profile {
+  margin: 0;
+  padding: 10px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 40px;
+}
+
+.profile dt {
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+
+.profile dd {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 500;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.text {
+  font-size: var(--fs-lg);
+  font-weight: 500;
+}
+
+.en {
+  font-size: var(--fs-sm);
+  color: var(--faint);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  color: var(--forest-2);
+}
+
+.failed {
+  margin: 0;
+  text-align: center;
+  color: var(--coral);
+}
+
+.history {
+  padding: 18px 26px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.history h2 {
+  margin: 0;
+}
+
+.offline {
+  position: fixed;
+  top: calc(var(--header-h) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 6px 12px;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-size: var(--fs-sm);
+  z-index: 30;
+}
+
+@media (max-width: 760px) {
+  .sheet,
+  .history {
+    padding-inline: 16px;
+  }
+
+  .section {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .section h2 {
+    padding-top: 0;
+  }
+}

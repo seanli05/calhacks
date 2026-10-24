@@ -1,0 +1,15 @@
+{
+  "case_id": "case_123",
+  "verification": {
+    "status": "verified",
+    "official_phone": "+18003755283",
+    "letter_phone_matches": null,
+    "evidence": [
+      "https://www.uscis.gov/contactcenter"
+    ],
+    "red_flags": []
+  },
+  "call_recommended": true,
+  "brief_id": "brief_77",
+  "call_goal_en": "Confirm the interview is still scheduled; ask what to do if the interpreter can't come"
+}

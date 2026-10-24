@@ -1,0 +1,107 @@
+.tracker {
+  --t-fg: var(--ink);
+  --t-muted: var(--muted);
+  --t-faint: var(--faint);
+  --t-line: var(--line-strong);
+  --t-done: var(--forest);
+  --t-done-fg: var(--lime);
+  --t-active: var(--ink);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.dark {
+  --t-fg: #fff;
+  --t-muted: #cfe3d8;
+  --t-faint: #9dbbac;
+  --t-line: rgba(255, 255, 255, 0.22);
+  --t-done: var(--lime);
+  --t-done-fg: var(--forest);
+  --t-active: var(--lime);
+}
+
+.tracker li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--t-faint);
+}
+
+.tracker li::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  left: 20px;
+  right: 0;
+  height: 1.5px;
+  background: var(--t-line);
+}
+
+.tracker li:last-child::before {
+  display: none;
+}
+
+.n {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--t-line);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  z-index: 1;
+}
+
+.tracker .done {
+  color: var(--t-muted);
+}
+
+.tracker .done::before {
+  background: var(--t-done);
+}
+
+.done .n {
+  background: var(--t-done);
+  border-color: var(--t-done);
+  color: var(--t-done-fg);
+}
+
+.tracker .active {
+  color: var(--t-fg);
+  font-weight: 600;
+}
+
+.active .n {
+  background: var(--t-active);
+  border-color: var(--t-active);
+}
+
+.pulse .n {
+  animation: ring 2s ease-out infinite;
+}
+
+.tracker .todo {
+  color: var(--t-faint);
+}
+
+@keyframes ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(23, 87, 63, 0.35);
+  }
+  100% {
+    box-shadow: 0 0 0 12px rgba(23, 87, 63, 0);
+  }
+}
+
+@media (max-width: 640px) {
+  .tracker li {
+    font-size: var(--fs-xs);
+  }
+}

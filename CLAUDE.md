@@ -44,14 +44,21 @@ Every change must keep these true. If one would be broken, stop and raise it wit
 - Agents talk to each other through `jobs` and `events` in Postgres, passing IDs and short fields. Don't import another component's internals or call its functions directly.
 
 ### Ownership and boundaries
-- Each person owns one area (see the spec's team split). Work mainly in your own package. If you need to change someone else's code, tell them first.
+- Each person owns one area (see the spec's team split). Work mainly in your own package.
+- Layout: all Python runs in one FastAPI app under `backend/app/`. Each component has its own package there (`orchestrator/`, `relay/`, `memory/`, `translation/`, `research/`, `glossary/`, `phone/`, `db/`, `api/`), with its owner in the package docstring. Shared payloads live in `backend/app/contracts/`. The dashboard goes in `dashboard/`; `mock_agency/` deploys on its own and imports nothing from the backend.
+- Build specs (columns, helper signatures, API shapes) live in `docs/specs/`. They implement Plan.md; they don't change it. If you need to change someone else's code, tell them first.
 - Keep modules small with one job each. If a file is growing past a few hundred lines or doing two things, split it.
-- Database access goes through shared DB helpers, not raw SQL scattered across agents.
+- Database access goes through shared DB helpers, not raw SQL scattered across agents. How to use them and the contracts: [docs/data-layer-guide.md](docs/data-layer-guide.md).
 
 ### Every piece runs alone
 - Each component needs a way to run with fake inputs: a stub job, a canned letter, a fake call report. Nobody should need the whole system running to work on their part.
 - External services (Twilio, Cartesia, Anthropic, web) sit behind thin wrappers so they can be faked in tests and local runs.
 - `main` must always start. Integration breaks get fixed before new features land.
+
+### The mock agency is a test target, not a spec
+- Build the phone agent for real agency phone lines. Its behavior comes from Plan.md, the case brief, and how real phone menus and representatives behave. Never shape it to fit `mock_agency/`.
+- Don't read the mock's code or prompts to decide what the phone agent does. That includes its keyword lists, exact wording, menu numbers, retry counts, and timeouts. Don't copy its prompts into phone agent tests or evals; write varied, realistic cases on their own.
+- Use the mock only for end-to-end runs. If the agent does something a real line would accept and the mock handles it badly, fix the mock to behave more like a real line. Don't bend the agent.
 
 ### Thin harness
 - Use the official SDKs (Anthropic, Twilio, Cartesia) and Pipecat. **No LangChain, LangGraph, CrewAI, or similar frameworks.**
@@ -60,13 +67,14 @@ Every change must keep these true. If one would be broken, stop and raise it wit
 
 ### Configuration and secrets
 - All config (API keys, model IDs, phone numbers, URLs) comes from environment variables through a single settings object. No hard-coded keys, numbers, or model names in the code.
-- Never log or commit secrets, real letters, phone numbers, or personal data. Use placeholder refs for sensitive values in payloads and logs.
+- Never log or commit secrets, real letters, personal phone numbers, or personal data. Use placeholder refs for sensitive values in payloads and logs. Our own demo service numbers (the mock agency line) may go in `.env.example`, never in code.
 - Prompts live in their own files or constants next to the agent that uses them, not inline inside long functions.
 
 ### Async and latency
 - The backend is async end to end. Don't call blocking I/O (sync HTTP, `time.sleep`, sync DB drivers) inside the event loop.
 - Anything user-facing must be fast. Slow work runs in the background, and the user gets a status message while they wait.
 - Put explicit timeouts on every external call and on every wait for the user.
+- The backend runs as one process: some state lives in memory (e.g. photo batching in the WhatsApp pipe). Never run it with `--workers`, and run the dev server with `--reload-dir backend` so changes in `.venv` don't restart it.
 
 ### Errors and observability
 - Follow the spec's failure rules exactly; don't improvise new behavior in the moment.
@@ -86,7 +94,8 @@ Every change must keep these true. If one would be broken, stop and raise it wit
 ### Git workflow
 - Branch per feature (`<name>/<short-topic>`), small PRs, merge to `main` often (several times a day). Long-lived branches will not merge cleanly on Saturday night.
 - Pull `main` before starting work and before opening a PR.
-- Commit messages say what changed and why, in the imperative ("Add hold detection timeout").
+- Commit messages are one short line in the imperative ("Add hold detection timeout"). No body unless the why isn't obvious.
+- No Claude or AI attribution in commits or PRs (no `Co-Authored-By` trailers, no "Generated with" lines).
 - At feature freeze, `main` gets bug fixes only.
 
 ### Scope discipline
@@ -101,6 +110,7 @@ Every change must keep these true. If one would be broken, stop and raise it wit
 
 ## Notes for Claude
 
+- Start with [backend/AGENTS.md](backend/AGENTS.md): a map of the code, the docs, and what's built so far.
 - Read the relevant part of the spec and the existing code before writing new code, and match the conventions already in use.
 - Stay inside the area the current task is about. Ask before editing shared contracts, the DB schema, or another person's component.
 - Never weaken a non-negotiable rule to make something work, even temporarily.

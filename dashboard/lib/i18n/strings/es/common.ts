@@ -1,0 +1,41 @@
+import type { CommonStrings } from "../en/common";
+
+export const common: CommonStrings = {
+  appName: "[App]",
+  nav: {
+    cases: "Mis trámites",
+    memory: "Lo que sabemos de ti",
+    back: "← Mis trámites",
+  },
+  languageSwitch: "Idioma",
+  docTypes: {
+    uscis_i797c_asylum_interview: "Entrevista de asilo",
+  },
+  docTypeFallback: "Carta",
+  stages: {
+    received: "Carta recibida",
+    explaining: "Leyendo tu carta",
+    needs_better_image: "Necesitamos otra foto",
+    checking: "Verificando la carta",
+    suspicious: "Podría no ser real",
+    unknown: "No pudimos confirmarla",
+    awaiting_consent: "Esperando tu permiso",
+    calling: "Llamando",
+    on_hold: "En espera",
+    connected: "Hablando con una persona",
+    call_ended: "Llamada terminada",
+    closed: "Cerrado",
+  },
+  trackerSteps: ["Carta", "Verificada", "Llamando", "En espera", "Persona"],
+  assistant: {
+    title: "Asistente",
+    viaWhatsApp: "por WhatsApp",
+    placeholder: "Pregunta lo que quieras…",
+    send: "Abrir en WhatsApp",
+    you: "Tú",
+  },
+  deleted: (date: string) => `(borrado el ${date})`,
+  loading: "Cargando…",
+  loadError: "No podemos conectar con el servidor. Reintentando…",
+  notFound: "No encontramos eso.",
+};

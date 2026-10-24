@@ -9,9 +9,9 @@ def tree_at(node: Node) -> PhoneTree:
     tree = PhoneTree(DEMO_CASE)
     tree.start()
     path = {
-        Node.MAIN_MENU: ["1"],
-        Node.APPOINTMENT: ["1", "2"],
-        Node.RECEIPT: ["1", "2", "2"],
+        Node.MAIN_MENU: [],
+        Node.APPOINTMENT: ["2"],
+        Node.RECEIPT: ["2", "2"],
     }[node]
     for key in path:
         tree.press(key)
@@ -24,6 +24,11 @@ def press_all(tree: PhoneTree, keys: str):
     for key in keys:
         turn = tree.press(key)
     return turn
+
+
+def test_greeting_goes_straight_to_english_main_menu():
+    turn = PhoneTree(DEMO_CASE).start()
+    assert turn.lines == [prompts.GREETING, prompts.MAIN_MENU]
 
 
 def test_happy_path_by_keypad_reaches_transfer():

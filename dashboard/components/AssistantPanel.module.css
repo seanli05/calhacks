@@ -1,0 +1,145 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.head {
+  padding: 14px 14px 2px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.note {
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+
+.sugs {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sug {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  padding: 10px 12px;
+  text-decoration: none;
+}
+
+.sug:hover {
+  border-color: var(--forest-2);
+  background: var(--sunk);
+}
+
+.sug b {
+  display: block;
+  font-weight: 600;
+}
+
+.sug span span {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+
+.go {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--forest-2);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.thread {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--sunk);
+}
+
+.msg {
+  max-width: 88%;
+  padding: 8px 12px;
+  font-size: var(--fs-md);
+  line-height: 1.4;
+  animation: rise 380ms ease both;
+}
+
+.msg small {
+  display: block;
+  color: var(--faint);
+  font-size: var(--fs-xs);
+  margin-top: 4px;
+}
+
+.in {
+  align-self: flex-end;
+  background: var(--lime-soft);
+}
+
+.in small {
+  color: #557060;
+}
+
+.out {
+  align-self: flex-start;
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+
+.photo {
+  padding: 6px;
+}
+
+.composer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 10px 12px 12px;
+  border: 1px solid var(--line-strong);
+  padding: 4px 4px 4px 12px;
+  background: var(--card);
+}
+
+.composer:focus-within {
+  border-color: var(--forest-2);
+  box-shadow: 0 0 0 3px var(--lime-soft);
+}
+
+.composer input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+}
+
+.composer input::placeholder {
+  color: var(--faint);
+}
+
+.send {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  background: var(--forest);
+  color: var(--lime);
+  display: grid;
+  place-items: center;
+}

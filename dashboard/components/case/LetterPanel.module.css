@@ -1,0 +1,231 @@
+.panel {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.code {
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+
+/* The letter itself: printed text stays small, it's an illustration of the page. */
+.paper {
+  position: relative;
+  flex: none;
+  height: 250px;
+  overflow: hidden;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  padding: 14px 14px 4px;
+  color: var(--paper-ink);
+  font-size: 11px;
+  line-height: 1.5;
+  box-shadow: 0 10px 24px rgba(15, 26, 20, 0.06);
+}
+
+.paper::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 60px;
+  background: linear-gradient(transparent, var(--paper));
+}
+
+.pHead {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #d9dcd6;
+  margin-bottom: 10px;
+}
+
+.seal {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #4a6b8a;
+  flex: none;
+  position: relative;
+}
+
+.seal::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  border: 1px solid #4a6b8a;
+}
+
+.agency {
+  display: flex;
+  flex-direction: column;
+  font-weight: 600;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pTitle {
+  margin-left: auto;
+  text-align: right;
+  font-weight: 700;
+  font-size: 11.5px;
+}
+
+.pGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  margin-bottom: 10px;
+}
+
+.k {
+  display: block;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6f7872;
+}
+
+.v {
+  font-family: var(--font-code);
+  font-size: 10.5px;
+}
+
+.pBody p {
+  margin: 0 0 7px;
+}
+
+.pBody :global(.pin) {
+  margin-left: 3px;
+}
+
+.line {
+  height: 5px;
+  background: #e4e7e1;
+  margin: 0 0 7px;
+}
+
+.stamp {
+  position: absolute;
+  right: 12px;
+  top: 118px;
+  z-index: 1;
+  transform: rotate(-8deg);
+  border: 1.5px solid var(--forest-2);
+  color: var(--forest-2);
+  padding: 3px 8px;
+  font-family: var(--font-code);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(255, 254, 250, 0.85);
+  animation: stamp 520ms cubic-bezier(0.2, 1.4, 0.4, 1) 300ms both;
+}
+
+@keyframes stamp {
+  from {
+    transform: rotate(-8deg) scale(1.35);
+    opacity: 0.3;
+  }
+  to {
+    transform: rotate(-8deg) scale(1);
+    opacity: 1;
+  }
+}
+
+/* The same facts in plain language, pinned to the marks above. */
+.facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.facts li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.facts li :global(.pin) {
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  margin-top: 1px;
+}
+
+.fk {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+
+.fv {
+  font-size: var(--fs-md);
+  font-weight: 500;
+}
+
+.warn .fv {
+  color: var(--amber);
+}
+
+.verdict {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+}
+
+.verdict ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.refs {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--sunk);
+}
+
+.refs div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.refs dt {
+  font-size: var(--fs-sm);
+  color: var(--faint);
+}
+
+.refs dd {
+  margin: 0;
+  font-size: var(--fs-sm);
+}

@@ -1,0 +1,84 @@
+.wrap {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+
+.feed::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 12px;
+  bottom: 12px;
+  width: 1px;
+  background: var(--line);
+}
+
+.feed li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 0 14px;
+  align-items: start;
+  animation: rise 380ms ease both;
+}
+
+.ic {
+  width: 30px;
+  height: 30px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  z-index: 1;
+}
+
+.feed li:last-child .ic {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: var(--lime);
+}
+
+.what {
+  font-size: var(--fs-lg);
+  padding-top: 3px;
+}
+
+.what small {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--faint);
+  margin-top: 1px;
+}
+
+.deleted {
+  color: var(--faint);
+  font-style: italic;
+}
+
+.when {
+  font-size: var(--fs-sm);
+  color: var(--faint);
+  padding-top: 6px;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .feed li {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .when {
+    grid-column: 2;
+    padding-top: 0;
+  }
+}

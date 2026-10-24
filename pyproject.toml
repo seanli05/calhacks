@@ -1,0 +1,9 @@
+# Tool config only. The backend installs from requirements*.txt; mock_agency/ has its own pyproject.
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests", "mock_agency/tests"]
+pythonpath = ["backend"]
+asyncio_mode = "auto"
