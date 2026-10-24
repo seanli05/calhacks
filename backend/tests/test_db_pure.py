@@ -3,7 +3,6 @@
 import re
 
 import pytest
-
 from app.contracts import CallState, FastResult, JobStatus, VerificationStatus
 from app.db import reset
 from app.db.ids import new_id

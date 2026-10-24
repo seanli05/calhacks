@@ -47,6 +47,26 @@ Run the backend (from the repo root, with the venv active):
 uvicorn app.main:app --app-dir backend --reload   # http://localhost:8000/health
 ```
 
+Startup creates any missing tables. To rebuild the database and seed the demo case (one Spanish-speaking user, the I-797C case from `mock_agency`, verified), run the command below. **This wipes the shared database for everyone**, so check with the team first:
+
+```bash
+cd backend && python -m app.db.reset --yes           # add --empty to skip the seed
+```
+
+### Using the database
+
+Import only your own writer module, plus the shared ones. That's how "one writer per table" is enforced.
+
+| Module | Who imports it |
+| --- | --- |
+| `app.db.writes.<orchestrator\|research\|phone\|relay\|memory\|glossary>` | That component only |
+| `app.db.reads` | Anyone. Includes `case_progress`, `official_dial_number` (the only way to get a number to dial), `resolve_ref`, `list_events` |
+| `app.db.jobs` | `enqueue` (creator); `claim_next`, `finish`, `fail` (handler) |
+| `app.db.events` / `app.db.messages` | `append_event` (everyone); `append_message` (orchestrator, relay) |
+| `app.db.deletes` | The "What we know about you" page |
+
+`case_progress(case_id)` returns one of `received`, `explaining`, `needs_better_image`, `checking`, `suspicious`, `unknown`, `awaiting_consent`, `calling`, `on_hold`, `connected`, `call_ended`, `closed`.
+
 ### WhatsApp (Twilio sandbox + ngrok)
 
 1. Install ngrok (version 3.20 or newer; run `ngrok update` if needed) and add your token: `ngrok config add-authtoken <token>`.
@@ -79,6 +99,8 @@ uvicorn app.main:app --app-dir backend --reload   # http://localhost:8000/health
 ruff format . && ruff check --fix .   # format + lint
 pytest                                # tests
 ```
+
+DB helper tests (`backend/tests/test_db_helpers.py`) are skipped unless `TEST_DATABASE_URL` is set. Point it at a separate Neon branch (`neon branch create --name test`), never the shared database: the tests drop and rebuild every table.
 
 - Work on a branch, open small PRs, and merge to `main` often.
 - Read [CLAUDE.md](CLAUDE.md) before writing code. It has the product rules that can't be broken and the team's engineering conventions.
