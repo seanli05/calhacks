@@ -1,0 +1,18 @@
+{
+  "doc_type": "county_benefits_renewal",
+  "call_purpose": "Ask whether the renewal packet was received",
+  "signals": {
+    "letterhead": "County of Example, Department of Social Services",
+    "county": "Example",
+    "return_address": "100 Main Street, Springfield, ST 00000",
+    "urls": [],
+    "form_ids": [],
+    "phones": [
+      {
+        "number": "+12025550123",
+        "label": "Customer service",
+        "quote": "Questions? Call (202) 555-0123"
+      }
+    ]
+  }
+}

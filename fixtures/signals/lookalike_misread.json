@@ -1,0 +1,16 @@
+{
+  "doc_type": "uscis_i797c_asylum_interview",
+  "call_purpose": "Confirm the interview appointment",
+  "signals": {
+    "letterhead": "Department of Homeland Security",
+    "sub_agency": "U.S. Citizenship and Immigration Services",
+    "urls": [
+      "https://www.uscls.gov/contactcenter"
+    ],
+    "form_ids": [
+      "I-797C"
+    ],
+    "case_number_format": "3 letters + 10 digits",
+    "phones": []
+  }
+}
