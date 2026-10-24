@@ -57,6 +57,8 @@ cd backend && python -m app.db.reset --yes           # add --empty to skip the s
 
 Import only your own writer module, plus the shared ones. That's how "one writer per table" is enforced.
 
+Full guide, with per-component recipes: [docs/data-layer-guide.md](docs/data-layer-guide.md).
+
 | Module | Who imports it |
 | --- | --- |
 | `app.db.writes.<orchestrator\|research\|phone\|relay\|memory\|glossary>` | That component only |

@@ -48,7 +48,7 @@ Every change must keep these true. If one would be broken, stop and raise it wit
 - Layout: all Python runs in one FastAPI app under `backend/app/`. Each component has its own package there (`orchestrator/`, `relay/`, `memory/`, `translation/`, `research/`, `glossary/`, `phone/`, `db/`, `api/`), with its owner in the package docstring. Shared payloads live in `backend/app/contracts/`. The dashboard goes in `dashboard/`; `mock_agency/` deploys on its own and imports nothing from the backend.
 - Build specs (columns, helper signatures, API shapes) live in `docs/specs/`. They implement Plan.md; they don't change it. If you need to change someone else's code, tell them first.
 - Keep modules small with one job each. If a file is growing past a few hundred lines or doing two things, split it.
-- Database access goes through shared DB helpers, not raw SQL scattered across agents.
+- Database access goes through shared DB helpers, not raw SQL scattered across agents. How to use them and the contracts: [docs/data-layer-guide.md](docs/data-layer-guide.md).
 
 ### Every piece runs alone
 - Each component needs a way to run with fake inputs: a stub job, a canned letter, a fake call report. Nobody should need the whole system running to work on their part.
