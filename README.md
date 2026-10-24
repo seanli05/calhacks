@@ -208,7 +208,7 @@ Checks before recording: `http://localhost:8000/health` and `https://<your-name>
 | `backend/tests/` | Backend tests | Everyone |
 | `dashboard/` | Next.js dashboard ([build guide](docs/specs/dashboard-build.md)) | 1 |
 | `mock_agency/` | Mock USCIS line on Cartesia; deploys on its own | 3 |
-| `spikes/` | Throwaway experiments (e.g. `dtmf/`: key presses on the mock line); not imported by the backend | Spike owner |
+| `spikes/` | Throwaway experiments (`dtmf/`: key presses on the mock line; `bridge/`: bridging the user into the agency call); not imported by the backend | Spike owner |
 | `docs/specs/` | Build specs that implement Plan.md | Spec owner |
 | `docs/whatsapp-pipe.md` | WhatsApp side: what works, notes for teammates, concerns | 2 |
 
