@@ -126,7 +126,7 @@ Everything runs on one laptop (the one recording the video). Only the backend is
    ```
 
    Without a static domain, use `ngrok http 8000` and redo steps 2 and 3 every time ngrok restarts.
-2. **Point the backend at it.** In `.env`, set `PUBLIC_BASE_URL=https://<your-name>.ngrok-free.app` (no trailing slash). Keep `DEV_ENDPOINTS=false`. Then start the backend without `--reload`, as one process:
+2. **Point the backend at it.** In `.env`, set `PUBLIC_BASE_URL=https://<your-name>.ngrok-free.app` (no trailing slash). Keep `DEV_ENDPOINTS=false`, and keep `DEMO_DIAL_NUMBER` set to the mock agency line so the agent never calls the real USCIS (Plan.md C40). Then start the backend without `--reload`, as one process:
 
    ```bash
    uvicorn app.main:app --app-dir backend --port 8000
