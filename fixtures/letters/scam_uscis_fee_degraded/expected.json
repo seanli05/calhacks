@@ -1,0 +1,21 @@
+{
+  "status": "ok",
+  "issuer_contains": [
+    "USCIS",
+    "Citizenship"
+  ],
+  "deadline": "2026-10-25",
+  "url_domains": [
+    "uscis-gov-payments.com"
+  ],
+  "phones_e164": [
+    "+18885550147"
+  ],
+  "forbidden_strings": [
+    "IOE8800012345",
+    "8800012345",
+    "MARCO EJEMPLO FALSO",
+    "77 PLACEHOLDER RD"
+  ],
+  "payment_instructions_present": true
+}

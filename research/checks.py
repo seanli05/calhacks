@@ -139,8 +139,8 @@ def lookalike(domain: str, anchors: Sequence[str]) -> SignalResult | None:
 
 
 def deadline_sane(deadline: date, today: date, max_days: int = 120) -> bool:
-    """True if the deadline is after `today` and within `max_days`."""
-    raise NotImplementedError
+    """True if the deadline is not before `today` and within `max_days`."""
+    return 0 <= (deadline - today).days <= max_days
 
 
 def decide_verdict(
