@@ -33,6 +33,10 @@ function heroCopy(t: CaseStrings, detail: CaseDetail, call: CallSummary | null, 
         ? h.human
         : { title: h.connected.title(agency), sub: h.connected.sub };
     case "call_ended":
+      // Wrap-up has no report yet; the outcome decides what the headline claims.
+      if (call?.report?.outcome === "failed")
+        return { title: h.call_failed.title(agency), sub: h.call_failed.sub };
+      if (call?.report?.outcome === "user_unreachable") return h.call_unreachable;
       return { title: h.call_ended.title(agency) };
     default:
       return h[detail.stage];
@@ -123,7 +127,7 @@ export function CallHero({ detail, onOpenTranscript }: { detail: CaseDetail; onO
         </>
       )}
 
-      <Tracker stage={detail.stage} onDark={moment} />
+      <Tracker stage={detail.stage} call={call} onDark={moment} />
     </div>
   );
 }

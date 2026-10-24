@@ -32,12 +32,16 @@ from app.phone.line import (
     Heard,
     LineEvent,
     NonSpeech,
+    SpeechStarted,
     UserAnswered,
     UserUnreachable,
 )
 from app.phone.ports import Clock
 
 WORDS_PER_S = 2.8
+PAUSE_BETWEEN_LINES_S = 0.6
+"""The breath between a prompt's sentences: shorter than the quiet the runner waits
+for, as on real lines, so a menu read in pieces is still answered whole."""
 
 
 @dataclass(frozen=True)
@@ -279,7 +283,10 @@ class PhoneTree:
             return None
 
     async def _speak(self, lines: tuple[str, ...]) -> None:
-        for line in lines:
+        for i, line in enumerate(lines):
+            if i:
+                await self._clock.sleep(PAUSE_BETWEEN_LINES_S)
+            self._push(SpeechStarted())
             await self._clock.sleep(speech_s(line))
             self._push(Heard(text=line))
 

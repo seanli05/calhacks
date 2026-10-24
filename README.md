@@ -62,8 +62,8 @@ Run the dashboard (Node 20, from the repo root):
 
 ```bash
 cd dashboard && npm install
-npm run dev     # http://localhost:3000, on fake data (fixtures) by default
-NEXT_PUBLIC_DATA=live npm run dev   # against the backend on :8000
+npm run dev     # http://localhost:3000, against the backend on :8000
+NEXT_PUBLIC_DATA=fixtures npm run dev   # on fake data, no backend needed
 ```
 
 ### Using the database
@@ -115,6 +115,53 @@ The call runner (`phone/runner.py`) runs a whole call on fakes. To watch one aga
 
 To play the line yourself, run the playground from `backend/`: `python -m app.phone.playground`. Each line you paste is what the agency says; the real runner answers, and each step shows the 1c reading, the state change, the 1b action, what went out, and latency. Add `--fake` to run without Claude (you type the menu decision). `/help` lists the commands; `/save <name>` records a session, and `python -m app.phone.playground --replay app/phone/playground/scripts/<name>.json` replays it with a pass/fail table (add `--fake` to replay the recorded answers for free). In a new worktree, copy the main checkout's `.env` first, or export `ANTHROPIC_API_KEY`.
 
+The real phone line (Twilio + Pipecat + Cartesia) lives in the backend as two routes, `POST /phone/calls/{call_id}/status` and `WS /phone/calls/{call_id}/stream`, so a live call needs ngrok and `PUBLIC_BASE_URL` like WhatsApp does, plus `CARTESIA_API_KEY` and `CARTESIA_AGENT_VOICE_ID` (any Cartesia voice). How it works: [docs/specs/phone-ports.md → The real line](docs/specs/phone-ports.md#the-real-line-phase-2).
+
+To place a live test call (`phone/smoke.py`):
+
+1. Stop the backend: the smoke test serves the phone routes itself, on `--port` (default 8000).
+2. Run `ngrok http 8000` and set `PUBLIC_BASE_URL` to its https URL. Fill in the Twilio and Cartesia vars above, and have `.env.local` for the shared database.
+3. From `backend/`:
+   - `python -m app.phone.smoke`: dials the seeded demo case through the real number check. Type `say <text>`, `keys <digits>` or `hangup`; every line event prints with its time.
+   - `python -m app.phone.smoke --runner`: the call runner drives the whole call (needs `ANTHROPIC_API_KEY`). Type a number to answer the applicant's question. Until the bridge lands it hangs up once a person is detected.
+   - `python -m app.phone.smoke --own-number`: dials `PHONE_SMOKE_DIAL_NUMBER` from your `.env`, so you can play the agency yourself (greet like a rep, go quiet, play music).
+
+The smoke test dials only the mock agency line (it refuses any other number a case resolves to) or, with `--own-number`, your own phone. It writes nothing to the database, and what it hears prints to the terminal only.
+
+### The research agent
+
+Research runs inside the backend: a worker started with the app claims `research_fast`, `research_deep` and `research_question` jobs from Postgres. It starts when `RESEARCH_WORKER=true` (the default) and `ANTHROPIC_API_KEY` is set; set `RESEARCH_WORKER=false` to run the backend without it. Don't call `POST /dev/fake-research` while the worker runs: both claim the same jobs.
+
+`DEMO_DIAL_NUMBER` (in `.env.example`, the mock agency line) makes `official_dial_number` return that number instead of the verified one, still only for a verified case (Plan.md C40). Leave it set for every rehearsal and the demo.
+
+Dev tools, from `backend/` (`--help` on each):
+
+```bash
+python -m app.research.cli fast --fake tests/fixtures/research/letters/i797c_asylum_interview/page_1.png   # canned R1, no key
+python -m app.research.cli fast tests/fixtures/research/letters/i797c_asylum_interview/page_1.png          # real fast pass
+python -m app.research.cli deep --signals tests/fixtures/research/signals/uscis_interview.json --replay    # recorded web, no network
+python -m app.research.cli eval                                                                             # score the fast pass on the fixture letters
+python -m app.research.cli ask "Can I bring an interpreter to my asylum interview?"
+```
+
+The live end-to-end test runs the demo letter through the worker, a real database, the model and the web, then checks the dashboard API. It needs `ANTHROPIC_API_KEY` and a Neon branch of your own in `TEST_DATABASE_URL` (it drops every table there), takes a few minutes and costs a few cents:
+
+```bash
+RESEARCH_E2E=1 pytest backend/tests/research/test_e2e_live.py
+```
+
+### Rehearse without a phone
+
+`python -m app.dev.rehearsal` (from `backend/`) runs the demo path end to end on your Neon test branch (`TEST_DATABASE_URL`), with no WhatsApp, phone or API key: a letter, research (the fake), consent, then the phone agent's real call runner on a simulated agency line, through to the call report. It rebuilds that branch's tables first and refuses the shared database. At each stage it checks the dashboard API and screenshots the case page, and writes `rehearsal/REPORT.md` with anything that looks wrong.
+
+For screenshots, serve the test branch on the side (headless Edge is used; `--browser` or `REHEARSAL_BROWSER` points elsewhere, `--no-screens` skips them):
+
+```bash
+DATABASE_URL_UNPOOLED=<TEST_DATABASE_URL> RESEARCH_WORKER=false uvicorn app.main:app --app-dir backend --port 8001
+cd dashboard && BACKEND_URL=http://localhost:8001 npx next dev -p 3001
+cd backend && python -m app.dev.rehearsal --out ../rehearsal
+```
+
 ### Deploying for the demo
 
 Everything runs on one laptop (the one recording the video). Only the backend is public, through ngrok, so Twilio can reach it. The dashboard stays on `localhost`.
@@ -140,10 +187,10 @@ Everything runs on one laptop (the one recording the video). Only the backend is
 
    ```bash
    cd dashboard && npm install
-   NEXT_PUBLIC_DATA=live npm run build && npm start   # http://localhost:3000
+   npm run build && npm start   # http://localhost:3000, on live data
    ```
 
-   `NEXT_PUBLIC_DATA` is baked in at build time, so rebuild after changing it. Open `http://localhost:3000`, follow the demo link to the case page, and record at 1920×1080.
+   Live data is the default; `NEXT_PUBLIC_DATA` is baked in at build time, so rebuild after changing it. Open `http://localhost:3000`, follow the demo link to the case page, and record at 1920×1080.
 
 Checks before recording: `http://localhost:8000/health` and `https://<your-name>.ngrok-free.app/health` both answer, a WhatsApp message to the sandbox shows up in the ngrok inspector (http://127.0.0.1:4040), and your phone joined the sandbox within the last 3 days.
 
@@ -161,7 +208,7 @@ Checks before recording: `http://localhost:8000/health` and `https://<your-name>
 | `backend/tests/` | Backend tests | Everyone |
 | `dashboard/` | Next.js dashboard ([build guide](docs/specs/dashboard-build.md)) | 1 |
 | `mock_agency/` | Mock USCIS line on Cartesia; deploys on its own | 3 |
-| `spikes/` | Throwaway experiments (e.g. `dtmf/`: key presses on the mock line); not imported by the backend | Spike owner |
+| `spikes/` | Throwaway experiments (`dtmf/`: key presses on the mock line; `bridge/`: bridging the user into the agency call); not imported by the backend | Spike owner |
 | `docs/specs/` | Build specs that implement Plan.md | Spec owner |
 | `docs/whatsapp-pipe.md` | WhatsApp side: what works, notes for teammates, concerns | 2 |
 

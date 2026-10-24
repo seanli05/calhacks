@@ -1,0 +1,16 @@
+{
+  "doc_type": "eviction_court_summons",
+  "call_purpose": "Ask the clerk how to file an answer to the eviction summons",
+  "signals": {
+    "letterhead": "Superior Court of California, County of Alameda",
+    "county": "Alameda",
+    "return_address": "1225 Fallon Street, Oakland, CA 94612",
+    "urls": [
+      "www.alameda.courts.ca.gov"
+    ],
+    "form_ids": [
+      "SUM-130 [Rev. January 1, 2024]"
+    ],
+    "phones": []
+  }
+}

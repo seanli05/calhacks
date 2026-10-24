@@ -232,6 +232,26 @@ CASES = [
         "press 0/2, or wait",
     ),
     Case(
+        "cut off after a fitting option",
+        "If you are calling about an interview that has been scheduled, press 3. For",
+        is_kind(WaitAction),
+        "wait for the rest",
+    ),
+    Case(
+        "cut off mid-option",
+        "For help with a pending petition, press 1. To ask about an upcoming "
+        "appointment, press",
+        is_kind(WaitAction),
+        "wait for the rest",
+    ),
+    Case(
+        "short menu, finished",
+        "For an interview you already have on the calendar, press 1. For anything "
+        "else, press 2.",
+        pressed("1"),
+        "press 1",
+    ),
+    Case(
         "garbled, 'for' means four",
         "for questions about an interview or an appointment press for to check case "
         "status press five",

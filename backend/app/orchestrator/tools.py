@@ -12,7 +12,7 @@ from photos, so there's no `start_research` tool.
 
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from anthropic import beta_async_tool
 from anthropic.lib.tools import BetaAsyncFunctionTool
@@ -29,6 +29,9 @@ from app.relay.outbound import send_template
 from app.relay.templates import LANGUAGES
 from app.relay.whatsapp import WhatsApp
 
+if TYPE_CHECKING:
+    from app.orchestrator.research_questions import ResearchQuestions
+
 logger = logging.getLogger(__name__)
 
 # R1 fields the orchestrator may explain; `proposed_facts` and `key_facts` values
@@ -42,10 +45,12 @@ class CaseTools:
         user: tables.User,
         whatsapp: WhatsApp,
         consent: ConsentGate | None = None,
+        research_questions: "ResearchQuestions | None" = None,
     ) -> None:
         self.user = user
         self._whatsapp = whatsapp
         self._consent = consent
+        self._research_questions = research_questions
         self.language_switched = False
         self.consent_requested = False
 
@@ -146,6 +151,24 @@ class CaseTools:
             }
         )
 
+    async def ask_official_source(self, question: str, case_id: str | None) -> str:
+        if self._research_questions is None:
+            return _json({"error": "Looking things up isn't available right now."})
+        question = question.strip()
+        if not question:
+            return _json({"error": "The question is empty."})
+        if case_id and await self._own_case(case_id) is None:
+            return _json({"error": f"No case {case_id} for this user."})
+        await self._research_questions.ask(self.user, question, case_id or None)
+        return _json(
+            {
+                "queued": True,
+                "note": "The answer, with its official sources, is sent to the user "
+                "on its own in a minute or two. Tell them you're looking it up on "
+                "official sites; don't answer the question yourself.",
+            }
+        )
+
     async def _own_case(self, case_id: CaseId) -> tables.Case | None:
         case = await reads.get_case(case_id)
         return case if case is not None and case.user_id == self.user.id else None
@@ -197,6 +220,19 @@ def build_tools(tools: CaseTools) -> list[BetaAsyncFunctionTool[Any]]:
         return await tools.request_consent(case_id)
 
     @beta_async_tool
+    async def ask_official_source(question: str, case_id: str = "") -> str:
+        """Look up a factual question about the user's letter or the immigration
+        process on official government sites (C38), when your tools don't already
+        answer it. Not for legal advice or anything about their asylum claim. The
+        answer is sent to the user separately, with its sources.
+
+        Args:
+            question: The question in plain English, self-contained.
+            case_id: The case it's about, from list_active_cases, or "" if none.
+        """
+        return await tools.ask_official_source(question, case_id or None)
+
+    @beta_async_tool
     async def set_language(language: str) -> str:
         """Switch the language the user is written to in, when they ask for it.
 
@@ -211,6 +247,7 @@ def build_tools(tools: CaseTools) -> list[BetaAsyncFunctionTool[Any]]:
         get_profile,
         close_case,
         request_consent,
+        ask_official_source,
         set_language,
     ]
 

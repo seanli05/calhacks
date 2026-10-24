@@ -3,8 +3,12 @@
 Transport-agnostic: the 1e simulator makes these from text scripts, and Phase 2
 makes them from Twilio status callbacks and the Pipecat stream (speech-to-text,
 voice activity). Each maps onto a `state.Trigger`, or feeds the menu decider and
-the phase classifier. `Heard` and `NonSpeech` are provisional until the phase
-classifier (1c) settles its input.
+the phase classifier.
+
+Turns: speech from the agency comes as one `SpeechStarted`, then exactly one event
+that closes the turn: `Heard` with the text, or `NonSpeech` if it produced none
+(music, noise). A line may skip `SpeechStarted` (the text fakes do); the runner
+then learns of the turn only when it closes.
 """
 
 from typing import Annotated, Literal
@@ -29,6 +33,14 @@ class AgencyUnreachable(_LineEvent):
 
 class AgencyHungUp(_LineEvent):
     kind: Literal["agency_hung_up"] = "agency_hung_up"
+
+
+class SpeechStarted(_LineEvent):
+    """The agency side started talking (voice activity). The runner holds any menu
+    answer until the turn closes and the line has been quiet a while, so it never
+    answers before hearing every option."""
+
+    kind: Literal["speech_started"] = "speech_started"
 
 
 class Heard(_LineEvent):
@@ -67,6 +79,7 @@ LineEvent = Annotated[
     AgencyAnswered
     | AgencyUnreachable
     | AgencyHungUp
+    | SpeechStarted
     | Heard
     | NonSpeech
     | UserAnswered

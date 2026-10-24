@@ -1,0 +1,69 @@
+{
+ "doc_type": "medi_cal_renewal",
+ "call_purpose": "Ask whether the Medi-Cal renewal packet was received",
+ "fetched_urls": [
+  "https://www.cdss.ca.gov/county-offices",
+  "https://www.alamedacountysocialservices.org/index.page",
+  "https://socialservices.alamedacountyca.gov/contact-us/",
+  "https://socialservices.alamedacountyca.gov/our-services/Health-and-Food/Medi-Cal/index",
+  "https://socialservices.alamedacountyca.gov/contact-us/index",
+  "https://socialservices.alamedacountyca.gov/our-services/Health-and-Food/Medi-Cal/keeping-your-benefits",
+  "https://socialservices.alamedacountyca.gov/contact-us/Our-Offices",
+  "https://socialservices.alamedacountyca.gov/contact-us/online-self-services-virtual-kiosk"
+ ],
+ "submission": {
+  "issuer_official_domain": "socialservices.alamedacountyca.gov",
+  "official_phone": "(510) 263-2420",
+  "phone_source_url": "https://www.cdss.ca.gov/county-offices",
+  "phone_label": "Alameda County Social Services Agency – North Oakland Self Sufficiency Center, 2000 San Pablo Ave, Oakland, CA 94612 (same number listed for all Alameda sites)",
+  "phone_purpose": "Alameda County Social Services Agency benefits line (Medi-Cal/CalFresh/CalWORKs case questions, including renewals)",
+  "alternative_contacts": [
+   {
+    "name": "Alameda County Social Services Agency (toll free)",
+    "purpose": "Toll-free benefits line listed in the CDSS county entry for Alameda",
+    "phone": "(888) 999-4772",
+    "source_url": "https://www.cdss.ca.gov/county-offices"
+   },
+   {
+    "name": "Thomas L. Berkley Square (North Oakland) office",
+    "purpose": "Office at 2000 San Pablo Avenue, Oakland (the letter's return address)",
+    "phone": "510-891-0700",
+    "source_url": "https://socialservices.alamedacountyca.gov/contact-us/Our-Offices"
+   },
+   {
+    "name": "BenefitsCal online portal",
+    "purpose": "County says Medi-Cal renewals can be submitted and case information viewed at BenefitsCal.com",
+    "phone": null,
+    "source_url": "https://socialservices.alamedacountyca.gov/contact-us/online-self-services-virtual-kiosk"
+   }
+  ],
+  "evidence": [
+   {
+    "signal": "issuer",
+    "url": "https://www.cdss.ca.gov/county-offices",
+    "note": "CDSS official county offices list has an entry for 'Alameda County Social Services Agency' linking to alamedacountysocialservices.org (redirects to socialservices.alamedacountyca.gov)"
+   },
+   {
+    "signal": "return_address",
+    "url": "https://www.cdss.ca.gov/county-offices",
+    "note": "Alameda entry lists North Oakland Self Sufficiency Center, 2000 San Pablo Ave, Oakland, CA 94612"
+   },
+   {
+    "signal": "return_address",
+    "url": "https://socialservices.alamedacountyca.gov/contact-us/Our-Offices",
+    "note": "County office locations page lists Thomas L. Berkley Square (North Oakland), 2000 San Pablo Avenue, Oakland, CA 94612"
+   },
+   {
+    "signal": "letter_phone",
+    "url": "https://www.cdss.ca.gov/county-offices",
+    "note": "(510) 263-2420 is the number shown for every Alameda County Social Services office in the CDSS entry; it matches the letter's printed number"
+   },
+   {
+    "signal": "issuer",
+    "url": "https://socialservices.alamedacountyca.gov/our-services/Health-and-Food/Medi-Cal/index",
+    "note": "County agency's own Medi-Cal page; administers Medi-Cal renewals"
+   }
+  ],
+  "notes": "CDSS county-offices list fetched; Alameda entry shows (510) 263-2420 for every site, including 2000 San Pablo Ave, plus (888) 999-4772 toll free. The entry's link alamedacountysocialservices.org redirected to socialservices.alamedacountyca.gov, but the homepage came back empty. County pages fetched: Medi-Cal index, contact-us index, Our-Offices and online self-services. None showed 263-2420. Our-Offices lists 2000 San Pablo at 510-891-0700. A search snippet showed 263-2420 on the county homepage and on the public-records page, but the homepage fetch was blank and I hit the fetch limit before fetching public-records. So official_phone comes from the official list entry, as the hint allows."
+ }
+}

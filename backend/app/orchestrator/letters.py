@@ -78,6 +78,25 @@ class Letters:
                 return
         await self._queue_fast(user, _Letter(document_id, case_id))
 
+    def question_pending(self, user_id: UserId) -> bool:
+        """Research asked something about the user's letter (C39)."""
+        return self._results.question(user_id) is not None
+
+    async def answer_question(self, user: tables.User, answer_en: str) -> bool:
+        """C39: the user's answer re-runs the fast pass on the same case, with the
+        answer as `user_note_en`. False if no question was open."""
+        question = self._results.take_question(user.id)
+        if question is None:
+            return False
+        if not question.document_ids:
+            logger.error(
+                "Letter question without a document case_id=%s", question.case_id
+            )
+            return False
+        letter = _Letter(question.document_ids[0], question.case_id)
+        await self._queue_fast(user, letter, user_note_en=answer_en)
+        return True
+
     async def active_letter(self, user_id: UserId) -> DocumentId | None:
         """The letter new photos might belong to: the one being read now, else the
         newest document of the newest active case."""
@@ -97,7 +116,9 @@ class Letters:
                 return case.id
         return None
 
-    async def _queue_fast(self, user: tables.User, letter: _Letter) -> None:
+    async def _queue_fast(
+        self, user: tables.User, letter: _Letter, user_note_en: str | None = None
+    ) -> None:
         assert user.language is not None
         job = await jobs.enqueue(
             ResearchFastJob(
@@ -105,6 +126,7 @@ class Letters:
                 user_id=user.id,
                 document_ids=[letter.document_id],
                 user_language=user.language,
+                user_note_en=user_note_en,
             ),
             Component.ORCHESTRATOR,
             user.id,

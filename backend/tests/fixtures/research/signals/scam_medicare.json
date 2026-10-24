@@ -1,0 +1,19 @@
+{
+  "doc_type": "medicare_benefit_notice",
+  "call_purpose": "Ask about the free test kit",
+  "signals": {
+    "letterhead": "Medicare Benefits Department",
+    "urls": [
+      "https://medicare-benefits-center.com/claim"
+    ],
+    "form_ids": [],
+    "phones": [
+      {
+        "number": "+12025550147",
+        "label": "Benefits line",
+        "quote": "Call (202) 555-0147"
+      }
+    ],
+    "payment_instructions": "You qualify for a free genetic test kit. Call us and give your Medicare number to the agent to claim it."
+  }
+}

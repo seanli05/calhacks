@@ -7,7 +7,7 @@ Every page and every API route is built and on `main`. This is the non-design wo
 ## Must do
 
 - [ ] **1. Verify the API fixes.** The speed fix (concurrent reads) and the Spanish stand-in for seeded text (`backend/app/api/stand_in_es.py`) landed in `d83c8be` and `cf6aac3`. Check on the shared database with `NEXT_PUBLIC_DATA=live`: the case view updates within about a second, and the Spanish screens show no English except the muted lines under each item. `GET /api/cases/{id}` took about 4.2s before the fix and about 1.9s after it, measured on 2026-10-24. Each DB read costs about 375ms against Neon in `us-east-2`. Then `engine.py` dropped `pool_pre_ping`, recycled connections at 240s (under Neon's 5-minute suspend) and grew the pool to 20: warm, the case page is about 1.0s, the case list about 1.0s, the feed about 0.6s and the memory page about 0.46s (2026-10-24). Speed is done. What's left is checking the Spanish screens by eye.
-- [ ] **2. Make live data the default.** `dashboard/lib/api/client.ts` still serves fixtures unless `NEXT_PUBLIC_DATA=live`. Flip the default to live, keep `NEXT_PUBLIC_DATA=fixtures` for building pages without the backend, and update `dashboard/.env.example`, [dashboard-build.md](dashboard-build.md) and the README.
+- [x] **2. Make live data the default.** Done Oct 24 (overnight): live unless `NEXT_PUBLIC_DATA=fixtures`; `.env.example`, [dashboard-build.md](dashboard-build.md) and the README updated.
 - [x] **3. Deployment (task step 5).** Done: README → "Deploying for the demo". It covers:
   - `ngrok http 8000`, with a reserved ngrok domain if the account has one, so webhook URLs survive restarts;
   - `PUBLIC_BASE_URL`, and pointing the WhatsApp sandbox and the voice webhooks at it;
@@ -15,6 +15,7 @@ Every page and every API route is built and on `main`. This is the non-design wo
 - [ ] **4. Tell the team which event `data` the feed needs.** Written up in [docs/dashboard-AGENTS.md](../dashboard-AGENTS.md); send it to the team. Feed lines are only specific when the emitter includes certain `data` fields; otherwise they fall back to a generic line. The table is at the top of [`backend/app/api/feed_templates.py`](../../backend/app/api/feed_templates.py). Persons 2 (consent, memory) and 4 (`call.*`) need it.
 - [ ] **5. Reset the shared database with the new seed:** `cd backend && python -m app.db.reset --yes` (no `--after-call`, so the case starts at `awaiting_consent`). Again right before the rehearsal and before recording.
 - [ ] **6. End-to-end rehearsal with the real components**, once the phone agent is on `main`. One real call with the case view on screen at 1920×1080. Check that:
+  - **Oct 24 overnight:** `python -m app.dev.rehearsal` (README → "Rehearse without a phone") ran the whole path on `research-int-p1` with fake research and the phone agent's real runner on a simulated line: 11 stage checks, 0 problems, screenshots at every stage, the green moment and the report included. What's left is the same run with real research, a real line and WhatsApp.
   - the tracker and headline move through calling → on hold → person answered → connected → call ended as the real events arrive;
   - the hold timer starts at `call.on_hold`;
   - the panel turns forest when a person answers;
@@ -22,6 +23,7 @@ Every page and every API route is built and on `main`. This is the non-design wo
   - the feed lines are specific (item 4) and in Spanish;
   - the WhatsApp mirror shows the relay messages as they're sent.
 - [ ] **7. Task C "Done when" checks.**
+  - **Oct 24 overnight, on `research-int-p1` with the seed:** ruff, all tests (866) and `npm run build` pass. At 1080p My cases, the case view, the memory page and the WhatsApp mirror render. A fact delete shows "(borrado el 24 oct)" in the feed, and no feed line is left in English. Left: the same on the shared database after item 5, and the report to the team.
   - `ruff format . && ruff check --fix . && pytest` pass from the repo root, and `npm run build` passes in `dashboard/`.
   - On the seeded database at 1080p: the feed, the case view, the memory page including one delete (it shows "(borrado …)" in the feed), and the WhatsApp mirror all work.
   - Everything is merged and pushed to `origin/main`.

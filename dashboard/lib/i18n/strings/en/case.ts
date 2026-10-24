@@ -68,6 +68,14 @@ export const caseView = {
       sub: "You can talk with the officer now.",
     },
     call_ended: { title: (agency: string) => `We spoke with ${agency}` },
+    call_failed: {
+      title: (agency: string) => `We couldn't reach a person at ${agency}`,
+      sub: "We can try again whenever you want. Just say so on WhatsApp.",
+    },
+    call_unreachable: {
+      title: "We couldn't reach you",
+      sub: "A person answered, but your phone didn't pick up. We can try again.",
+    },
     closed: { title: "This case is closed", sub: "Everything stays in your history." },
   },
   outcome: {

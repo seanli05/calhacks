@@ -55,3 +55,5 @@ recordings/
 
 # --- Glossary source downloads (PDFs, copied pages): never commit ---
 backend/app/glossary/_sources/
+backend/tests/fixtures/research/private/
+rehearsal/

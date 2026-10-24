@@ -20,6 +20,7 @@ from app.contracts.common import MessageId
 from app.db import jobs, reads, tables
 from app.orchestrator.consent import ConsentGate
 from app.orchestrator.prompts import ORCHESTRATOR_SYSTEM
+from app.orchestrator.research_questions import ResearchQuestions
 from app.orchestrator.tools import CaseTools, build_tools
 from app.relay.outbound import send_template, send_text
 from app.relay.whatsapp import WhatsApp
@@ -44,6 +45,7 @@ class OrchestratorTurn:
         translator: Translator,
         consent: ConsentGate | None = None,
         turn_timeout_s: float = TURN_TIMEOUT_S,
+        research_questions: ResearchQuestions | None = None,
     ) -> None:
         self._client = client
         self._model = model
@@ -51,6 +53,7 @@ class OrchestratorTurn:
         self._translator = translator
         self._consent = consent
         self._turn_timeout_s = turn_timeout_s
+        self._research_questions = research_questions
 
     async def run(
         self,
@@ -72,7 +75,7 @@ class OrchestratorTurn:
     async def _reply(
         self, user: tables.User, *, same_or_new_pending: bool, consent_pending: bool
     ) -> None:
-        tools = CaseTools(user, self._whatsapp, self._consent)
+        tools = CaseTools(user, self._whatsapp, self._consent, self._research_questions)
         context = await build_context(
             user,
             same_or_new_pending=same_or_new_pending,

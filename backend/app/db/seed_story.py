@@ -122,7 +122,8 @@ class Story:
                 source=FactSource.FROM_DOCUMENT,
                 source_ref=document_id,
                 sensitivity=Sensitivity.SENSITIVE,
-                status=FactStatus.ACTIVE,
+                # C15, C25: an immigration fact waits for the user's OK.
+                status=FactStatus.PENDING_CONSENT,
                 recorded_at=self.at(1),
             ),
             tables.Fact(
@@ -176,7 +177,9 @@ class Story:
             self.event("research.fast_done", research, 1, "Letter explained"),
             *(
                 self.event(
-                    "memory.fact_saved",
+                    "memory.fact_pending_consent"
+                    if f.status == FactStatus.PENDING_CONSENT
+                    else "memory.fact_saved",
                     memory,
                     1.1 + i / 10,
                     "Saved a fact",

@@ -5,10 +5,17 @@ left the menu or spoke again meanwhile, and the action goes out through the
 executor. ask_user runs as a task while the line is still read: reprompts of the
 asked prompt aren't decided again, the second one takes the default, and a new
 prompt drops the question.
+
+Every answer (a press, a say, starting ask_user, the applicant's choice) is held
+until the line has been quiet `menu_quiet_s` after the turn closed, so the agent
+never answers before hearing every option. Speech in the meantime pauses it; if
+that speech adds text, a held decision is dropped and the menu so far is decided
+again as a whole.
 """
 
 import asyncio
 import logging
+from functools import partial
 from typing import Any
 
 from app.contracts import AskUserReply, AskUserRequest, EventType
@@ -28,7 +35,7 @@ from app.phone.menu import (
 from app.phone.phase import PhaseReading
 from app.phone.ports import LineClosed
 from app.phone.runner_base import RunnerBase
-from app.phone.runner_parts import AskDone, MenuGaveUp, OpenAsk
+from app.phone.runner_parts import AskDone, HeldAnswer, MenuGaveUp, OpenAsk
 
 logger = logging.getLogger("app.phone.runner")
 
@@ -41,6 +48,14 @@ class MenuSteps(RunnerBase):
     async def _menu_heard(self, text: str, at_s: float, seq: int) -> None:
         if self.executor.observe(text):
             self.step.flags.append("keypad_mode")
+        if self.held is not None:
+            if not self.held.redo_on_heard and sounds_like_reprompt(
+                text, self.held.heard
+            ):
+                # The menu is repeating itself: the applicant's choice still applies.
+                self.step.flags.append("reprompt_while_held")
+                return
+            await self._drop_held()
         if self.ask is not None:
             await self._heard_while_asking(text, at_s, seq)
             return
@@ -51,20 +66,21 @@ class MenuSteps(RunnerBase):
         self, at_s: float, seq: int, reading: PhaseReading | None = None
     ) -> None:
         """1c and 1b in parallel; 1b's answer is dropped if the line left the menu
-        or spoke again meanwhile."""
+        or spoke again meanwhile. An answer is held until the line goes quiet."""
         heard = " ".join(self.menu_buffer)
-        deciding = asyncio.ensure_future(
-            self._timed(
+        history = list(self.menu_history)
+
+        async def decide() -> MenuAction:
+            # The model call is made inside the task, so a task cancelled before it
+            # starts (1c fired first) leaves no never-awaited coroutine behind.
+            return await self._timed(
                 "decide",
                 menu.decide(
-                    heard,
-                    self.brief,
-                    self.menu_history,
-                    client=self.llm,
-                    call_id=self.call_id,
+                    heard, self.brief, history, client=self.llm, call_id=self.call_id
                 ),
             )
-        )
+
+        deciding = asyncio.ensure_future(decide())
         try:
             if reading is None:
                 reading = await self._classify(self.menu_buffer[-1], at_s)
@@ -86,10 +102,64 @@ class MenuSteps(RunnerBase):
             self.step.flags.append("stale_dropped")
             await self._log_menu_heard(reading, action, stale=True)
             return
+        if isinstance(action, WaitAction):
+            await self._answer(action, heard, reading)
+            return
+        # Kept in `menu_buffer` until sent, so a menu that goes on is decided whole.
+        self._hold(
+            HeldAnswer(
+                send=partial(self._answer, action, heard, reading),
+                heard=heard,
+                redo_on_heard=True,
+                on_drop=partial(self._log_menu_heard, reading, action, stale=True),
+            )
+        )
+
+    async def _answer(
+        self, action: MenuAction, heard: str, reading: PhaseReading
+    ) -> None:
         self.menu_buffer.clear()
         self.menu_history.append(MenuTurn(heard=heard, action=action))
         await self._log_menu_heard(reading, action)
         await self._act(action, heard)
+
+    # Holding answers until every option has been heard
+
+    def _hold(self, held: HeldAnswer) -> None:
+        self.held = held
+        self.step.flags.append("held")
+        self.arm_held()
+
+    def arm_held(self) -> None:
+        """Send the held answer once the line has been quiet `menu_quiet_s`."""
+        if self.held is None or self.line_speaking:
+            return
+        wait = self.quiet_since_s + self.config.menu_quiet_s - self.now_s()
+        self.timers.start("menu_quiet", max(wait, 0.0))
+
+    async def send_held(self) -> None:
+        if self.held is None or self.line_speaking:
+            self.step.flags.append("stale_timer")
+            return
+        held, self.held = self.held, None
+        await held.send()
+
+    def speech_started(self) -> None:
+        """Pause the held answer. What the turn says decides its fate: more text
+        redoes a decision (`_menu_heard`), a turn with none lets it go out."""
+        self.timers.cancel("menu_quiet")
+
+    async def _drop_held(self) -> None:
+        held = self.forget_held()
+        if held is not None and held.on_drop is not None:
+            await held.on_drop()
+
+    def forget_held(self) -> HeldAnswer | None:
+        held, self.held = self.held, None
+        self.timers.cancel("menu_quiet")
+        if held is not None:
+            self.step.flags.append("held_dropped")
+        return held
 
     async def _heard_while_asking(self, text: str, at_s: float, seq: int) -> None:
         assert self.ask is not None
@@ -224,6 +294,15 @@ class MenuSteps(RunnerBase):
     async def _press_choice(self, ask: OpenAsk, choice: int, source: str) -> None:
         press = menu.press_for_choice(ask.action, choice)
         self.step.action = press
+        self._hold(
+            HeldAnswer(
+                send=partial(self._send_choice, ask, press, source),
+                heard=ask.heard,
+                redo_on_heard=False,
+            )
+        )
+
+    async def _send_choice(self, ask: OpenAsk, press: PressAction, source: str) -> None:
         self.menu_history[ask.turn_index] = MenuTurn(heard=ask.heard, action=press)
         self.menu_buffer.clear()
         await self._send(press, ask.heard, source)

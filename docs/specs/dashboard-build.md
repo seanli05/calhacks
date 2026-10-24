@@ -13,9 +13,9 @@ npm run dev            # http://localhost:3000
 npm run build          # type-checks every page; must pass before merging
 ```
 
-Pages run on **fixtures** by default (`NEXT_PUBLIC_DATA` unset or `fixtures`): fake data from `lib/api/fixtures.ts`, no backend needed. A **Fixtures** bar at the bottom steps the demo call through its states (◀ ▶ or the arrow keys): waiting for consent → dialing → menu → on hold → person answered → connected → call ended. Deletes work in fixtures too.
+Pages run on **live data** by default. With `NEXT_PUBLIC_DATA=fixtures` they use fake data from `lib/api/fixtures.ts` instead, with no backend needed. A **Fixtures** bar at the bottom steps the demo call through its states (◀ ▶ or the arrow keys): waiting for consent → dialing → menu → on hold → person answered → connected → call ended. Deletes work in fixtures too.
 
-With the backend running, `NEXT_PUBLIC_DATA=live npm run dev` (or put it in `dashboard/.env.local`, see `.env.example`) calls the real API through the `/api` rewrite.
+With the backend running, `npm run dev` calls the real API through the `/api` rewrite (`BACKEND_URL`, default `http://localhost:8000`; see `.env.example`).
 
 Useful URLs on fixtures: `/u/user_demo000000000001` (My cases), `/u/user_demo000000000001/cases/case_demo000000000001` (case view), `/u/user_demo000000000001/memory`.
 

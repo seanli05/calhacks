@@ -21,6 +21,7 @@ from app.contracts import (
     AskUserRequest,
     CallJob,
     CallState,
+    CaseBrief,
     Component,
     Event,
     EventType,
@@ -32,6 +33,7 @@ from app.db import jobs, tables
 from app.db.events import append_event
 from app.db.ids import new_id
 from app.db.messages import append_message
+from app.db.reset import demo_brief
 from app.db.tables import utcnow
 from app.db.writes import phone, research
 from app.orchestrator.call_status import CallStatusWatcher
@@ -119,7 +121,14 @@ async def play_call(
 async def _create_rows(user: tables.User) -> tuple[CaseId, CallId]:
     case = await research.create_case(new_id("case"), user.id, [])
     brief = await research.save_brief(
-        case.id, {"call_goal_en": "Dev fake call"}, "[dev] fake call, nothing is dialed"
+        case.id,
+        CaseBrief.model_validate(
+            {
+                **demo_brief(case.id, new_id("brief")),
+                "call_goal_en": "Dev fake call",
+                "handoff_note": "[dev] fake call, nothing is dialed",
+            }
+        ),
     )
     note = await append_message(
         user.id,

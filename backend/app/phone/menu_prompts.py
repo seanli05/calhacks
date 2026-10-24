@@ -43,8 +43,10 @@ and homophones stand in for numbers ("press for" is "press four", "to" or "too" 
 is "two", "won" is "one"). Read them as the number when the menu's pattern makes it \
 clear. If the option you need is cut off \
 and you can't tell its key, wait for the menu to repeat or take the general path.
-4. Don't act on a menu that is still listing options unless an option clearly fits; \
-a better one may come later. If the line said nothing actionable, wait.
+4. Answer only a menu that has finished. The system holds your answer until the \
+line goes quiet and gives you everything said since your last answer. If that stops \
+partway through an option ("For…", "press 3 for" with nothing after it), wait for \
+the rest, even if an earlier option fits. If the line said nothing actionable, wait.
 5. Lines hang up after a few silent turns. When a prompt asks you for input, answer \
 it: never wait in response to a direct question.
 

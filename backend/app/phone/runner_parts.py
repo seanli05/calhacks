@@ -5,7 +5,7 @@ See `runner.py` for how they fit together.
 
 import asyncio
 import itertools
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from app.contracts import AskUserReply, EventType
@@ -29,6 +29,14 @@ class RunnerConfig:
     menus usually hang up after two or three no-inputs."""
     music_to_hold_s: float = 5.0
     """Music this long in a menu means hold, with no model call."""
+    menu_quiet_s: float = 1.0
+    """How long the line must stay quiet after a menu turn closes before an answer
+    goes out, so every option has been heard. The audio line closes a turn after
+    about 1 s of quiet, so it's about 2 s of quiet in all; menus usually wait 5-10 s
+    for input."""
+    turn_backstop_s: float = 30.0
+    """A turn that never closes after `SpeechStarted` counts as closed after this
+    long, so a held answer still goes out."""
     user_answer_backstop_s: float = 45.0
     """In case `UserUnreachable` never comes (Twilio's ring timeout is 30 s)."""
     holding_lines_max: int = 2
@@ -87,6 +95,20 @@ class OpenAsk:
     """Its turn in the menu history, replaced by the press once answered."""
     task: asyncio.Task[None]
     reprompts: int = 0
+
+
+@dataclass(frozen=True)
+class HeldAnswer:
+    """A menu answer that's decided but not sent: it goes out once the line has been
+    quiet for `menu_quiet_s`, so the agent never answers before every option."""
+
+    send: Callable[[], Awaitable[None]]
+    heard: str
+    """The prompt it answers."""
+    redo_on_heard: bool
+    """A model decision is dropped when the line says more, and decided again on the
+    whole menu. The applicant's choice is kept through a reprompt."""
+    on_drop: Callable[[], Awaitable[None]] | None = None
 
 
 @dataclass

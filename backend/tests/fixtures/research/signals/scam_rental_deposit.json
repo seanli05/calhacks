@@ -1,0 +1,18 @@
+{
+  "doc_type": "private_landlord_rental_offer",
+  "call_purpose": "Ask how to pay the deposit",
+  "signals": {
+    "letterhead": "Sunny Homes Rentals",
+    "urls": [],
+    "form_ids": [],
+    "phones": [
+      {
+        "number": "+12025550133",
+        "label": "Owner",
+        "quote": "Text me at (202) 555-0133"
+      }
+    ],
+    "payment_instructions": "I am working overseas so I can't show the house. Send the $1,800 security deposit by Zelle today and I will mail you the keys.",
+    "signature_block": "John, Owner"
+  }
+}

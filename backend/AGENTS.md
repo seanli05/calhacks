@@ -27,6 +27,8 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | [docs/specs/dashboard-done.md](../docs/specs/dashboard-done.md) | Dashboard: what's left before it's done |
 | [docs/dashboard-AGENTS.md](../docs/dashboard-AGENTS.md) | **Integrating with the dashboard:** what each component must write (event `data`, brief keys, call states) so it shows up |
 | [docs/specs/phone-ports.md](../docs/specs/phone-ports.md) | Phone agent: its ports, fakes, and which rules they enforce |
+| [docs/overnight-2026-10-24.md](../docs/overnight-2026-10-24.md) | What person 1's session changed overnight Oct 24, by owner, for review |
+| [docs/specs/case-brief.md](../docs/specs/case-brief.md) | **The case brief:** the research → phone contract, field by field, who writes and reads each, the rules every brief keeps |
 | [docs/research-integration.md](../docs/research-integration.md) | **Joining the research agent to `main`:** a runbook two agents execute end to end (status table, decisions, step 1 for person 1, step 2 for person 3) |
 | [docs/whatsapp-pipe.md](../docs/whatsapp-pipe.md) | WhatsApp side: what works, how to plug in (`send_template`, `messages` fields), concerns |
 | [docs/whatsapp-AGENTS.md](../docs/whatsapp-AGENTS.md) | Reviewing the WhatsApp side: every file person 2 built, deliberate choices, what to check |
@@ -46,6 +48,8 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | `glossary/` | Preset glossary: `terms.csv` (75 English terms; es, fa (Dari), ne for every term, official-only ar, ps, ru, vi), sources in `SOURCES.md`, review sheets for the Dari and Nepali checkers, loader `python -m app.glossary.load [--dry-run] [--language xx]` (run from `backend/`; tell the team first, and re-run after a reset). The automatic glossary worker is out of the MVP (C28) | 2 | Data, loader and tests done; translation grounding not started |
 | `research/` | Letter reading, verification, case brief | 3 | Work is on branch `research_agent` (top-level `research/`, own models); integration plan in [docs/research-integration.md](../docs/research-integration.md) |
 | `phone/` | Call state machine, hold/human detection, bridge, call report | 4 | State machine (`state.py`), menu decider (`menu.py`), phase classifier (`phase.py`), ports and fakes (`ports.py`, `fakes.py`), and the call runner (`runner.py` + `runner_*.py`, `executor.py`, a stand-in `report.py`) done, with a text-tree simulator (`simulate.py`, `sim_trees.py`) and an interactive playground (`playground/`, where you play the line); see [docs/specs/phone-ports.md](../docs/specs/phone-ports.md). Real audio (Twilio + Pipecat), the bridge, the LLM call report, and the job worker next |
+| `research/`, `glossary/` | Letter reading, verification, case brief; glossary | 3 | Research done: fast pass (R1, refs), deep pass (verification, alternative contacts, brief), `research_question`, on `app.contracts` and `app.db`. `worker.py` claims its jobs and starts with the app (`RESEARCH_WORKER`); `jobs.py` holds the handlers; `cli.py` runs each pass alone (README → The research agent). Tests and a DB fake in `tests/research/`, letter and web fixtures in `tests/fixtures/research/`. Glossary not started |
+| `phone/` | Call state machine, hold/human detection, bridge, call report | 4 | State machine (`state.py`), menu decider (`menu.py`), phase classifier (`phase.py`), ports and fakes (`ports.py`, `fakes.py`), and the call runner (`runner.py` + `runner_*.py`, `executor.py`, a stand-in `report.py`) done, with a text-tree simulator (`simulate.py`, `sim_trees.py`) and an interactive playground (`playground/`, where you play the line); the real agency leg over Twilio + Pipecat (`twilio_line.py`, `listener.py`, `audio_pipeline.py`, `routes.py`) built and tested on fakes, with a live smoke test (`smoke.py`, a dev tool the app never imports); see [docs/specs/phone-ports.md](../docs/specs/phone-ports.md). First live runs, the bridge, the LLM call report, and the job worker next |
 
 Tests live in `backend/tests/`. Contract fixtures in `backend/tests/fixtures/contracts/` double as fake inputs for any component.
 
@@ -81,6 +85,4 @@ ruff format . && ruff check --fix . && pytest         # before every push
 ## Open issues
 
 Tracked in [data-layer-guide.md → Open issues](../docs/data-layer-guide.md#open-issues):
-- the provisional `CaseBrief` shape;
-- the research models that don't match the contracts yet;
 - the fake WhatsApp number in the seed.

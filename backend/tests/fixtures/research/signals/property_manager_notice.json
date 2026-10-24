@@ -1,0 +1,20 @@
+{
+  "doc_type": "property_manager_rent_increase",
+  "call_purpose": "Ask whether the rent increase is allowed",
+  "signals": {
+    "letterhead": "Example Property Management LLC",
+    "county": "Example",
+    "return_address": "200 Oak Street, Springfield, ST 00000",
+    "urls": [
+      "www.examplepm.com"
+    ],
+    "form_ids": [],
+    "phones": [
+      {
+        "number": "+12025550111",
+        "label": "Office",
+        "quote": "Call our office at (202) 555-0111"
+      }
+    ]
+  }
+}

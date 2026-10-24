@@ -147,6 +147,65 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         ),
     },
     # Plan.md → Failure rules: unreadable photo (C9).
+    "letter.which_letter": {
+        "es": (
+            "Antes de explicarle, necesito una respuesta: parece que las fotos son de "
+            "cartas distintas. ¿Cuál carta leo primero? Respóndame en pocas palabras."
+        ),
+        "en": (
+            "Before I explain, I need one answer: these photos look like they come "
+            "from different letters. Which letter should I read first? Reply in a few "
+            "words."
+        ),
+    },
+    "letter.reading_again": {
+        "es": "Gracias. Ahora leo esa carta y le escribo en cuanto termine.",
+        "en": "Thanks. I'm reading that letter now and will write as soon as I'm done.",
+    },
+    "research_question.not_found": {
+        "es": (
+            "No encontré una respuesta en una fuente oficial para su pregunta. "
+            "Puede preguntarle a un abogado o a un representante acreditado por el DOJ."
+        ),
+        "en": (
+            "I couldn't find an answer to your question in an official source. "
+            "A lawyer or a DOJ-accredited representative can help."
+        ),
+    },
+    "research_question.legal_advice": {
+        "es": (
+            "No puedo darle consejos legales sobre su caso. Un abogado o un "
+            "representante acreditado por el DOJ puede ayudarle, muchas veces gratis."
+        ),
+        "en": (
+            "I can't give legal advice about your case. A lawyer or a DOJ-accredited "
+            "representative can help, often for free."
+        ),
+    },
+    "research_question.asylum_claim": {
+        "es": (
+            "No hablo sobre los detalles de su solicitud de asilo. Un abogado o un "
+            "representante acreditado por el DOJ puede ayudarle con eso."
+        ),
+        "en": (
+            "I don't discuss the details of your asylum claim. A lawyer or a "
+            "DOJ-accredited representative can help with that."
+        ),
+    },
+    "research_question.untranslated": {
+        "es": (
+            "Encontré una respuesta en una fuente oficial, pero no pude traducirla. "
+            "Puede leerla aquí:\n{sources}"
+        ),
+        "en": (
+            "I found an answer in an official source but couldn't translate it. "
+            "You can read it here:\n{sources}"
+        ),
+    },
+    "research_question.failed": {
+        "es": "No pude buscar la respuesta ahora. Pregúnteme de nuevo en un rato.",
+        "en": "I couldn't look that up right now. Ask me again in a little while.",
+    },
     "letter.retake": {
         "es": (
             "No pude leer bien la foto. ¿Me puede enviar otra? Ponga la carta sobre "

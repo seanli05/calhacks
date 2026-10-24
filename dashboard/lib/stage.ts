@@ -1,10 +1,14 @@
-import type { CaseStage, CallState } from "./api/types";
+import type { CallState, CallSummary, CaseStage } from "./api/types";
 
 /**
  * The five-step tracker (Letter → Verified → Calling → On hold → Person) collapses
  * the 13 case stages. Returns the index of the current step; 5 means all done.
+ * After a failed call, only the steps the call really reached count as done.
  */
-export function trackerIndex(stage: CaseStage): number {
+export function trackerIndex(stage: CaseStage, call?: CallSummary | null): number {
+  if (stage === "call_ended" && call?.outcome === "failed") {
+    return call.hold_started_at ? 4 : 3;
+  }
   switch (stage) {
     case "received":
     case "explaining":
@@ -38,8 +42,7 @@ export function isHumanMoment(callState: CallState | null | undefined): boolean 
   return (
     callState === "human_detected" ||
     callState === "bridging" ||
-    callState === "connected" ||
-    callState === "wrap_up"
+    callState === "connected"
   );
 }
 

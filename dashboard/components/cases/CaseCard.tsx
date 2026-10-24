@@ -79,7 +79,7 @@ export function CaseCard({ userId, summary }: { userId: string; summary: CaseSum
           </p>
         )}
 
-        <Tracker stage={summary.stage} onDark={moment} />
+        <Tracker stage={summary.stage} call={summary.latest_call} onDark={moment} />
       </div>
 
       <span className={styles.open}>{t.open} →</span>

@@ -1,0 +1,48 @@
+{
+ "doc_type": "housing_authority_recertification",
+ "call_purpose": "Ask to reschedule the annual recertification appointment",
+ "fetched_urls": [
+  "https://www.hud.gov/contactus/public-housing-contacts",
+  "https://www.oakha.org",
+  "https://www.hud.gov/sites/dfiles/PIH/documents/PHA_Contact_Report_CA.pdf",
+  "https://www.oakha.org/contact-us"
+ ],
+ "submission": {
+  "issuer_official_domain": "oakha.org",
+  "official_phone": "(510)874-1500",
+  "phone_source_url": "https://www.hud.gov/sites/dfiles/PIH/documents/PHA_Contact_Report_CA.pdf",
+  "phone_label": "Phone (HUD PHA contact list entry CA003 Oakland Housing Authority)",
+  "phone_purpose": "Oakland Housing Authority main office line (housing programs, including recertification appointments)",
+  "alternative_contacts": [
+   {
+    "name": "HUD PIH Customer Service Center",
+    "purpose": "HUD questions about public housing and housing choice voucher programs; cannot reschedule OHA appointments",
+    "phone": "(800) 955-2232",
+    "source_url": "https://www.hud.gov/contactus/public-housing-contacts"
+   }
+  ],
+  "evidence": [
+   {
+    "signal": "issuer",
+    "url": "https://www.hud.gov/sites/dfiles/PIH/documents/PHA_Contact_Report_CA.pdf",
+    "note": "HUD California PHA list includes CA003 Oakland Housing Authority, a Combined-type PHA."
+   },
+   {
+    "signal": "return_address",
+    "url": "https://www.hud.gov/sites/dfiles/PIH/documents/PHA_Contact_Report_CA.pdf",
+    "note": "Entry CA003 address: 1619 Harrison St., Oakland, CA 94612, which matches the letter's return address."
+   },
+   {
+    "signal": "letter_phone",
+    "url": "https://www.hud.gov/sites/dfiles/PIH/documents/PHA_Contact_Report_CA.pdf",
+    "note": "Entry CA003 phone (510)874-1500 matches the number printed on the letter."
+   },
+   {
+    "signal": "url_domains",
+    "url": "https://www.hud.gov/sites/dfiles/PIH/documents/PHA_Contact_Report_CA.pdf",
+    "note": "Entry email executiveoffice@oakha.org matches the letter's printed www.oakha.org domain."
+   }
+  ],
+  "notes": "oakha.org home and /contact-us returned 403, so I couldn't fetch the issuer's own site. Fetched the HUD PHA contact page and the California PDF (PHA_Contact_Report_CA.pdf). Entry CA003 gives the phone, address and oakha.org email domain, and all three match the letter. I didn't find a separate recertification-specific line because the OHA site was blocked."
+ }
+}

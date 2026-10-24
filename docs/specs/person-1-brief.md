@@ -114,7 +114,7 @@ What the API does on top of the raw rows:
 - **It never sends anything** (rule 1). The suggestions and the chat bar open WhatsApp with the text already typed in.
 - **Languages:** every label comes from per-language string files (`lib/i18n/strings/<lang>/`), Spanish and English for now. A switch in the header changes the language live. Text from the database shows in the user's language, with the English muted underneath.
 - **Two data modes:**
-  - `NEXT_PUBLIC_DATA=live` reads the real API. It polls every 1–3s, never overlapping requests.
+  - Live data (the default) reads the real API. It polls every 1–3s, never overlapping requests.
   - Otherwise it uses built-in fake data: a 7-step demo you step through with the arrow keys. That's for building pages without a backend.
 
 ## 6. Deployment (README → "Deploying for the demo")
@@ -149,7 +149,7 @@ What the API does on top of the raw rows:
 
 **Does making live data the default mean we start practice runs?** No, they're separate.
 - "Live default" (item 2) only changes what `npm run dev` shows when no setting is given: the real database instead of fake data. It's a 10-minute change and starts nothing.
-- Practice runs can already happen today, with person 2's dev tools. Turn them on with `DEV_ENDPOINTS=true`, run the backend, and watch with `NEXT_PUBLIC_DATA=live`. Use your own Neon branch, not the shared database.
+- Practice runs can already happen today, with person 2's dev tools. Turn them on with `DEV_ENDPOINTS=true`, run the backend, and watch the dashboard (live data is the default). Use your own Neon branch, not the shared database.
   1. **Fake research:** `POST /dev/fake-research` finishes research jobs from the contract fixtures. Send a letter photo on WhatsApp and the case appears on the dashboard: explanation, verdict, brief, masked refs. It takes research jobs from the shared queue, so don't run it while person 3's real research worker is running.
   2. **Fake call:** `POST /dev/fake-call` plays a scripted call through the real tables: dialing, menu, a real WhatsApp question, hold, a person answers, the call ends. It sends real WhatsApp messages to the number you give it. It makes its own throwaway case and closes it at the end, so open that case's page while it runs.
   3. **Real call (item 6):** once person 4's call runner is on `main`.

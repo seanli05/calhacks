@@ -11,6 +11,13 @@ httpx==0.28.1
 pydantic==2.14.1
 pydantic-settings==2.16.1
 
+# Research agent
+pillow==13.0.0
+phonenumbers==9.0.41
+tldextract==5.4.0
+beautifulsoup4==4.15.0
+pypdf==6.21.2
+
 # Database
 sqlmodel==0.0.48
 asyncpg==0.32.0

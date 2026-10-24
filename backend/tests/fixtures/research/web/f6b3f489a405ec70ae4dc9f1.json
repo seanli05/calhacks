@@ -1,0 +1,10 @@
+{
+ "url": "https://www.alameda.courts.ca.gov/self-help-center",
+ "fetched_at": "2026-10-24T09:29:18.152573+00:00",
+ "status_code": 301,
+ "headers": {
+  "content-type": "text/html; charset=UTF-8",
+  "location": "/system/403"
+ },
+ "body": "\n<!DOCTYPE html>\n<html>\n    <head>\n        <meta charset=\"UTF-8\" />\n        <meta http-equiv=\"refresh\" content=\"0;url='/system/403'\" />\n\n        <title>Redirecting to /system/403</title>\n    </head>\n    <body>\n        Redirecting to <a href=\"/system/403\">/system/403</a>.\n    </body>\n</html>"
+}
