@@ -1,6 +1,6 @@
 # WhatsApp side: status, interfaces, and decisions
 
-Owner: person 2 (Lauren). Last updated 2026-10-24, branch `lauren-goal4-research-jobs`.
+Owner: person 2 (Lauren). Last updated 2026-10-24, branch `lauren-goal4-claude-turn`.
 
 This page is the record for the WhatsApp side (relay, orchestrator pipe, call status). Other components should build against the interfaces and decisions here. If something here conflicts with Plan.md, Plan.md wins; tell person 2.
 
@@ -9,7 +9,7 @@ This page is the record for the WhatsApp side (relay, orchestrator pipe, call st
 **Goal 2, the WhatsApp pipe.** Tested end to end on a real phone, through the Twilio sandbox and the shared Neon database.
 - **Language pick.** "Hola, recibí una carta" gets the Spanish one-tap confirm; replying `1` sets `users.language`.
 - **Letters.** A photo gets "Recibido. ¿Tiene más páginas?"; photos within 6 s of each other become one `documents` row.
-- **Other text.** It's echoed back as a placeholder until the orchestrator's Claude turn (Goal 4).
+- **Other text.** It goes to the orchestrator's Claude turn (Goal 4.1, below). Without `ANTHROPIC_API_KEY` it's still echoed back.
 - **Logging.** Every message in both directions is in `messages`, with its Twilio SID.
 
 **Goal 3, ask_user and call status.** Tested on fakes. Try it on a phone with the fake call below.
@@ -26,6 +26,8 @@ This page is the record for the WhatsApp side (relay, orchestrator pipe, call st
 - **"Same letter or new?"** It's asked from the moment research is queued, not only once a case exists (concern 1 fixed). Answering "same letter" re-runs the fast pass in the same case. If the last fast job is still queued, research reads the new pages anyway, so nothing more is queued.
 - **Finished jobs.** One watcher per queued job polls `get_job` until it's done or failed. After 45 s on the fast pass, the user gets "taking longer" (Plan.md failure rules). The R1 reaction itself is Goal 6.1; for now a finished fast pass is only logged.
 - **Turns outside the lock.** The orchestrator turn runs after the per-number routing lock is released, so an ask_user reply never waits behind it (concern 8 fixed).
+- **The Claude turn (4.1, 4.5).** Free text gets a reply from `MODEL_DEFAULT` with five tools: `list_active_cases`, `get_case_status`, `get_profile`, `close_case`, `set_language`. It answers questions about a letter from the stored R1 (explanation, appointment, checklist) and the verdict. It refuses legal advice and interview interpreting per C33. It never sees a resolved ref. Text that isn't `1`/`2` while "same letter or new?" is open goes to the turn, which answers and reminds the user to pick.
+- **Translation at the edges (5.1).** Inbound text is translated to English for `messages.body_en` (`MODEL_FAST`), except replies to an open ask_user question. The turn thinks and writes in English, and its reply is translated into the user's language (Spanish register: warm, simple, *usted*). If the model or the translation fails, the user gets the `orchestrator.unavailable` template, never untranslated English.
 - **Fake research agent.** `POST /dev/fake-research` claims research jobs and finishes them from the contract fixtures, so the path can be tried before the research agent is on `main`.
 
 `pytest` covers every routing path on fakes, with no network.
@@ -44,6 +46,8 @@ This page is the record for the WhatsApp side (relay, orchestrator pipe, call st
 | Call-status rules and the watcher that applies them | `orchestrator/call_status.py` |
 | Starting research on a letter; which letter is being read | `orchestrator/letters.py` |
 | Watching queued jobs until done or failed | `orchestrator/job_watch.py` |
+| The Claude turn, its tools, its prompt | `orchestrator/turn.py`, `tools.py`, `prompts.py` |
+| Translation to and from English | `translation/translate.py` |
 | Fake phone agent and `POST /dev/fake-call`; fake research and `POST /dev/fake-research` (dev only) | `backend/app/dev/` |
 | Test fakes and fixtures for all of the above | `backend/tests/whatsapp_fakes.py`, `conftest.py` |
 
@@ -120,6 +124,7 @@ Made to unblock the build; each follows Plan.md where Plan.md speaks. Raise any 
 5. **Late replies (C24) count for 10 minutes after the timeout, once per question.** The window is held in memory.
 6. **The orchestrator watches each job it queues with `get_job`** (one task per job, about once a second, stops at done or failed or after 3 hours). No new helper from person 1. Which letter is being read lives in memory too (`orchestrator/letters.py`), because research creates the `cases` row only when the fast pass finishes. A restart forgets it, and a photo sent then becomes a new letter.
 7. **The fake research agent lives in `dev/`, behind the same guard as the fake call.** `POST /dev/fake-research` claims `research_fast` and `research_deep` for 30 minutes (or `{"minutes": n}`), finishing each from `tests/fixtures/contracts/` after 5 s and 10 s. It saves the verification with **our mock agency line** (`TWILIO_MOCK_AGENCY_NUMBER`), never the fixture's real USCIS number. With that unset, the phone is empty and `official_dial_number` refuses the case. It claims from the shared queue, so don't run it while a real research worker uses the same database. It queues no `memory_write`; the memory writer doesn't exist yet.
+8. **The turn has five tools for now; `request_consent` and `start_call` come with the consent gate (Goal 6.3).** That keeps C21 in code, not in the model's hands. Until then the prompt tells the model it can't place calls from the chat. That line comes out with Goal 6. Research starts from photos, so there's no `start_research` tool. One turn is one tool-runner loop: up to 6 model calls, 30 s per call, 60 s overall. `effort: low`, and the system prompt is cached.
 
 ## Try it on your phone (fake call)
 
@@ -153,7 +158,7 @@ Made to unblock the build; each follows Plan.md where Plan.md speaks. Raise any 
    - It also stops status messages for a call in progress.
    - Keep `--reload-dir backend`.
 4. **The sandbox is slow.** Twilio takes 5–9 s to forward each message to us (photos are the slow end). Our reply goes out 1–2 s after that.
-5. **The Spanish template text needs a native speaker's check**, using USCIS's official Spanish terms where they apply.
+5. **The Spanish template text needs a native speaker's check**, using USCIS's official Spanish terms where they apply. That includes the new `research.slow` and `orchestrator.unavailable` templates, and a sample of translated turn replies.
 6. **The sandbox delay eats into ask_user's timeout.** The user has about 30 s of real time out of 45 s. Don't go below 45.
 7. **ask_user options are in English for now.** The question text is Spanish, but the option labels go out as given until translation lands (Goal 5).
 8. ~~Goal 4 must not hold up ask_user replies.~~ Fixed: the orchestrator turn runs after the routing lock is released, under a separate per-number turn lock. Job reactions run in their watcher's task, outside both.

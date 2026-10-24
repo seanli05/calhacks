@@ -11,6 +11,8 @@ from app.contracts import (
     AskUserRequest,
     Component,
     Event,
+    EventType,
+    FactStatus,
     JobPayload,
     JobStatus,
     JobType,
@@ -19,6 +21,7 @@ from app.contracts import (
     QuestionStatus,
 )
 from app.db import tables
+from app.db.progress import CaseStage, compute_stage
 from app.db.tables import utcnow
 from app.relay.inbound import InboundMedia, InboundMessage
 from app.relay.media import DownloadedMedia, MediaDownloadError
@@ -44,6 +47,9 @@ class FakeDB:
         self.questions: dict[str, tables.Question] = {}
         self.events: list[Event] = []
         self.jobs: dict[str, tables.Job] = {}
+        self.verifications: dict[str, tables.Verification] = {}
+        self.profiles: dict[str, tables.Profile] = {}
+        self.facts: list[tables.Fact] = []
 
     # Relay: questions (race-safe like the real helpers: only an open row closes)
 
@@ -237,8 +243,45 @@ class FakeDB:
     async def list_messages(self, user_id: str) -> list[tables.Message]:
         return [m for m in self.messages if m.user_id == user_id]
 
+    def _closed(self, case_id: str) -> bool:
+        return any(
+            e.type == EventType.CASE_CLOSED and e.case_id == case_id
+            for e in self.events
+        )
+
     async def list_active_cases(self, user_id: str) -> list[tables.Case]:
-        return [c for c in reversed(self.cases) if c.user_id == user_id]
+        return [
+            c
+            for c in reversed(self.cases)
+            if c.user_id == user_id and not self._closed(c.id)
+        ]
+
+    async def case_progress(self, case_id: str) -> CaseStage:
+        case = next(c for c in self.cases if c.id == case_id)
+        verification = self.verifications.get(case_id)
+        return compute_stage(
+            closed=self._closed(case_id),
+            latest_call_state=None,
+            latest_verification=verification.status if verification else None,
+            fast_job=None,
+            deep_job=None,
+            fast_result=(case.fast_result or {}).get("status"),
+        )
+
+    async def latest_verification(self, case_id: str) -> tables.Verification | None:
+        return self.verifications.get(case_id)
+
+    async def get_profile(self, user_id: str) -> tables.Profile | None:
+        return self.profiles.get(user_id)
+
+    async def list_facts(
+        self, user_id: str, statuses: Sequence[FactStatus] | None = None
+    ) -> list[tables.Fact]:
+        return [
+            f
+            for f in self.facts
+            if f.user_id == user_id and (statuses is None or f.status in statuses)
+        ]
 
     def outbound_templates(self) -> list[str | None]:
         return [m.template for m in self.messages if m.direction == "out"]

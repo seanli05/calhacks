@@ -29,6 +29,10 @@ _READS = (
     "get_user",
     "list_events",
     "get_job",
+    "case_progress",
+    "latest_verification",
+    "get_profile",
+    "list_facts",
 )
 
 
@@ -45,6 +49,7 @@ def db(monkeypatch: pytest.MonkeyPatch) -> FakeDB:
     monkeypatch.setattr("app.orchestrator.pipe.append_message", fake.append_message)
     monkeypatch.setattr("app.relay.outbound.append_message", fake.append_message)
     monkeypatch.setattr("app.relay.ask_user.append_event", fake.append_event)
+    monkeypatch.setattr("app.orchestrator.tools.append_event", fake.append_event)
     return fake
 
 

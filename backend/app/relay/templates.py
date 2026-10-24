@@ -68,6 +68,14 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "I'll write as soon as I'm done."
         ),
     },
+    # The orchestrator's turn failed (model or translation); never English instead.
+    "orchestrator.unavailable": {
+        "es": (
+            "Lo siento, no pude responderle ahora. Por favor escríbame otra vez "
+            "en unos minutos."
+        ),
+        "en": "Sorry, I couldn't answer just now. Please write to me again in a few minutes.",
+    },
     "media.download_failed": {
         "es": "Lo siento, no pude descargar ese archivo. ¿Me lo puede enviar otra vez?",
         "en": "Sorry, I couldn't download that file. Could you send it again?",
