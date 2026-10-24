@@ -54,3 +54,6 @@ recordings/
 .neon
 backend/tests/fixtures/research/private/
 rehearsal/
+
+# Phone smoke test runs: what was heard and said on test calls, local only
+backend/smoke_runs/
