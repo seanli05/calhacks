@@ -160,19 +160,21 @@ The work each row implies, grouped by owner, for sizing the migration later. Add
 
 | Row | Change | Kind | Callers and fixtures to touch | Cost |
 |---|---|---|---|---|
-| 2 | `FastResult.key_dates` | additive | fixtures | |
-| 3 | `KeyFact`: `value` or `ref`, `quote`, `page`; drop `citation` | breaking | `app/dev/fake_research.py`, `app/db/reset.py`, dashboard letter panel, fixtures | |
-| 4, 5 | `Appointment.time` and `location_ref` optional | loosening | `app/api/`, dashboard, fixtures | |
-| 6, 14 | `ProposedFact.sensitivity` | additive | memory writer (person 2) must hold `sensitive` facts | |
-| 8 | `Verification.signals` | additive | fixtures | |
-| 9 | `DeepResult.official_phone_purpose` (nice) | additive | fixtures | |
-| 10 | `DeepResult.alternative_contacts` | additive | orchestrator relays them (person 2), fixtures | |
-| 11 | `DeepResult.brief_id` optional | loosening | callers that assume a brief | |
-| 13 | `ResearchDeepJob.signals`, `call_purpose` | additive | fixtures | |
-| 17 | new research event types | additive | dashboard feed templates | |
-| 18 | `CaseBrief` model | replaces a dict | `save_brief`, phone agent's brief reader (person 4) | |
-| 19 | `research_question` job, result, events | new | orchestrator queues it and relays answers (person 2), dashboard templates | |
-| 1 | `needs_user_input` flow | new | see that section: person 1 about an hour, person 2 about 2 hours, research about 30 minutes | |
+| 2 | `FastResult.key_dates` | additive | fixtures | S: one field |
+| 3 | `KeyFact`: `value` or `ref`, `quote`, `page`; drop `citation` | breaking | `app/dev/fake_research.py`, `app/db/reset.py`, dashboard letter panel, fixtures | S: three callers, each a line or two (`orchestrator/tools.py:237` only reads `field`, the dashboard doesn't read key facts) |
+| 4, 5 | `Appointment.time` and `location_ref` optional | loosening | `app/api/`, dashboard, fixtures | S: guard `None` in `api/case_views.py:33`, `:37`, the API model, and `orchestrator/letter_result.py:55` (`format_time`, person 2) |
+| 6, 14 | `ProposedFact.sensitivity` | additive | memory writer (person 2) must hold `sensitive` facts | S now; the memory writer isn't built yet |
+| 8 | `Verification.signals` | additive | fixtures | S |
+| 9 | `DeepResult.official_phone_purpose` (nice) | additive | fixtures | S |
+| 10 | `DeepResult.alternative_contacts` | additive | orchestrator relays them (person 2), fixtures | S for the contract; relaying them is person 2's call and not on the demo path |
+| 11 | `DeepResult.brief_id` optional | loosening | callers that assume a brief | S: `orchestrator/consent.py` reads the brief row, not R2's `brief_id` |
+| 13 | `ResearchDeepJob.signals`, `call_purpose` | additive | fixtures | S |
+| 17 | new research event types | additive | dashboard feed templates | S: enum values plus feed templates |
+| 18 | `CaseBrief` model | replaces a dict | `save_brief`, phone agent's brief reader (person 4) | M: their model carries `brief_id` inside, but `save_brief` mints the row's ID, so `save_brief` takes an optional `brief_id` (person 1). The phone agent reads the brief as a dict, so a model dump still works; person 4 confirms the fields |
+| 19 | `research_question` job, result, events | new | orchestrator queues it and relays answers (person 2), dashboard templates | L: a new job type and feature, not in Plan.md. Person 2 queues it and relays answers, plus contracts, templates and tests |
+| 1 | `needs_user_input` flow | new | see that section: person 1 about an hour, person 2 about 2 hours, research about 30 minutes | M: about 3.5 hours across three people |
+
+Sizes: **S** under 30 minutes, **M** 1–2 hours, **L** half a day or more, each with Claude.
 
 **Research's integration (person 3, step 2):** move the code, switch to `app.contracts`, swap the simulated `Store` for the real helpers in `research/jobs.py`, use `app.settings`, add the worker (row 20 and step 2).
 
