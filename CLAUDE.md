@@ -86,7 +86,8 @@ Every change must keep these true. If one would be broken, stop and raise it wit
 ### Git workflow
 - Branch per feature (`<name>/<short-topic>`), small PRs, merge to `main` often (several times a day). Long-lived branches will not merge cleanly on Saturday night.
 - Pull `main` before starting work and before opening a PR.
-- Commit messages say what changed and why, in the imperative ("Add hold detection timeout").
+- Commit messages are one short line in the imperative ("Add hold detection timeout"). No body unless the why isn't obvious.
+- No Claude or AI attribution in commits or PRs (no `Co-Authored-By` trailers, no "Generated with" lines).
 - At feature freeze, `main` gets bug fixes only.
 
 ### Scope discipline
