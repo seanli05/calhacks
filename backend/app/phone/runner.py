@@ -32,6 +32,7 @@ from app.phone.line import (
     AgencyUnreachable,
     Heard,
     NonSpeech,
+    Overheard,
     SpeechStarted,
     UserAnswered,
     UserLeft,
@@ -244,6 +245,10 @@ class _CallRunner(MenuSteps):
         self.timers.cancel_all()
         if self.ask is not None:
             self._drop_ask()
+        if self.speaking is not None:
+            self.speaking.cancel()
+            self._dropped.append(self.speaking)
+            self.speaking = None
 
     async def _stop_tasks(self) -> None:
         self._stop_background()
@@ -298,6 +303,9 @@ class _CallRunner(MenuSteps):
     async def _dispatch(self, item: LineInput) -> None:
         state = self.sm.state
         match item.event:
+            case Overheard(speaker=speaker, text=text):
+                # A fork can open a moment before `USER_JOINED`; keep its lines too.
+                self._said(speaker, text)
             case SpeechStarted():
                 self.speech_started()
             case Heard(text=text):
@@ -392,35 +400,35 @@ class _CallRunner(MenuSteps):
             await self._classify_and_decide(at_s, seq, reading)
 
     async def _on_human(self) -> None:
-        """Ring the applicant at once (< 5 s) and introduce the agent meanwhile."""
-        intro = asyncio.ensure_future(self._say_line(call_lines.INTRO))
+        """Ring the applicant at once (< 5 s) and introduce the agent meanwhile. The
+        intro plays in the background, so the applicant joining never waits on it."""
+        self._speak_meanwhile(call_lines.INTRO)
         try:
             await self.deps.telephony.ring_user(self.call_id, self.job.user_id)
         except LineClosed:
             self.step.flags.append("line_closed")
-            await asyncio.gather(intro, return_exceptions=True)
             return  # the hang-up event follows
         except BaseException:
-            intro.cancel()
-            await asyncio.gather(intro, return_exceptions=True)
+            await self._stop_speaking()
             raise
         self.step.sent.append("rang the applicant")
         await self._fire(Trigger.USER_DIALED)
-        await intro
 
     async def _bridging_heard(self, at_s: float) -> None:
         gap_ok = (
             self.last_holding_s is None
             or at_s - self.last_holding_s >= self.config.holding_line_gap_s
         )
-        if self.holding_said >= self.config.holding_lines_max or not gap_ok:
+        speaking = self.speaking is not None and not self.speaking.done()
+        if speaking or self.holding_said >= self.config.holding_lines_max or not gap_ok:
             self.step.flags.append("quiet")
             return
-        if await self._say_line(call_lines.HOLDING):
-            self.holding_said += 1
-            self.last_holding_s = at_s
+        self.holding_said += 1
+        self.last_holding_s = at_s
+        self._speak_meanwhile(call_lines.HOLDING)
 
     async def _user_answered(self) -> None:
+        await self._stop_speaking()
         try:
             await self.deps.telephony.connect_user()
         except LineClosed:
@@ -430,8 +438,30 @@ class _CallRunner(MenuSteps):
         await self._fire(Trigger.USER_JOINED)
 
     async def _user_unreachable(self, reason: str) -> None:
+        await self._stop_speaking()
         await self._say_line(call_lines.CALL_BACK)
         await self._fire(Trigger.USER_UNREACHABLE, reason=reason)
+
+    def _speak_meanwhile(self, text: str) -> None:
+        """A fixed line to the rep while the applicant's phone rings, played in the
+        background so the inbox keeps moving."""
+        self.speaking = asyncio.ensure_future(self._say_in_background(text))
+
+    async def _say_in_background(self, text: str) -> None:
+        try:
+            await self._say_line(text)
+        except Exception:
+            logger.exception("a line to the representative failed (%s)", self._ids())
+
+    async def _stop_speaking(self) -> None:
+        """Cut off a line still playing: the applicant is joining, or won't."""
+        task, self.speaking = self.speaking, None
+        if task is None:
+            return
+        if not task.done():
+            task.cancel()
+            self.step.flags.append("speech_cut")
+        await asyncio.gather(task, return_exceptions=True)
 
     async def _fire_reading(self, trigger: Trigger, reading: PhaseReading) -> None:
         await self._fire(

@@ -5,6 +5,7 @@ import asyncio
 
 import pytest
 from app.db.errors import UnverifiedNumber
+from app.phone.call_lines import JOIN_PROMPTS
 from app.phone.fakes import FakeNumberSource
 from app.phone.line import (
     AgencyAnswered,
@@ -12,12 +13,19 @@ from app.phone.line import (
     AgencyUnreachable,
     Heard,
     LineEvent,
+    Overheard,
+    UserAnswered,
+    UserLeft,
+    UserUnreachable,
 )
 from app.phone.ports import LineClosed
-from app.phone.twilio_line import LineRegistry, LineTiming, LineUrls, TwilioTelephony
+from app.phone.twilio_line import LineRegistry, LineTiming, TwilioTelephony
+from app.phone.twilio_urls import LineUrls
 
 OFFICIAL = "+18005550100"
+APPLICANT = "+15555550123"
 SID = "CA123"
+USER_SID = "CA456"
 FAST = LineTiming(stream_wait_s=0.2, gone_grace_s=0.05, say_margin_s=0.05)
 
 
@@ -26,6 +34,7 @@ class FakeCalls:
         self.created: list[dict[str, str]] = []
         self.updates: list[str] = []
         self.completed: list[str] = []
+        self.ended: list[str] = []
         self.call_status = "in-progress"
         self.on_update: list[object] = []
         self.fail_create = False
@@ -34,13 +43,16 @@ class FakeCalls:
         if self.fail_create:
             raise TimeoutError
         self.created.append({"to": to, "twiml": twiml, "status": status_callback})
-        return SID
+        return SID if len(self.created) == 1 else USER_SID
 
     async def update_twiml(self, sid: str, twiml: str) -> None:
         self.updates.append(twiml)
 
     async def complete(self, sid: str) -> None:
         self.completed.append(sid)
+
+    async def end(self, sid: str) -> None:
+        self.ended.append(sid)
 
     async def status(self, sid: str) -> str:
         return self.call_status
@@ -66,14 +78,18 @@ class FakeStream:
 
 
 class Line:
-    def __init__(self, *, verified: bool = True) -> None:
+    def __init__(self, *, verified: bool = True, language: str = "es") -> None:
         self.calls = FakeCalls()
         self.registry = LineRegistry()
-        numbers = FakeNumberSource(verified={"case_1": OFFICIAL} if verified else {})
+        numbers = FakeNumberSource(
+            verified={"case_1": OFFICIAL} if verified else {},
+            users={"user_9": APPLICANT},
+        )
         self.line = TwilioTelephony(
             numbers,
             self.calls,
             LineUrls("https://agent.example.app"),
+            user_language=language,
             registry=self.registry,
             timing=FAST,
         )
@@ -81,6 +97,25 @@ class Line:
     async def dialed(self) -> "Line":
         await self.line.dial_agency("call_1", "case_1")
         return self
+
+    async def answered(self) -> tuple["Line", int]:
+        """Dialed, with the agency on the stream; returns the stream's number."""
+        await self.dialed()
+        seq = self.line.attach_stream(FakeStream(), SID)
+        assert seq is not None
+        return self, seq
+
+    async def rung(self) -> tuple["Line", int]:
+        line, seq = await self.answered()
+        await line.line.ring_user("call_1", "user_9")
+        return line, seq
+
+    async def bridged(self) -> tuple["Line", int]:
+        line, seq = await self.rung()
+        line.line.user_pressed_key(USER_SID)
+        await line.line.connect_user()
+        line.line.detach_stream(seq)  # moving the leg ends its stream
+        return line, seq
 
     async def events(self) -> list[LineEvent]:
         """Everything the line said, once it's hung up."""
@@ -288,9 +323,189 @@ async def test_hang_up_is_safe_twice_and_closes_everything() -> None:
         await line.line.press_keys("2")
 
 
-async def test_the_bridge_is_phase_3() -> None:
-    line = await Line().dialed()
-    with pytest.raises(NotImplementedError):
-        await line.line.ring_user("call_1", "user_9")
-    with pytest.raises(NotImplementedError):
+# The bridge: ringing the applicant (C6), the join gate, and the conference
+
+
+async def test_ring_user_calls_the_users_own_number_with_a_join_gate() -> None:
+    line, _ = await Line().rung()
+
+    _, user_leg = line.calls.created
+    assert user_leg["to"] == APPLICANT
+    assert user_leg["status"] == (
+        "https://agent.example.app/phone/calls/call_1/user/status"
+    )
+    twiml = user_leg["twiml"]
+    assert JOIN_PROMPTS["es"].text in twiml and 'language="es-US"' in twiml
+    assert 'action="https://agent.example.app/phone/calls/call_1/user/joined"' in twiml
+    assert "/phone/calls/call_1/user/missed</Redirect>" in twiml
+    assert "record" not in twiml.lower()  # C29
+
+
+async def test_the_join_gate_speaks_the_users_language() -> None:
+    line, _ = await Line(language="en").rung()
+    assert JOIN_PROMPTS["en"].text in line.calls.created[1]["twiml"]
+
+
+async def test_a_language_with_no_prompt_falls_back_to_english() -> None:
+    line, _ = await Line(language="fa").rung()
+    assert JOIN_PROMPTS["en"].text in line.calls.created[1]["twiml"]
+
+
+async def test_a_failed_ring_is_unreachable_not_a_crash() -> None:
+    line, _ = await Line().answered()
+    line.calls.fail_create = True
+
+    await line.line.ring_user("call_1", "user_9")
+
+    assert await line.events() == [
+        AgencyAnswered(),
+        UserUnreachable(reason="failed"),
+    ]
+
+
+async def test_a_key_press_joins_the_conference_and_reports_the_answer() -> None:
+    line, _ = await Line().rung()
+
+    twiml = line.line.user_pressed_key(USER_SID)
+
+    assert "<Conference" in twiml and ">bridge-call_1</Conference>" in twiml
+    assert 'endConferenceOnExit="true"' in twiml and 'beep="false"' in twiml
+    assert 'url="wss://agent.example.app/phone/calls/call_1/fork/user"' in twiml
+    assert 'track="inbound_track"' in twiml
+    assert "record" not in twiml.lower()  # C29
+    assert await line.events() == [AgencyAnswered(), UserAnswered()]
+
+
+async def test_no_key_press_is_unreachable_once() -> None:
+    line, _ = await Line().rung()
+
+    twiml = line.line.user_missed_gate(USER_SID)
+    line.line.on_user_status(USER_SID, "completed")
+
+    assert "<Hangup" in twiml
+    assert await line.events() == [
+        AgencyAnswered(),
+        UserUnreachable(reason="no_key_press"),
+    ]
+
+
+async def test_picking_up_and_putting_down_without_a_key_is_unreachable() -> None:
+    line, _ = await Line().rung()
+    line.line.on_user_status(USER_SID, "in-progress")  # picked up: maybe voicemail
+    line.line.on_user_status(USER_SID, "completed")
+
+    assert await line.events() == [
+        AgencyAnswered(),
+        UserUnreachable(reason="no_key_press"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("status", "reason"),
+    [("busy", "busy"), ("no-answer", "no_answer"), ("failed", "failed")],
+)
+async def test_a_user_leg_that_never_connects_is_unreachable(
+    status: str, reason: str
+) -> None:
+    line, _ = await Line().rung()
+    line.line.on_user_status(USER_SID, "ringing")
+    line.line.on_user_status(USER_SID, status)
+
+    assert await line.events() == [AgencyAnswered(), UserUnreachable(reason=reason)]
+
+
+async def test_a_key_press_too_late_hangs_up_the_applicant() -> None:
+    line, _ = await Line().rung()
+    line.line.user_missed_gate(USER_SID)  # or the runner's backstop gave up
+
+    assert "<Hangup" in line.line.user_pressed_key(USER_SID)
+    assert UserAnswered() not in await line.events()
+
+
+async def test_a_key_press_after_the_agency_left_hangs_up_the_applicant() -> None:
+    line, _ = await Line().rung()
+    line.line.on_status(SID, "completed")
+
+    assert "<Hangup" in line.line.user_pressed_key(USER_SID)
+    assert await line.events() == [AgencyAnswered(), AgencyHungUp()]
+
+
+async def test_another_sid_cant_press_for_the_applicant() -> None:
+    line, _ = await Line().rung()
+    assert "<Hangup" in line.line.user_pressed_key("CA999")
+    line.line.on_user_status("CA999", "busy")
+    assert await line.events() == [AgencyAnswered()]
+
+
+async def test_connect_user_moves_the_agency_leg_into_the_conference() -> None:
+    line, _ = await Line().bridged()
+    await asyncio.sleep(0.1)  # past the grace: the stream's close isn't a hang-up
+
+    [twiml] = line.calls.updates
+    assert ">bridge-call_1</Conference>" in twiml
+    assert 'url="wss://agent.example.app/phone/calls/call_1/fork/agency"' in twiml
+    assert await line.events() == [AgencyAnswered(), UserAnswered()]
+
+
+async def test_the_agent_is_silent_once_the_applicant_is_on() -> None:
+    line, _ = await Line().bridged()
+    with pytest.raises(LineClosed):
+        await line.line.say("hello")
+    with pytest.raises(LineClosed):
+        await line.line.press_keys("1")
+    assert line.line.attach_stream(FakeStream(), SID) is None
+
+
+async def test_connect_user_needs_the_applicant_to_have_joined() -> None:
+    line, _ = await Line().rung()
+    with pytest.raises(RuntimeError):
         await line.line.connect_user()
+    assert line.calls.updates == []
+
+
+async def test_after_the_bridge_either_side_leaving_is_reported() -> None:
+    line, _ = await Line().bridged()
+    line.line.on_user_status(USER_SID, "completed")
+    line.line.on_status(SID, "completed")
+
+    assert await line.events() == [
+        AgencyAnswered(),
+        UserAnswered(),
+        UserLeft(),
+        AgencyHungUp(),
+    ]
+
+
+async def test_forks_are_taken_only_from_each_joined_leg() -> None:
+    line, _ = await Line().rung()
+    assert not line.line.attach_fork("user", USER_SID)  # no key pressed yet
+    line.line.user_pressed_key(USER_SID)
+    assert line.line.attach_fork("user", USER_SID)
+    assert not line.line.attach_fork("agency", SID)  # not moved in yet
+    await line.line.connect_user()
+    assert line.line.attach_fork("agency", SID)
+    assert not line.line.attach_fork("agency", USER_SID)
+    assert not line.line.attach_fork("user", SID)
+
+    line.line.emit(Overheard(speaker="agency", text="Your reference number is"))
+    assert Overheard(speaker="agency", text="Your reference number is") in (
+        await line.events()
+    )
+    assert not line.line.attach_fork("user", USER_SID)  # hung up
+
+
+async def test_hang_up_ends_both_legs() -> None:
+    line, _ = await Line().bridged()
+    await line.line.hang_up()
+    await line.line.hang_up()
+
+    assert line.calls.completed == [SID]
+    assert line.calls.ended == [USER_SID]
+
+
+async def test_hang_up_leaves_an_applicant_leg_thats_already_over() -> None:
+    line, _ = await Line().rung()
+    line.line.on_user_status(USER_SID, "no-answer")
+    await line.line.hang_up()
+
+    assert line.calls.ended == []

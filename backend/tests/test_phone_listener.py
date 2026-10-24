@@ -4,8 +4,14 @@ and the quiet between them. Timestamps only; no audio, no network."""
 from array import array
 
 from app.phone.audio_pipeline import MarkingTwilioSerializer
-from app.phone.line import Heard, NonSpeech, SpeechStarted
-from app.phone.listener import LOUD_RMS, PlaybackMarkFrame, TurnAssembler, rms
+from app.phone.line import Heard, LineEvent, NonSpeech, Overheard, SpeechStarted
+from app.phone.listener import (
+    LOUD_RMS,
+    PlaybackMarkFrame,
+    TurnAssembler,
+    overheard,
+    rms,
+)
 from pipecat.serializers.twilio import TwilioFrameSerializer
 
 
@@ -109,6 +115,29 @@ def test_flush_closes_a_half_built_turn() -> None:
     turns.speech_started(1.0)
     turns.transcript("To repeat", 2.0)
     assert turns.flush(2.5) == [Heard(text="To repeat")]
+
+
+def test_a_fork_passes_on_only_finished_turns_as_its_speakers_lines() -> None:
+    lines: list[LineEvent] = []
+    emit = overheard(lines.append, "agency")
+    turns = TurnAssembler(now=0)
+    for event in [
+        *turns.speech_started(1.0),
+        *turns.speech_stopped(2.0),
+        *turns.transcript("Your reference number is", 2.2),
+        *turns.speech_started(2.4),
+        *turns.speech_stopped(4.0),
+        *turns.transcript("C as in cat, 4, 4, 7.", 4.1),
+        *turns.tick(5.1),
+        *turns.tick(11.0),  # a quiet stretch: dropped
+    ]:
+        emit(event)
+
+    assert lines == [
+        Overheard(
+            speaker="agency", text="Your reference number is C as in cat, 4, 4, 7."
+        )
+    ]
 
 
 def test_rms() -> None:

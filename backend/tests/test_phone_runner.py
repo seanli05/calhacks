@@ -39,8 +39,10 @@ from app.phone.line import (
     AgencyHungUp,
     Heard,
     NonSpeech,
+    Overheard,
     SpeechStarted,
     UserAnswered,
+    UserLeft,
     UserUnreachable,
 )
 from app.phone.menu import (
@@ -161,6 +163,7 @@ class Call:
     steps: list[StepRecord] = field(default_factory=list)
     line: FakeTelephony | None = None
     relay: FakeRelay | None = None
+    say_s_per_word: float = 0.0
 
     def deps(
         self,
@@ -173,7 +176,9 @@ class Call:
             verified={"case_123": OFFICIAL} if verified else {},
             users={"user_9": "+15555550123"},
         )
-        self.line = FakeTelephony(numbers, self.clock, script, responder)
+        self.line = FakeTelephony(
+            numbers, self.clock, script, responder, say_s_per_word=self.say_s_per_word
+        )
         self.relay = FakeRelay(self.clock, replies)
         return CallDeps(
             telephony=GuardedTelephony(self.line, [BLOCKED_A_NUMBER]),
@@ -433,6 +438,78 @@ async def test_user_never_heard_from_hits_the_backstop() -> None:
     call, report = await _run(llm, _opening(), tree)
     assert report.outcome == CallOutcome.USER_UNREACHABLE
     assert Said(call_lines.CALL_BACK) in call.actions
+    rang = _sent_step(call, "rang the applicant")
+    backstop = next(step for step in call.steps if step.input == "timer:user_backstop")
+    # Long enough for 30 s of ringing plus the join gate.
+    assert backstop.at_s - rang.at_s == pytest.approx(75)
+
+
+async def test_no_key_at_the_join_gate_tells_the_rep_and_hangs_up() -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    tree = _to_rep(Said("two"), user=Step(35, UserUnreachable(reason="no_key_press")))
+    call, report = await _run(llm, _opening(), tree)
+
+    assert call.actions[-2:] == [Said(call_lines.CALL_BACK), HungUp()]
+    assert report.outcome == CallOutcome.USER_UNREACHABLE
+    [unreachable] = call.events_of(EventType.CALL_USER_UNREACHABLE)
+    assert unreachable.data["reason"] == "no_key_press"
+
+
+async def test_the_applicant_joining_cuts_the_intro_short() -> None:
+    """Speech takes time on a real line; a join mustn't wait for the intro to end."""
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    tree = _to_rep(Said("two"), user=Step(2, UserAnswered()))
+    call, report = await _run(llm, _opening(), tree, call=Call(say_s_per_word=0.4))
+
+    rang = _sent_step(call, "rang the applicant")
+    joined = _sent_step(call, "connected the applicant")
+    assert joined.at_s - rang.at_s == pytest.approx(2)  # the intro takes ~9 s
+    assert "speech_cut" in joined.flags
+    assert report.outcome == CallOutcome.PARTIAL
+
+
+async def test_the_rep_talking_over_the_intro_gets_no_second_line() -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    base = _to_rep(Said("two"), user=Step(20, UserAnswered()))
+
+    def tree(action: Action) -> list[Step]:
+        if isinstance(action, RangUser):
+            return [Step(1, Heard(text="Hello? Who is this?")), *base(action)]
+        return base(action)
+
+    call, _ = await _run(llm, _opening(), tree, call=Call(say_s_per_word=0.4))
+    assert Said(call_lines.HOLDING) not in call.actions
+    talked_over = next(
+        step for step in call.steps if step.text == "Hello? Who is this?"
+    )
+    assert "quiet" in talked_over.flags
+
+
+async def test_overheard_lines_after_the_bridge_go_in_the_transcript() -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    base = _to_rep(Said("two"))
+
+    def tree(action: Action) -> list[Step]:
+        if isinstance(action, ConnectedUser):
+            return [
+                Step(2, Overheard(speaker="agency", text="Can I have your name?")),
+                Step(3, Overheard(speaker="user", text="Ana Morales.")),
+                Step(9, Overheard(speaker="agency", text="Your reference is C447.")),
+                Step(5, UserLeft()),
+            ]
+        return base(action)
+
+    call, report = await _run(llm, _opening(), tree)
+
+    after = call.record.transcript[-3:]
+    assert [(line.speaker, line.text) for line in after] == [
+        ("agency", "Can I have your name?"),
+        ("user", "Ana Morales."),
+        ("agency", "Your reference is C447."),
+    ]
+    [ended] = call.events_of(EventType.CALL_ENDED)
+    assert ended.data["cause"] == "call_finished"
+    assert report.outcome == CallOutcome.PARTIAL
 
 
 def _hang_up_in(state: CallState) -> tuple[list[Step], Callable[[Action], list[Step]]]:

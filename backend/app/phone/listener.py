@@ -24,6 +24,7 @@ import time
 from array import array
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Literal
 
 from pipecat.frames.frames import (
     Frame,
@@ -37,7 +38,7 @@ from pipecat.frames.frames import (
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
-from app.phone.line import Heard, LineEvent, NonSpeech, SpeechStarted
+from app.phone.line import Heard, LineEvent, NonSpeech, Overheard, SpeechStarted
 from app.phone.ports import LineClosed
 
 logger = logging.getLogger(__name__)
@@ -167,6 +168,20 @@ def rms(pcm16: bytes) -> float:
     if not samples:
         return 0.0
     return math.sqrt(sum(s * s for s in samples) / len(samples))
+
+
+def overheard(
+    emit: Callable[[LineEvent], None], speaker: Literal["agency", "user"]
+) -> Callable[[LineEvent], None]:
+    """An `emit` for a listen-only fork after the bridge: each finished turn becomes
+    one `Overheard` line for `speaker`, and everything else (turn openings, quiet
+    stretches) is dropped, since nothing decides on it any more."""
+
+    def emit_overheard(event: LineEvent) -> None:
+        if isinstance(event, Heard):
+            emit(Overheard(speaker=speaker, text=event.text))
+
+    return emit_overheard
 
 
 @dataclass

@@ -5,11 +5,15 @@ wired into the app (a test checks nothing in `app` imports it).
     python -m app.phone.smoke --runner        # the full call runner drives the call
     python -m app.phone.smoke --own-number    # your phone plays the agency
     python -m app.phone.smoke --case CASE_ID  # another case (still the mock line only)
+    python -m app.phone.smoke --runner --bridge   # your phone plays the applicant
+    python -m app.phone.smoke --bridge --language en  # the join prompt in English
 
 It serves the phone routes itself, in this process, because a call's line lives
 in memory: stop the backend first, and point ngrok and `PUBLIC_BASE_URL` at
-`--port`. Interactive commands: `say <text>`, `keys <digits>`, `hangup`. With
-`--runner`, type a number to answer the applicant's question, or `hangup`.
+`--port`. Interactive commands: `say <text>`, `keys <digits>`, `bridge` (with
+`--bridge`: ring your phone; a key press there joins you, and the agency leg
+follows), `hangup`. With `--runner`, type a number to answer the applicant's
+question, or `hangup`.
 
 What it may dial, without weakening rule 2:
 
@@ -18,6 +22,9 @@ What it may dial, without weakening rule 2:
   run can never call a real agency;
 - with `--own-number`, `PHONE_SMOKE_DIAL_NUMBER` from your `.env`, through
   `SmokeNumberSource`, which exists only here. The number is never printed.
+
+It rings only `PHONE_SMOKE_USER_NUMBER` as the applicant, and only with `--bridge`
+(C6 holds: the line reads it from the number source; it's never printed).
 
 Smoke calls are ours to our own lines, not a user's call, so no `calls` row or
 consent message exists: the runner gets fake stores and a fake job, and nothing
@@ -45,10 +52,11 @@ from app.db import reads
 from app.db.ids import new_id
 from app.db.reset import demo_brief
 from app.phone.adapters import DbCaseReader, DbNumberSource, load_blocked_values
+from app.phone.call_lines import JOIN_PROMPTS
 from app.phone.clock import SystemClock
 from app.phone.fakes import FakeCallStore, FakeCaseReader, FakeEventLog
 from app.phone.guard import BlockedIdentifier, GuardedTelephony
-from app.phone.line import Heard, LineEvent, NonSpeech
+from app.phone.line import Heard, LineEvent, NonSpeech, Overheard, UserAnswered
 from app.phone.observe import StepRecord
 from app.phone.playground.render import clip, describe
 from app.phone.playground.tap import ConsoleRelay
@@ -56,12 +64,15 @@ from app.phone.ports import CallDeps, CaseReader, LineClosed, NumberSource
 from app.phone.routes import router
 from app.phone.runner import run_call
 from app.phone.simulate import SIM_BLOCKED
-from app.phone.twilio_line import LineUrls, TwilioTelephony
+from app.phone.twilio_line import TwilioTelephony
 from app.phone.twilio_rest import TwilioCalls
+from app.phone.twilio_urls import LineUrls
 from app.settings import Settings
 
 RUNS_DIR = Path(__file__).resolve().parents[2] / "smoke_runs"
 """`backend/smoke_runs/`, git-ignored: one JSON-lines file per run."""
+SMOKE_LANGUAGE = "es"
+"""The smoke job's language by default (`--language`), and so the join gate's."""
 OWN_CASE = "case_smoke"
 OWN_BRIEF = "brief_smoke"
 SMOKE_USER = "user_smoke"
@@ -80,16 +91,41 @@ _LIVE_CALL = (
 class SmokeSettings(Settings):
     phone_smoke_dial_number: str = ""
     """Your own phone, for `--own-number` only. Never commit it."""
+    phone_smoke_user_number: str = ""
+    """Your own phone as the applicant, for `--bridge` only. Never commit it."""
 
 
 class SmokeRefused(Exception):
     """The smoke test won't dial this. The message never contains a number."""
 
 
-class MockLineOnly:
+def _e164(number: str, name: str) -> str:
+    if not (number.startswith("+") and number[1:].isdigit()):
+        raise SmokeRefused(f"{name} must be E.164 (+15551234567)")
+    return number
+
+
+class _RingsOnlyYou:
+    """The applicant's number: your own phone with `--bridge`, else nobody."""
+
+    def __init__(self, applicant: str | None) -> None:
+        self._applicant = (
+            None if applicant is None else _e164(applicant, "PHONE_SMOKE_USER_NUMBER")
+        )
+
+    async def user_number(self, user_id: UserId) -> str:
+        if self._applicant is None:
+            raise SmokeRefused("the smoke test rings the applicant only with --bridge")
+        return self._applicant
+
+
+class MockLineOnly(_RingsOnlyYou):
     """A `NumberSource` that passes on only the mock agency line."""
 
-    def __init__(self, inner: NumberSource, mock_number: str) -> None:
+    def __init__(
+        self, inner: NumberSource, mock_number: str, applicant: str | None = None
+    ) -> None:
+        super().__init__(applicant)
         self._inner = inner
         self._mock_number = mock_number
 
@@ -102,23 +138,16 @@ class MockLineOnly:
             )
         return number
 
-    async def user_number(self, user_id: UserId) -> str:
-        raise SmokeRefused("the smoke test never rings the applicant")
 
-
-class SmokeNumberSource:
+class SmokeNumberSource(_RingsOnlyYou):
     """Your own phone as the agency. Only `--own-number` builds one."""
 
-    def __init__(self, number: str) -> None:
-        if not (number.startswith("+") and number[1:].isdigit()):
-            raise SmokeRefused("PHONE_SMOKE_DIAL_NUMBER must be E.164 (+15551234567)")
-        self._number = number
+    def __init__(self, number: str, applicant: str | None = None) -> None:
+        super().__init__(applicant)
+        self._number = _e164(number, "PHONE_SMOKE_DIAL_NUMBER")
 
     async def official_dial_number(self, case_id: CaseId) -> str:
         return self._number
-
-    async def user_number(self, user_id: UserId) -> str:
-        raise SmokeRefused("the smoke test never rings the applicant")
 
 
 def missing_settings(settings: SmokeSettings, args: argparse.Namespace) -> list[str]:
@@ -128,6 +157,8 @@ def missing_settings(settings: SmokeSettings, args: argparse.Namespace) -> list[
     )
     if args.runner:
         needed.append("anthropic_api_key")
+    if args.bridge:
+        needed.append("phone_smoke_user_number")
     return [name.upper() for name in needed if not getattr(settings, name)]
 
 
@@ -168,6 +199,8 @@ class Printer:
                 self._print(f'heard      "{text}"')
             case NonSpeech(sound=sound, seconds=seconds):
                 self._print(f"non_speech {sound} {seconds:.0f} s")
+            case Overheard(speaker=speaker, text=text):
+                self._print(f'{speaker + ":":<10} "{text}"')
             case _:
                 self._print(event.kind)
         self.save("line_event", event=event.model_dump())
@@ -251,11 +284,17 @@ async def interactive(
 ) -> None:
     call_id = new_id("call")
     sid = await line.dial_agency(call_id, case_id)
-    out.line(f"dialed (call_id={call_id} sid={sid}); type say/keys/hangup")
+    out.line(f"dialed (call_id={call_id} sid={sid}); type say/keys/bridge/hangup")
 
     async def watch() -> None:
         async for event in line.events():
             out.event(event)
+            if isinstance(event, UserAnswered):
+                try:
+                    await line.connect_user()
+                    out.line("bridged: the agency leg joined you")
+                except LineClosed as exc:
+                    out.line(f"not bridged: {exc}")
         out.line("the line has ended")
 
     watcher = asyncio.create_task(watch())
@@ -272,9 +311,18 @@ async def interactive(
                 elif verb == "keys" and rest:
                     await line.press_keys(rest)
                     out.line("keys sent; stream back")
+                elif verb == "bridge":
+                    await line.ring_user(call_id, SMOKE_USER)
+                    out.line("ringing you; press any key when you pick up")
                 elif verb:
-                    out.line("commands: say <text> · keys <digits> · hangup")
-            except (BlockedIdentifier, LineClosed, ValueError) as exc:
+                    out.line("commands: say <text> · keys <digits> · bridge · hangup")
+            except (
+                BlockedIdentifier,
+                LineClosed,
+                ValueError,
+                RuntimeError,
+                SmokeRefused,
+            ) as exc:
                 out.line(f"not sent: {exc}")
     finally:
         await line.hang_up()
@@ -286,6 +334,7 @@ async def with_runner(
     case_id: CaseId,
     cases: CaseReader,
     brief_id: str,
+    language: str,
     keyboard: Keyboard,
     out: Printer,
 ) -> None:
@@ -295,7 +344,7 @@ async def with_runner(
         case_id=case_id,
         user_id=SMOKE_USER,
         brief_id=brief_id,
-        user_language="es",
+        user_language=language,
         consent_at=datetime.now(UTC),
         consent_message_id="msg_smoke",  # a dev call to our own line, not a user's
         max_hold_minutes=15,
@@ -403,14 +452,17 @@ async def main(args: argparse.Namespace) -> None:
 
     numbers: NumberSource
     cases: CaseReader
+    applicant = settings.phone_smoke_user_number if args.bridge else None
     if args.own_number:
-        numbers = SmokeNumberSource(settings.phone_smoke_dial_number)
+        numbers = SmokeNumberSource(settings.phone_smoke_dial_number, applicant)
         case_id, brief_id = OWN_CASE, OWN_BRIEF
         cases = FakeCaseReader({OWN_BRIEF: demo_brief(OWN_CASE, OWN_BRIEF)})
         blocked = list(SIM_BLOCKED)
         print("WARNING: dialing your own phone (PHONE_SMOKE_DIAL_NUMBER).")
     else:
-        numbers = MockLineOnly(DbNumberSource(), settings.twilio_mock_agency_number)
+        numbers = MockLineOnly(
+            DbNumberSource(), settings.twilio_mock_agency_number, applicant
+        )
         case_id = args.case or await demo_case()
         brief = await reads.latest_brief(case_id)
         if brief is None and args.runner:
@@ -423,16 +475,25 @@ async def main(args: argparse.Namespace) -> None:
     server = Server(args.port)
     await server.start()
     raw = TwilioTelephony(
-        numbers, TwilioCalls(settings), LineUrls.from_settings(settings)
+        numbers,
+        TwilioCalls(settings),
+        LineUrls.from_settings(settings),
+        user_language=args.language,
     )
     line = GuardedTelephony(raw, blocked)
-    mode = ("runner" if args.runner else "manual") + ("-own" if args.own_number else "")
+    mode = (
+        ("runner" if args.runner else "manual")
+        + ("-own" if args.own_number else "")
+        + ("-bridge" if args.bridge else "")
+    )
     out = Printer(None if args.no_save else run_file_for(mode))
     out.save("run", mode=mode, case_id=case_id, started_at=datetime.now(UTC))
     keyboard = Keyboard()
     try:
         if args.runner:
-            await with_runner(line, case_id, cases, brief_id, keyboard, out)
+            await with_runner(
+                line, case_id, cases, brief_id, args.language, keyboard, out
+            )
         else:
             await interactive(line, case_id, keyboard, out)
     finally:
@@ -452,6 +513,17 @@ def cli() -> None:
     )
     parser.add_argument(
         "--case", help="a seeded case ID (default: the first user's case)"
+    )
+    parser.add_argument(
+        "--bridge",
+        action="store_true",
+        help="ring PHONE_SMOKE_USER_NUMBER as the applicant when a person answers",
+    )
+    parser.add_argument(
+        "--language",
+        choices=sorted(JOIN_PROMPTS),
+        default=SMOKE_LANGUAGE,
+        help="the applicant's language: the join prompt speaks it",
     )
     parser.add_argument("--port", type=int, default=8000, help="where ngrok forwards")
     parser.add_argument(

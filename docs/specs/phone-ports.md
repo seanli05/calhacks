@@ -8,7 +8,7 @@ The call runner talks to the outside world only through the Protocols in `ports.
 
 | Port | What it is | Real adapter | Fake |
 |---|---|---|---|
-| `Telephony` | One call's line: `dial_agency`, `say`, `press_keys`, `ring_user`, `connect_user`, `hang_up`, plus `events()`, the stream of everything that happens (`line.py`) | `TwilioTelephony` (`twilio_line.py`; agency leg only until Phase 3) | `FakeTelephony`: a script, plus an optional `responder` that reacts to actions (how the simulator plugs in a phone tree) |
+| `Telephony` | One call's line: `dial_agency`, `say`, `press_keys`, `ring_user`, `connect_user`, `hang_up`, plus `events()`, the stream of everything that happens (`line.py`) | `TwilioTelephony` (`twilio_line.py`: the agency leg, and the applicant's leg bridged into it) | `FakeTelephony`: a script, plus an optional `responder` that reacts to actions (how the simulator plugs in a phone tree) |
 | `Relay` | `ask_user` (P1) | `RelayAskUser` → `app.relay.ask_user` | `FakeRelay`: scripted `Answer` / `NoAnswer` |
 | `CaseReader` | The brief | `DbCaseReader` | `FakeCaseReader` |
 | `CallStore` | `calls`, `transcripts` (only the phone agent writes them) | `DbCallStore` → `writes.phone` | `FakeCallStore` |
@@ -55,7 +55,8 @@ Files: `runner.py` (lifecycle, dispatch, hold, the person, the bridge), `runner_
 | Hold limit | From the first hold, never reset. If it passes in a menu or with a person, it fires on the next hold |
 | Menu gives up | Over 8 min in menus, or "representative" a 4th time in one menu stretch → `AGENT_ABORTED` |
 | Person | Ring the applicant at once (< 5 s) and say the intro meanwhile; `USER_DIALED` once ringing. So `FALSE_HUMAN` almost never fires: 1c's thresholds are the defense, and after the ring a transfer just means the applicant waits on hold too |
-| Bridging | Rep speech gets one fixed holding line, at most twice, ≥ 8 s apart. `UserUnreachable` (or the 45 s backstop) → the call-back line, then hang up |
+| Bridging | The intro and holding lines play in the background, so the applicant joining (or not) is acted on at once and cuts them short. Rep speech gets one fixed holding line, at most twice, ≥ 8 s apart, never over a line still playing. `UserUnreachable` (or the 75 s backstop: 30 s ringing plus the join gate) → the call-back line, then hang up |
+| Connected | `Overheard` lines from the forks go into the transcript as `agency` / `user`; nothing else is decided |
 | Blocked identifier | Nothing sent, flagged; a second in a row says "representative" instead |
 | Unexpected error | `AGENT_ABORTED` and wrap-up. With the applicant on (no abort from `connected`), the bridge stays up and the runner only watches for the end |
 | `events()` ends unannounced | As a hang-up (`CALL_FINISHED` when connected) |
@@ -88,11 +89,37 @@ Files: `runner.py` (lifecycle, dispatch, hold, the person, the bridge), `runner_
 
 Settings: `CARTESIA_AGENT_VOICE_ID` (required for speech), `CARTESIA_STT_MODEL`, `CARTESIA_TTS_MODEL`, and `PUBLIC_BASE_URL` for Twilio to reach us. The Pipecat worker's idle timeout is off; its default would cancel the stream after 5 minutes on hold.
 
-**Open, for Phase 2 and the team:**
-- Live smoke test: `python -m app.phone.smoke` (steps in the README). It dials only the mock line (`MockLineOnly` refuses any other number a case resolves to) or, with `--own-number`, `PHONE_SMOKE_DIAL_NUMBER` through `SmokeNumberSource`, which only `smoke.py` has (a test checks nothing in `app` imports it). Smoke calls are dev calls to our own lines, so they use a fake job and fake stores and write nothing. Not yet checked on a live call: which URL Twilio signs on the websocket handshake (both `https` and `wss` forms are accepted), the mark round trip, the reconnect time, and `LOUD_RMS` against real hold music.
-- `ring_user` and `connect_user` raise `NotImplementedError` (Phase 3), so a full call on the real line aborts and hangs up once a person is detected.
+Live smoke test: `python -m app.phone.smoke` (steps in the README). It dials only the mock line (`MockLineOnly` refuses any other number a case resolves to) or, with `--own-number`, `PHONE_SMOKE_DIAL_NUMBER` through `SmokeNumberSource`, which only `smoke.py` has (a test checks nothing in `app` imports it). It rings only `PHONE_SMOKE_USER_NUMBER` as the applicant, and only with `--bridge`. Smoke calls are dev calls to our own lines, so they use a fake job and fake stores and write nothing.
+
+## The bridge (Phase 3)
+
+When a person is detected, the runner says the intro (in the background) and calls `ring_user`; the applicant joins a conference, and `connect_user` moves the agency leg in after them. Proven live in [spikes/bridge/README.md](../../spikes/bridge/README.md), rebuilt here.
+
+| Route | What arrives | Becomes |
+|---|---|---|
+| `POST /phone/calls/{call_id}/user/status` | The applicant leg's status callbacks | Before a key: `busy`/`no-answer`/`failed`/`canceled` → `UserUnreachable` with that reason, `completed` (picked up, put down) → `UserUnreachable("no_key_press")`. After joining: ended → `UserLeft` |
+| `POST /phone/calls/{call_id}/user/joined` | The join gate's `<Gather>` action: any key | `UserAnswered`, and TwiML that puts the applicant in `bridge-{call_id}`. Too late (the agency left, the runner gave up, we hung up) → `<Hangup/>` |
+| `POST /phone/calls/{call_id}/user/missed` | The gate's fall-through: no key in time | `UserUnreachable("no_key_press")`, `<Hangup/>` |
+| `WS /phone/calls/{call_id}/fork/{speaker}` | A listen-only `<Start><Stream>` of one joined leg (`agency` or `user`) | VAD → Ink → `LineListener` → `Overheard(speaker, text)` per finished turn. Only that leg's own SID may open it |
+
+| Piece | What it does |
+|---|---|
+| Join gate | Carrier voicemail picks up declined and unanswered calls, and Twilio reports it as answered, so the applicant's leg says `call_lines.JOIN_PROMPTS[user_language]` twice and waits 15 s for **any** key; voicemail can't press one, so the rep never hears it. The orchestrator's "Someone picked up, I'm calling you now" WhatsApp (C36) has already told them it's coming |
+| Gate language | `CallJob.user_language` (from `users.language`, the language the user writes to us in), passed to `TwilioTelephony(user_language=…)`; spoken by Twilio `<Say>` with a native voice per language (`en`, `es`). A language with no prompt yet gets English, logged |
+| Ringing | `ring_user` reads the number from `NumberSource.user_number` (C6) and rings 30 s. A failed REST call is `UserUnreachable("failed")`, not a crash, so the rep still hears the call-back line |
+| `connect_user` | REST update of the agency leg to the conference. That ends its media stream, which is expected, not a hang-up; from then on `say` and `press_keys` raise `LineClosed`: the agent is silent (rule 3) |
+| Conference | No beep, no hold music, either side leaving ends it. Key presses still reach the agency through it |
+| Forks | One per leg, of that leg's own `inbound_track`, so each carries one speaker (Pipecat's serializer ignores `track`, and an `outbound_track` fork never opened in the spike). They only feed the transcript; status callbacks say when the call ends |
+| `hang_up` | Also ends the applicant's leg (`canceled` while ringing, `completed` once answered) |
+| Not stored | No `record` anywhere (C29). The applicant's number is never logged |
+
+Manual checks on real phones, and their results: [phone-live-checks.md](phone-live-checks.md).
+
+**Open, for the team:**
+- **The any-key gate is the current choice, not a team decision yet.** It means "answered" in the Plan.md failure rules is "pressed a key", and the worst case before the call-back line is about 55 s (30 s ringing, the prompt twice, 15 s). Alternatives if the team objects: answering-machine detection, or detecting voicemail after bridging.
+- Dari (or any language past `en`/`es`) needs a `JOIN_PROMPTS` entry; Twilio may have no Dari voice, so it will likely be a pre-recorded clip played with `<Play>`.
+- Not yet run live: the agency hanging up first after the bridge (spike row 5).
 - No `bridging → hold`: a "person" who transfers after the ring can't be undone (state.py).
-- **How the user joins the bridge is not settled.** Carriers send declined and unanswered calls to voicemail, and Twilio reports that as answered, so a plain `ring_user` bridges the rep into voicemail. The bridge spike uses a "Press 1 to join" key-press gate as a stopgap. Whether the product should have a bot asking the user to press a key is still open (alternatives: a WhatsApp heads-up before ringing, answering-machine detection, detecting voicemail after bridging). It also changes what "answered" means in the Plan.md failure rules, so it's a team decision. See [spikes/bridge/README.md](../../spikes/bridge/README.md).
 
 ## Open, with person 2 (`relay/ask_user.py`)
 

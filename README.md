@@ -115,18 +115,19 @@ The call runner (`phone/runner.py`) runs a whole call on fakes. To watch one aga
 
 To play the line yourself, run the playground from `backend/`: `python -m app.phone.playground`. Each line you paste is what the agency says; the real runner answers, and each step shows the 1c reading, the state change, the 1b action, what went out, and latency. Add `--fake` to run without Claude (you type the menu decision). `/help` lists the commands; `/save <name>` records a session, and `python -m app.phone.playground --replay app/phone/playground/scripts/<name>.json` replays it with a pass/fail table (add `--fake` to replay the recorded answers for free). In a new worktree, copy the main checkout's `.env` first, or export `ANTHROPIC_API_KEY`.
 
-The real phone line (Twilio + Pipecat + Cartesia) lives in the backend as two routes, `POST /phone/calls/{call_id}/status` and `WS /phone/calls/{call_id}/stream`, so a live call needs ngrok and `PUBLIC_BASE_URL` like WhatsApp does, plus `CARTESIA_API_KEY` and `CARTESIA_AGENT_VOICE_ID` (any Cartesia voice). How it works: [docs/specs/phone-ports.md → The real line](docs/specs/phone-ports.md#the-real-line-phase-2).
+The real phone line (Twilio + Pipecat + Cartesia) lives in the backend as routes under `/phone/calls/{call_id}/`: the agency leg's `status` and `stream`, and for the bridge the applicant leg's `user/status`, `user/joined` and `user/missed`, plus the listen-only `fork/{speaker}` streams. A live call needs ngrok and `PUBLIC_BASE_URL` like WhatsApp does, plus `CARTESIA_API_KEY` and `CARTESIA_AGENT_VOICE_ID` (any Cartesia voice). How it works: [docs/specs/phone-ports.md → The real line](docs/specs/phone-ports.md#the-real-line-phase-2) and [→ The bridge](docs/specs/phone-ports.md#the-bridge-phase-3).
 
 To place a live test call (`phone/smoke.py`):
 
 1. Stop the backend: the smoke test serves the phone routes itself, on `--port` (default 8000).
 2. Run `ngrok http 8000` and set `PUBLIC_BASE_URL` to its https URL. Fill in the Twilio and Cartesia vars above, and have `.env.local` for the shared database.
 3. From `backend/`:
-   - `python -m app.phone.smoke`: dials the seeded demo case through the real number check. Type `say <text>`, `keys <digits>` or `hangup`; every line event prints with its time.
-   - `python -m app.phone.smoke --runner`: the call runner drives the whole call (needs `ANTHROPIC_API_KEY`). Type a number to answer the applicant's question. Until the bridge lands it hangs up once a person is detected.
-   - `python -m app.phone.smoke --own-number`: dials `PHONE_SMOKE_DIAL_NUMBER` from your `.env`, so you can play the agency yourself (greet like a rep, go quiet, play music).
+   - `python -m app.phone.smoke`: dials the seeded demo case through the real number check. Type `say <text>`, `keys <digits>`, `bridge` (with `--bridge`) or `hangup`; every line event prints with its time.
+   - `python -m app.phone.smoke --runner`: the call runner drives the whole call (needs `ANTHROPIC_API_KEY`). Type a number to answer the applicant's question. Without `--bridge` it can't ring anyone, so it gives up once a person is detected.
+   - `python -m app.phone.smoke --runner --bridge`: the whole call, and when a person picks up it rings `PHONE_SMOKE_USER_NUMBER` from your `.env` as the applicant. Answer, press any key, and you're talking to the agency; what each side says after that prints as `agency:` / `user:`. `--language en` (default `es`) picks the join prompt's language.
+   - `python -m app.phone.smoke --own-number`: dials `PHONE_SMOKE_DIAL_NUMBER` from your `.env`, so you can play the agency yourself (greet like a rep, go quiet, play music). With `--bridge` too, you need two phones: one plays the agency, the other the applicant.
 
-The smoke test dials only the mock agency line (it refuses any other number a case resolves to) or, with `--own-number`, your own phone. It writes nothing to the database. Each runner step prints what was heard, the phase reading and its reason, the menu action and its reason, what was sent, model latency, and flags. The whole run is also saved to `backend/smoke_runs/<time>-<mode>.jsonl`: line events, every step, and in runner mode the report, transcript, and events. That folder is git-ignored because it holds what was said; add `--no-save` to skip it.
+The smoke test dials only the mock agency line (it refuses any other number a case resolves to) or, with `--own-number`, your own phone, and it rings only your own phone as the applicant, only with `--bridge`. It writes nothing to the database. Each runner step prints what was heard, the phase reading and its reason, the menu action and its reason, what was sent, model latency, and flags. The whole run is also saved to `backend/smoke_runs/<time>-<mode>.jsonl`: line events, every step, and in runner mode the report, transcript, and events. That folder is git-ignored because it holds what was said; add `--no-save` to skip it.
 
 ### The research agent
 

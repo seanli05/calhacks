@@ -1,11 +1,23 @@
-"""The real `Telephony`: one call's agency leg over Twilio (Phase 2).
+"""The real `Telephony`: one call's agency leg over Twilio (Phase 2), and the
+applicant's leg bridged into it (Phase 3).
 
 Three things feed one call's line, all in this one process:
 
-- `dial_agency` and `press_keys` / `hang_up` go out over the REST API (`CallControl`);
-- Twilio's status callbacks come back through `routes.py` → `on_status`;
+- `dial_agency`, `press_keys`, `ring_user`, `connect_user`, and `hang_up` go out
+  over the REST API (`CallControl`);
+- Twilio's callbacks come back through `routes.py`: the agency leg's status
+  (`on_status`), and the applicant leg's status and its join gate
+  (`on_user_status`, `user_pressed_key`, `user_missed_gate`);
 - the media stream's websocket (`routes.py` → `audio_pipeline.py`) attaches an
-  `AudioStream` and emits speech events through `emit`.
+  `AudioStream` and emits speech events through `emit`. After the bridge, each
+  leg's listen-only fork emits `Overheard` lines the same way.
+
+The bridge (spikes/bridge/README.md): `ring_user` calls the applicant with a join
+gate, because carrier voicemail picks up unanswered calls and Twilio reports that
+as answered. A key press puts the applicant in the call's conference and emits
+`UserAnswered`; `connect_user` then moves the agency leg in too. That ends the
+agency leg's media stream, which from then on is expected, not a hang-up, and the
+agent can't speak any more (rule 3).
 
 `LINES` maps each `call_id` to its line so the routes can find it. Twilio doesn't
 promise the order of callbacks and streams, so the line keeps how far the agency
@@ -21,29 +33,39 @@ kept (C29), and logs carry IDs and statuses, never numbers or what was said.
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
-from typing import Protocol
-from urllib.parse import urlsplit
+from typing import Literal, Protocol
 
 from aiohttp import ClientError
 from twilio.base.exceptions import TwilioRestException
 
-from app.contracts.common import CallId, CaseId, UserId
+from app.contracts.common import CallId, CaseId, LanguageCode, UserId
+from app.phone.call_lines import JOIN_PROMPTS, join_prompt
 from app.phone.line import (
     AgencyAnswered,
     AgencyHungUp,
     AgencyUnreachable,
     LineEvent,
+    UserAnswered,
+    UserLeft,
+    UserUnreachable,
 )
 from app.phone.ports import LineClosed, NumberSource
-from app.phone.twilio_rest import ENDED_STATUSES, stream_twiml
-from app.settings import Settings
+from app.phone.twilio_rest import (
+    ENDED_STATUSES,
+    conference_twiml,
+    hang_up_twiml,
+    stream_twiml,
+    user_gate_twiml,
+)
+from app.phone.twilio_urls import LineUrls, Speaker
 
 logger = logging.getLogger(__name__)
 
-STATUS_PATH = "/phone/calls/{call_id}/status"
-STREAM_PATH = "/phone/calls/{call_id}/stream"
+type UserStage = Literal["none", "ringing", "joined", "gone"]
+"""The applicant's leg: not rung yet, rung (and maybe picked up, by them or by
+voicemail), joined by a key press, over."""
 
 _UNREACHABLE = {"busy": "busy", "no-answer": "no_answer", "failed": "failed"}
 _REST_ERRORS = (TwilioRestException, ClientError, TimeoutError)
@@ -55,6 +77,7 @@ class CallControl(Protocol):
     async def create(self, *, to: str, twiml: str, status_callback: str) -> str: ...
     async def update_twiml(self, sid: str, twiml: str) -> None: ...
     async def complete(self, sid: str) -> None: ...
+    async def end(self, sid: str) -> None: ...
     async def status(self, sid: str) -> str: ...
 
 
@@ -72,26 +95,6 @@ class AudioStream(Protocol):
     async def close(self) -> None:
         """End the pipeline. Never hangs up the call."""
         ...
-
-
-@dataclass(frozen=True)
-class LineUrls:
-    """Where Twilio reaches us for one call, from `PUBLIC_BASE_URL`."""
-
-    base_url: str
-
-    @classmethod
-    def from_settings(cls, settings: Settings) -> "LineUrls":
-        if not settings.public_base_url:
-            raise ValueError("PUBLIC_BASE_URL is not set; Twilio can't reach us")
-        return cls(settings.public_base_url.rstrip("/"))
-
-    def status(self, call_id: CallId) -> str:
-        return self.base_url + STATUS_PATH.format(call_id=call_id)
-
-    def stream(self, call_id: CallId) -> str:
-        host = urlsplit(self.base_url).netloc
-        return f"wss://{host}" + STREAM_PATH.format(call_id=call_id)
 
 
 @dataclass(frozen=True)
@@ -133,7 +136,8 @@ def say_seconds(text: str) -> float:
 
 
 class TwilioTelephony:
-    """One call's agency leg. The bridge (`ring_user`, `connect_user`) is Phase 3."""
+    """One call's agency leg, and the applicant's leg bridged into it.
+    `user_language` is the call job's: the join gate speaks it."""
 
     def __init__(
         self,
@@ -141,12 +145,14 @@ class TwilioTelephony:
         calls: CallControl,
         urls: LineUrls,
         *,
+        user_language: LanguageCode,
         registry: LineRegistry = LINES,
         timing: LineTiming | None = None,
     ) -> None:
         self._numbers = numbers
         self._calls = calls
         self._urls = urls
+        self._user_language = user_language
         self._registry = registry
         self._timing = timing or LineTiming()
         self._queue: asyncio.Queue[LineEvent | None] = asyncio.Queue()
@@ -161,6 +167,10 @@ class TwilioTelephony:
         self._reconnecting = False
         self._keys_lock = asyncio.Lock()
         self._gone_check: asyncio.Task[None] | None = None
+        self._user_sid: str | None = None
+        self._user_stage: UserStage = "none"
+        self._bridged = False
+        """The agency leg was moved into the conference."""
 
     def __repr__(self) -> str:
         return f"TwilioTelephony(call_id={self._call_id})"
@@ -232,10 +242,66 @@ class TwilioTelephony:
                 self._reconnecting = False
 
     async def ring_user(self, call_id: CallId, user_id: UserId) -> None:
-        raise NotImplementedError("the bridge to the applicant is Phase 3")
+        """A failed REST call doesn't raise: it's `UserUnreachable("failed")`, so the
+        representative still hears that the account holder will call back."""
+        self._require_agency()
+        if call_id != self._call_id:
+            raise RuntimeError("ring_user for another call")
+        if self._user_stage != "none":
+            raise RuntimeError("the applicant was already rung")
+        number = await self._numbers.user_number(user_id)
+        if self._user_language not in JOIN_PROMPTS:
+            logger.warning(
+                "no join prompt in %r; using English (call_id=%s)",
+                self._user_language,
+                call_id,
+            )
+        self._user_stage = "ringing"
+        try:
+            sid = await self._calls.create(
+                to=number,
+                twiml=user_gate_twiml(
+                    join_prompt(self._user_language),
+                    self._urls.user_joined(call_id),
+                    self._urls.user_missed(call_id),
+                ),
+                status_callback=self._urls.user_status(call_id),
+            )
+        except _REST_ERRORS as exc:
+            logger.warning(
+                "ringing the applicant failed (call_id=%s): %s",
+                call_id,
+                type(exc).__name__,
+            )
+            self._user_gone(UserUnreachable(reason="failed"))
+            return
+        self._user_sid = self._user_sid or sid
+        logger.info("rang the applicant (call_id=%s sid=%s)", call_id, sid)
 
     async def connect_user(self) -> None:
-        raise NotImplementedError("the bridge to the applicant is Phase 3")
+        self._require_agency()
+        if self._user_stage != "joined":
+            raise RuntimeError("the applicant hasn't joined")
+        # Before the update: it ends the stream, and that close isn't a hang-up.
+        self._bridged = True
+        call_id = self._require_call_id()
+        try:
+            await self._calls.update_twiml(
+                self._require_sid(),
+                conference_twiml(
+                    self._conference(), self._urls.fork(call_id, "agency")
+                ),
+            )
+        except _REST_ERRORS as exc:
+            self._bridged = False
+            logger.warning(
+                "moving the agency leg failed (call_id=%s): %s",
+                call_id,
+                type(exc).__name__,
+            )
+            await self._give_up_line()
+            raise LineClosed("the agency leg couldn't join the applicant") from exc
+        logger.info("bridged (call_id=%s)", call_id)
 
     async def hang_up(self) -> None:
         if self._hung_up:
@@ -246,15 +312,10 @@ class TwilioTelephony:
         if self._gone_check is not None:
             self._gone_check.cancel()
         if self._sid is not None and not self._agency_gone:
-            try:
-                async with asyncio.timeout(self._timing.hang_up_s):
-                    await self._calls.complete(self._sid)
-            except _REST_ERRORS as exc:
-                logger.warning(
-                    "hang-up request failed (call_id=%s): %s",
-                    self._call_id,
-                    type(exc).__name__,
-                )
+            await self._end_leg("agency", self._calls.complete, self._sid)
+        if self._user_sid is not None and self._user_stage in ("ringing", "joined"):
+            # Twilio refuses `completed` for a call still ringing; `end` cancels it.
+            await self._end_leg("applicant", self._calls.end, self._user_sid)
         stream, self._stream = self._stream, None
         self._wake()
         if stream is not None:
@@ -286,10 +347,73 @@ class TwilioTelephony:
         elif status == "completed":
             self._agency_ended()
 
+    def on_user_status(self, call_sid: str, status: str) -> None:
+        """A Twilio status callback for the applicant's leg."""
+        if not self._matches_user(call_sid):
+            logger.warning(
+                "applicant status for another SID ignored (call_id=%s)", self._call_id
+            )
+            return
+        self._user_sid = self._user_sid or call_sid
+        logger.info("applicant leg %s (call_id=%s)", status, self._call_id)
+        if self._user_stage == "ringing":
+            if status in _UNREACHABLE or status == "canceled":
+                self._user_gone(
+                    UserUnreachable(reason=_UNREACHABLE.get(status, "failed"))
+                )
+            elif status == "completed":
+                # Picked up, then put down before pressing a key.
+                self._user_gone(UserUnreachable(reason="no_key_press"))
+        elif self._user_stage == "joined" and status in ENDED_STATUSES:
+            self._user_gone(UserLeft())
+
+    def user_pressed_key(self, call_sid: str) -> str:
+        """The applicant pressed a key at the join gate: TwiML for their leg, which
+        joins them to the conference, or hangs up if the call can't take them any
+        more (the agency left, the runner gave up on them, or we hung up)."""
+        if (
+            not self._matches_user(call_sid)
+            or self._user_stage != "ringing"
+            or self._hung_up
+            or self._agency_gone
+        ):
+            logger.info(
+                "key press too late (call_id=%s stage=%s)",
+                self._call_id,
+                self._user_stage,
+            )
+            return hang_up_twiml()
+        self._user_sid = self._user_sid or call_sid
+        self._user_stage = "joined"
+        self.emit(UserAnswered())
+        return conference_twiml(
+            self._conference(), self._urls.fork(self._require_call_id(), "user")
+        )
+
+    def user_missed_gate(self, call_sid: str) -> str:
+        """No key after the join prompt: voicemail, or a phone put down."""
+        if self._matches_user(call_sid) and self._user_stage == "ringing":
+            self._user_gone(UserUnreachable(reason="no_key_press"))
+        return hang_up_twiml()
+
+    def attach_fork(self, speaker: Speaker, call_sid: str) -> bool:
+        """A listen-only fork connected. Only a joined leg's own SID may fork it."""
+        if self._hung_up:
+            return False
+        if speaker == "agency":
+            return self._bridged and call_sid == self._sid
+        return self._user_stage == "joined" and call_sid == self._user_sid
+
     def attach_stream(self, stream: AudioStream, call_sid: str) -> int | None:
         """A media stream connected. Returns its number, or None if the line won't
-        take it (ours hung up, or the SID doesn't match): close it then."""
-        if self._hung_up or self._agency_gone or not self._matches(call_sid):
+        take it (ours hung up, the agency leg is bridged, or the SID doesn't
+        match): close it then."""
+        if (
+            self._hung_up
+            or self._agency_gone
+            or self._bridged
+            or not self._matches(call_sid)
+        ):
             return None
         self._sid = self._sid or call_sid
         self._stream_seq += 1
@@ -304,7 +428,9 @@ class TwilioTelephony:
             return  # an older stream, already replaced
         self._stream = None
         logger.info("stream %d down (call_id=%s)", seq, self._call_id)
-        if not (self._reconnecting or self._hung_up or self._agency_gone):
+        if not (
+            self._reconnecting or self._hung_up or self._agency_gone or self._bridged
+        ):
             # A <Connect><Stream> that ends ends the call; `completed` should follow.
             self._gone_check = asyncio.create_task(self._end_if_still_gone())
 
@@ -334,14 +460,44 @@ class TwilioTelephony:
         self._stream_changed.set()
         self._stream_changed = asyncio.Event()
 
+    def _user_gone(self, event: LineEvent) -> None:
+        if self._user_stage == "gone":
+            return
+        self._user_stage = "gone"
+        self.emit(event)
+
     def _matches(self, call_sid: str) -> bool:
         return self._sid is None or call_sid == self._sid
+
+    def _matches_user(self, call_sid: str) -> bool:
+        if self._user_stage == "none":
+            return False
+        return self._user_sid is None or call_sid == self._user_sid
+
+    def _conference(self) -> str:
+        return f"bridge-{self._require_call_id()}"
+
+    async def _end_leg(
+        self, leg: str, end: Callable[[str], Awaitable[None]], sid: str
+    ) -> None:
+        try:
+            async with asyncio.timeout(self._timing.hang_up_s):
+                await end(sid)
+        except _REST_ERRORS as exc:
+            logger.warning(
+                "ending the %s leg failed (call_id=%s): %s",
+                leg,
+                self._call_id,
+                type(exc).__name__,
+            )
 
     def _require_agency(self) -> None:
         if self._call_id is None:
             raise RuntimeError("dial the agency first")
         if self._hung_up or self._agency_gone:
             raise LineClosed("the agency leg has ended")
+        if self._bridged:
+            raise LineClosed("the applicant is on the call; the agent is silent")
 
     def _require_sid(self) -> str:
         if self._sid is None:
