@@ -49,6 +49,10 @@ TWILIO_SAMPLE_RATE = 8000
 VAD_STOP_S = 0.5
 """Silence that ends a speech chunk, and makes speech-to-text finalize. Pipecat's
 0.2 s split menu sentences mid-phrase; the listener joins chunks into turns."""
+VAD_START_S = 0.5
+"""Speech this long before it counts as speech, so breaths and clicks don't open a
+turn (and hold back a menu answer). Risk: a rep's bare "Hello?" is about this
+long; if live calls miss one, 0.3 s is the fallback."""
 START_TIMEOUT_S = 10.0
 _marks = count(1)
 
@@ -150,7 +154,9 @@ async def run_stream(
         [
             transport.input(),
             VADProcessor(
-                vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=VAD_STOP_S))
+                vad_analyzer=SileroVADAnalyzer(
+                    params=VADParams(start_secs=VAD_START_S, stop_secs=VAD_STOP_S)
+                )
             ),
             CartesiaSTTService(
                 api_key=settings.cartesia_api_key,
