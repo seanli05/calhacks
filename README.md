@@ -155,6 +155,8 @@ The live end-to-end test runs the demo letter through the worker, a real databas
 RESEARCH_E2E=1 pytest backend/tests/research/test_e2e_live.py
 ```
 
+Step by step, with what it checks and what to do if it fails: [docs/research-live-test.md](docs/research-live-test.md).
+
 ### Rehearse without a phone
 
 `python -m app.dev.rehearsal` (from `backend/`) runs the demo path end to end on your Neon test branch (`TEST_DATABASE_URL`), with no WhatsApp, phone or API key: a letter, research (the fake), consent, then the phone agent's real call runner on a simulated agency line, through to the call report. It rebuilds that branch's tables first and refuses the shared database. At each stage it checks the dashboard API and screenshots the case page, and writes `rehearsal/REPORT.md` with anything that looks wrong.
