@@ -64,7 +64,7 @@ async def test_seeded_case_end_to_end(api: httpx.AsyncClient) -> None:
     feed = (await api.get(f"/api/users/{user_id}/feed")).json()
     texts = [item["text"]["text"] for item in feed]
     assert texts[0] == "Recibimos tu carta"
-    assert "Guardamos: Prefers voice notes" in texts
+    assert "Guardamos: Prefieres mensajes de voz" in texts
     assert "Confirmamos que la carta es real (uscis.gov)" in texts
     assert texts[-1] == "Te preguntamos si quieres que llamemos a USCIS"
 

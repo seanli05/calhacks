@@ -2,12 +2,13 @@
 countdown, then glossary practice, then a checklist reminder. A rule whose data is
 missing is skipped."""
 
+import asyncio
 from datetime import UTC, date, datetime
 
 from fastapi import APIRouter
 
 from app.api.case_views import fast_result_of
-from app.api.common import LangQuery, resolve_language
+from app.api.common import LangQuery, localize, resolve_language
 from app.api.models import Localized, Suggestion
 from app.api.suggestion_templates import TEXTS
 from app.contracts import ChecklistKind, FastResult
@@ -24,8 +25,9 @@ def today() -> date:
 
 @router.get("/users/{user_id}/suggestions")
 async def suggestions(user_id: str, lang: LangQuery = None) -> list[Suggestion]:
-    lang = await resolve_language(user_id, lang)
-    cases = await reads.list_active_cases(user_id)
+    lang, cases = await asyncio.gather(
+        resolve_language(user_id, lang), reads.list_active_cases(user_id)
+    )
     if not cases:
         return []
     case = cases[0]
@@ -43,8 +45,14 @@ class _Texts:
         self.lang = lang
 
     def get(self, key: str, **values: str) -> Localized:
+        return self.pair(key, values, values)
+
+    def pair(
+        self, key: str, values: dict[str, str], values_en: dict[str, str]
+    ) -> Localized:
+        """Separate fill values for the text and for the English."""
         return Localized(
-            text=self.raw(key, **values), en=TEXTS["en"][key].format(**values)
+            text=self.raw(key, **values), en=TEXTS["en"][key].format(**values_en)
         )
 
     def raw(self, key: str, **values: str) -> str:
@@ -78,11 +86,13 @@ def _countdown(
 async def _glossary(case: tables.Case, lang: str) -> Suggestion | None:
     """The brief's `glossary_terms` that the glossary has in the user's language.
     The brief's shape is provisional, so the field is read defensively."""
-    brief = await reads.latest_brief(case.id)
+    brief, glossary = await asyncio.gather(
+        reads.latest_brief(case.id), reads.get_glossary(lang)
+    )
     terms = brief.brief.get("glossary_terms") if brief else None
     if not isinstance(terms, list):
         return None
-    known = {row.term.lower() for row in await reads.get_glossary(lang)}
+    known = {row.term.lower() for row in glossary}
     matched = [t for t in terms if isinstance(t, str) and t.lower() in known]
     if not matched:
         return None
@@ -110,16 +120,17 @@ def _checklist(
             break
     else:
         return None
-    item = _lower_first(entry.item)
+    item = localize(entry.item, lang)
+    item_text, item_en = _lower_first(item.text), _lower_first(item.en)
     texts = _Texts(lang)
     return Suggestion(
         id=f"checklist_{case.id}",
         kind="checklist",
         case_id=case.id,
-        title=texts.get("checklist_title", item=item),
+        title=texts.pair("checklist_title", {"item": item_text}, {"item": item_en}),
         detail=texts.get("checklist_detail"),
         action=texts.get("checklist_action"),
-        prefill=texts.raw("checklist_prefill", item=item),
+        prefill=texts.raw("checklist_prefill", item=item_text),
     )
 
 

@@ -1,5 +1,6 @@
 """The live feed: the user's events rendered in their language (C23, C27)."""
 
+import asyncio
 from datetime import datetime
 
 from fastapi import APIRouter
@@ -9,7 +10,7 @@ from app.api.case_views import fast_result_of
 from app.api.common import LangQuery, localize, resolve_language
 from app.api.models import FeedItem, Localized
 from app.contracts import Event, EventType
-from app.db import reads
+from app.db import reads, tables
 
 router = APIRouter()
 
@@ -26,43 +27,47 @@ _DELETE_TYPES = {
 async def feed(
     user_id: str, since: datetime | None = None, lang: LangQuery = None
 ) -> list[FeedItem]:
-    lang = await resolve_language(user_id, lang)
-    events = await reads.list_events(user_id, since)
-    refs = _References(user_id)
-    issuers: dict[str, str | None] = {}
-    items = []
-    for event in events:
-        values = _scalars(event.data)
-        deleted_at = None
-        if event.type not in _DELETE_TYPES:
-            text, deleted_at = await refs.lookup(event)
-            if text is not None:
-                values["fact"] = text
-        if "agency" not in values and event.case_id:
-            if event.case_id not in issuers:
-                issuers[event.case_id] = await _issuer(event.case_id)
-            if issuers[event.case_id]:
-                values["agency"] = issuers[event.case_id]
-        items.append(
-            FeedItem(
-                id=event.event_id,
-                at=event.created_at,
-                type=event.type,
-                case_id=event.case_id,
-                call_id=event.call_id,
-                text=_text(event, lang, values),
-                deleted_at=deleted_at,
-            )
-        )
-    return items
+    lang, events = await asyncio.gather(
+        resolve_language(user_id, lang), reads.list_events(user_id, since)
+    )
+    if not events:
+        return []
+    refs = _References()
+    cases, _ = await asyncio.gather(
+        reads.list_cases(user_id), refs.load(user_id, events)
+    )
+    issuers = {case.id: _issuer(case) for case in cases}
+    return [_item(event, lang, refs, issuers) for event in events]
 
 
-def _text(event: Event, lang: str, values: dict[str, str]) -> Localized:
-    rendered = feed_templates.render(event.type, lang, values)
-    if rendered is None:
-        return localize(event.summary_en, lang)
-    text, en = rendered
-    return Localized(text=text, en=en)
+def _item(
+    event: Event, lang: str, refs: "_References", issuers: dict[str, str | None]
+) -> FeedItem:
+    values = _scalars(event.data)
+    if "agency" not in values and issuers.get(event.case_id or ""):
+        values["agency"] = issuers[event.case_id]
+    values_en = dict(values)
+    deleted_at = None
+    if event.type not in _DELETE_TYPES:
+        fact, deleted_at = refs.lookup(event)
+        if fact is not None:
+            values_en["fact"] = fact
+            values["fact"] = localize(fact, lang).text
+    rendered = feed_templates.render(event.type, lang, values, values_en)
+    text = (
+        Localized(text=rendered[0], en=rendered[1])
+        if rendered
+        else localize(event.summary_en, lang)
+    )
+    return FeedItem(
+        id=event.event_id,
+        at=event.created_at,
+        type=event.type,
+        case_id=event.case_id,
+        call_id=event.call_id,
+        text=text,
+        deleted_at=deleted_at,
+    )
 
 
 def _scalars(data: dict) -> dict[str, str]:
@@ -77,52 +82,57 @@ def _scalars(data: dict) -> dict[str, str]:
     }
 
 
-async def _issuer(case_id: str) -> str | None:
-    case = await reads.get_case(case_id)
-    fast = fast_result_of(case) if case else None
+def _issuer(case: tables.Case) -> str | None:
+    fast = fast_result_of(case)
     return fast.issuer if fast else None
 
 
 class _References:
-    """Looks up the fact or document an event points at, at render time (C27).
-    Each table is read at most once per request, and only if an event needs it."""
+    """The facts and documents events point at, looked up at render time (C27).
+    `load` reads only the tables the events need, all at once."""
 
-    def __init__(self, user_id: str) -> None:
-        self.user_id = user_id
-        self.facts: dict[str, str] | None = None
-        self.documents: set[str] | None = None
-        self.deleted: dict[str, datetime] | None = None
+    def __init__(self) -> None:
+        self.facts: dict[str, str] = {}
+        self.documents: set[str] = set()
+        self.deleted: dict[str, datetime] = {}
         self.deleted_all: datetime | None = None
 
-    async def lookup(self, event: Event) -> tuple[str | None, datetime | None]:
-        """`(fact text or None, deleted_at)` for the row the event refers to."""
+    async def load(self, user_id: str, events: list[Event]) -> None:
+        referring = [e for e in events if e.type not in _DELETE_TYPES]
+        need_facts = any(isinstance(e.data.get("fact_id"), str) for e in referring)
+        need_docs = any(isinstance(e.data.get("document_id"), str) for e in referring)
+        if not (need_facts or need_docs):
+            return
+        facts, documents, history = await asyncio.gather(
+            reads.list_facts(user_id) if need_facts else _nothing(),
+            reads.list_documents(user_id) if need_docs else _nothing(),
+            # Delete events may predate `since`, so read the whole history.
+            reads.list_events(user_id),
+        )
+        self.facts = {row.id: row.fact for row in facts}
+        self.documents = {row.id for row in documents}
+        for event in history:
+            if event.type == EventType.USER_DELETED_ALL:
+                self.deleted_all = event.created_at
+            elif event.type in _DELETE_TYPES:
+                for key in ("fact_id", "document_id"):
+                    if isinstance(event.data.get(key), str):
+                        self.deleted[event.data[key]] = event.created_at
+
+    def lookup(self, event: Event) -> tuple[str | None, datetime | None]:
+        """`(fact text or None, deleted_at)` for the row the event refers to. "Delete
+        everything" removes rows without a delete event per row, so a missing row
+        with no delete event of its own takes that time."""
         fact_id = event.data.get("fact_id")
         if isinstance(fact_id, str):
-            if self.facts is None:
-                rows = await reads.list_facts(self.user_id)
-                self.facts = {row.id: row.fact for row in rows}
             if fact_id in self.facts:
                 return self.facts[fact_id], None
-            return None, await self._deleted_at(fact_id)
+            return None, self.deleted.get(fact_id, self.deleted_all)
         document_id = event.data.get("document_id")
-        if isinstance(document_id, str):
-            if self.documents is None:
-                rows = await reads.list_documents(self.user_id)
-                self.documents = {row.id for row in rows}
-            if document_id not in self.documents:
-                return None, await self._deleted_at(document_id)
+        if isinstance(document_id, str) and document_id not in self.documents:
+            return None, self.deleted.get(document_id, self.deleted_all)
         return None, None
 
-    async def _deleted_at(self, row_id: str) -> datetime | None:
-        """When the row's delete event happened; "delete everything" removes rows
-        without one per row, so fall back to that."""
-        if self.deleted is None:
-            self.deleted = {}
-            for event in await reads.list_events(self.user_id):
-                if event.type == EventType.USER_DELETED_ALL:
-                    self.deleted_all = event.created_at
-                elif event.type in _DELETE_TYPES:
-                    for key in ("fact_id", "document_id"):
-                        if isinstance(event.data.get(key), str):
-                            self.deleted[event.data[key]] = event.created_at
-        return self.deleted.get(row_id, self.deleted_all)
+
+async def _nothing() -> list:
+    return []

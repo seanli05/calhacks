@@ -57,8 +57,13 @@ def test_demo_case_gets_all_three_in_order(monkeypatch: pytest.MonkeyPatch) -> N
     assert countdown["title"]["en"] == "Your interview is in 20 days"
     assert countdown["prefill"] == "¿Qué tengo que llevar a mi entrevista?"
     assert glossary["detail"]["text"] == "asylum interview · interpreter · dependent"
-    assert checklist["kind"] == "checklist"
-    assert checklist["title"]["en"].startswith("Don't forget: a qualified interpreter")
+    assert checklist["title"] == {
+        "text": "No olvides: un intérprete calificado si no hablas inglés con fluidez",
+        "en": "Don't forget: a qualified interpreter if you are not fluent in English",
+    }
+    assert checklist["prefill"] == (
+        "¿Cómo consigo un intérprete calificado si no hablas inglés con fluidez?"
+    )
 
 
 def test_rules_without_data_are_skipped(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -217,12 +217,15 @@ def fill(variants: list[str], values: dict[str, str]) -> str:
 
 
 def render(
-    event_type: str, lang: str, values: dict[str, str]
+    event_type: str, lang: str, values: dict[str, str], values_en: dict[str, str]
 ) -> tuple[str, str] | None:
-    """`(text in lang, English)`, or None when the type has no template. A language
-    without templates gets the English."""
+    """`(text in lang, English)`, or None when the type has no template. `values`
+    fill the text in `lang`, `values_en` the English. A language without templates
+    gets the English."""
     variants = TEMPLATES.get(event_type)
     if variants is None:
         return None
-    en = fill(variants["en"], values)
-    return fill(variants.get(lang, variants["en"]), values), en
+    en = fill(variants["en"], values_en)
+    if lang not in variants:
+        return en, en
+    return fill(variants[lang], values), en

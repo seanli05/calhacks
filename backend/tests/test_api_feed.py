@@ -48,6 +48,7 @@ def _serve(
     monkeypatch.setattr(reads, "list_facts", list_facts)
     monkeypatch.setattr(reads, "get_user", get_user)
     monkeypatch.setattr(reads, "list_documents", list_documents)
+    monkeypatch.setattr(reads, "list_cases", list_documents)
     return TestClient(app)
 
 
@@ -101,7 +102,10 @@ def test_fact_text_is_looked_up_at_render_time(monkeypatch: pytest.MonkeyPatch) 
         monkeypatch, [_event(EventType.MEMORY_FACT_SAVED, fact_id=fact.id)], (fact,)
     )
     (item,) = _texts(client)
-    assert item["text"]["text"] == "Guardamos: Lives in Los Angeles County"
+    assert item["text"] == {
+        "text": "Guardamos: Vives en el condado de Los Ángeles",
+        "en": "Saved: Lives in Los Angeles County",
+    }
     assert item["deleted_at"] is None
 
 
