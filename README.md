@@ -126,7 +126,7 @@ To place a live test call (`phone/smoke.py`):
    - `python -m app.phone.smoke --runner`: the call runner drives the whole call (needs `ANTHROPIC_API_KEY`). Type a number to answer the applicant's question. Until the bridge lands it hangs up once a person is detected.
    - `python -m app.phone.smoke --own-number`: dials `PHONE_SMOKE_DIAL_NUMBER` from your `.env`, so you can play the agency yourself (greet like a rep, go quiet, play music).
 
-The smoke test dials only the mock agency line (it refuses any other number a case resolves to) or, with `--own-number`, your own phone. It writes nothing to the database, and what it hears prints to the terminal only.
+The smoke test dials only the mock agency line (it refuses any other number a case resolves to) or, with `--own-number`, your own phone. It writes nothing to the database. Each runner step prints what was heard, the phase reading and its reason, the menu action and its reason, what was sent, model latency, and flags. The whole run is also saved to `backend/smoke_runs/<time>-<mode>.jsonl`: line events, every step, and in runner mode the report, transcript, and events. That folder is git-ignored because it holds what was said; add `--no-save` to skip it.
 
 ### The research agent
 

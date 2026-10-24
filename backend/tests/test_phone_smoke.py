@@ -2,12 +2,25 @@
 line or your own phone, never rings anyone else, and the app never imports it."""
 
 import ast
+import json
+import subprocess
 from pathlib import Path
 
 import pytest
+from app.contracts.common import CallState
 from app.db.errors import UnverifiedNumber
 from app.phone.fakes import FakeNumberSource
-from app.phone.smoke import MockLineOnly, SmokeNumberSource, SmokeRefused
+from app.phone.line import Heard
+from app.phone.menu import PressAction
+from app.phone.observe import StepRecord
+from app.phone.phase import Phase, PhaseReading
+from app.phone.smoke import (
+    RUNS_DIR,
+    MockLineOnly,
+    Printer,
+    SmokeNumberSource,
+    SmokeRefused,
+)
 
 MOCK = "+15672298566"
 APP = Path(__file__).resolve().parents[1] / "app"
@@ -68,3 +81,50 @@ def test_nothing_in_the_app_imports_the_smoke_test() -> None:
             ):
                 importers.append(str(path.relative_to(APP)))
     assert importers == []
+
+
+def test_a_run_is_printed_in_full_and_saved_as_json_lines(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    record = StepRecord(
+        at_s=4.2,
+        input="timer:menu_quiet",
+        text="For an interview you have scheduled, press 2.",
+        state_before=CallState.MENU,
+        state_after=CallState.MENU,
+        reading=PhaseReading(
+            phase=Phase.MENU,
+            confidence=0.93,
+            reason_en="Keypad options",
+            source="model",
+        ),
+        action=PressAction(
+            kind="press", digits="2", option_label_en="interview", reason_en="Fits"
+        ),
+        sent=["speech: two"],
+        latency_ms={"classify": 640, "decide": 910},
+        flags=["held"],
+    )
+    run_file = tmp_path / "smoke_runs" / "run.jsonl"
+    out = Printer(run_file)
+    out.event(Heard(text="Please hold."))
+    out.step(record)
+    out.close()
+
+    printed = capsys.readouterr().out
+    for shown in ("menu 0.93 (model)", "Fits", "speech: two", "decide 910 ms", "held"):
+        assert shown in printed
+    rows = [json.loads(row) for row in run_file.read_text().splitlines()]
+    assert [row["kind"] for row in rows] == ["line_event", "step"]
+    assert rows[0]["event"] == {"kind": "heard", "text": "Please hold."}
+    assert rows[1]["record"]["sent"] == ["speech: two"]
+
+
+def test_saved_runs_are_never_committed() -> None:
+    assert RUNS_DIR.name == "smoke_runs"
+    ignored = subprocess.run(
+        ["git", "check-ignore", "-q", str(RUNS_DIR / "any.jsonl")],
+        cwd=APP.parent,
+        check=False,
+    )
+    assert ignored.returncode == 0

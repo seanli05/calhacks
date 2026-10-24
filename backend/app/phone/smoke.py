@@ -27,10 +27,13 @@ terminal only, never logged. The C35 guard is always on.
 
 import argparse
 import asyncio
+import json
 import logging
 import sys
 import time
 from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 import uvicorn
 from fastapi import FastAPI
@@ -47,6 +50,7 @@ from app.phone.fakes import FakeCallStore, FakeCaseReader, FakeEventLog
 from app.phone.guard import BlockedIdentifier, GuardedTelephony
 from app.phone.line import Heard, LineEvent, NonSpeech
 from app.phone.observe import StepRecord
+from app.phone.playground.render import clip, describe
 from app.phone.playground.tap import ConsoleRelay
 from app.phone.ports import CallDeps, CaseReader, LineClosed, NumberSource
 from app.phone.routes import router
@@ -56,6 +60,8 @@ from app.phone.twilio_line import LineUrls, TwilioTelephony
 from app.phone.twilio_rest import TwilioCalls
 from app.settings import Settings
 
+RUNS_DIR = Path(__file__).resolve().parents[2] / "smoke_runs"
+"""`backend/smoke_runs/`, git-ignored: one JSON-lines file per run."""
 OWN_CASE = "case_smoke"
 OWN_BRIEF = "brief_smoke"
 SMOKE_USER = "user_smoke"
@@ -129,29 +135,81 @@ def missing_settings(settings: SmokeSettings, args: argparse.Namespace) -> list[
 
 
 class Printer:
-    def __init__(self) -> None:
+    """Prints the run to the terminal and, unless `run_file` is None, saves it as
+    JSON lines there. The file holds what was heard and said: it stays on this
+    machine (`smoke_runs/` is git-ignored) and is never logged."""
+
+    def __init__(self, run_file: Path | None = None) -> None:
         self._start = time.monotonic()
+        self._file = None
+        if run_file is not None:
+            run_file.parent.mkdir(exist_ok=True)
+            self._file = run_file.open("a", encoding="utf-8")
+            print(f"saving this run to {run_file}", flush=True)
+
+    def close(self) -> None:
+        if self._file is not None:
+            self._file.close()
+            self._file = None
+
+    def save(self, kind: str, **data: Any) -> None:
+        if self._file is not None:
+            row = {"t": round(self._elapsed(), 2), "kind": kind, **data}
+            self._file.write(json.dumps(row, default=str) + "\n")
+            self._file.flush()
 
     def line(self, text: str) -> None:
-        print(f"[+{time.monotonic() - self._start:6.1f}s] {text}", flush=True)
+        print(f"[+{self._elapsed():6.1f}s] {text}", flush=True)
+        self.save("note", text=text)
 
     def event(self, event: LineEvent) -> None:
         match event:
             case Heard(text=text):
-                self.line(f'heard      "{text}"')
+                self._print(f'heard      "{text}"')
             case NonSpeech(sound=sound, seconds=seconds):
-                self.line(f"non_speech {sound} {seconds:.0f} s")
+                self._print(f"non_speech {sound} {seconds:.0f} s")
             case _:
-                self.line(event.kind)
+                self._print(event.kind)
+        self.save("line_event", event=event.model_dump())
 
     def step(self, record: StepRecord) -> None:
         moved = f"{record.state_before} → {record.state_after}"
-        parts = [f"{record.input:<18}", moved if record.transitions else ""]
+        self._print(f"{record.input:<18} {moved if record.transitions else ''}")
+        if record.text:
+            self._detail("text", f'"{clip(record.text, 110)}"')
+        if record.reading is not None:
+            reading = record.reading
+            self._detail(
+                "phase",
+                f"{reading.phase} {reading.confidence:.2f} ({reading.source}): "
+                f"{reading.reason_en}",
+            )
         if record.action is not None:
-            parts.append(f"action={record.action.kind}")
-        parts += [f"sent={sent}" for sent in record.sent]
-        parts += [f"!{flag}" for flag in record.flags]
-        self.line(" ".join(part for part in parts if part))
+            self._detail(
+                "action", f"{describe(record.action)}: {record.action.reason_en}"
+            )
+        for sent in record.sent:
+            self._detail("sent", sent)
+        if record.latency_ms:
+            timings = " · ".join(f"{k} {v} ms" for k, v in record.latency_ms.items())
+            self._detail("latency", timings)
+        if record.flags:
+            self._detail("flags", " ".join(record.flags))
+        self.save("step", record=record.model_dump(mode="json"))
+
+    def _print(self, text: str) -> None:
+        print(f"[+{self._elapsed():6.1f}s] {text}", flush=True)
+
+    def _detail(self, label: str, text: str) -> None:
+        print(f"{'':11}{label:<8}{text}", flush=True)
+
+    def _elapsed(self) -> float:
+        return time.monotonic() - self._start
+
+
+def run_file_for(mode: str) -> Path:
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return RUNS_DIR / f"{stamp}-{mode}.jsonl"
 
 
 # The two modes
@@ -208,12 +266,14 @@ async def with_runner(
         consent_message_id="msg_smoke",  # a dev call to our own line, not a user's
         max_hold_minutes=15,
     )
+    store = FakeCallStore()
+    log = FakeEventLog()
     deps = CallDeps(
         telephony=line,
         relay=relay,
         cases=cases,
-        calls=FakeCallStore(),
-        events=FakeEventLog(),
+        calls=store,
+        events=log,
         clock=clock,
     )
     call = asyncio.create_task(run_call("job_smoke", job, deps, observer=out.step))
@@ -235,8 +295,13 @@ async def with_runner(
         try:
             report = await call
             out.line(f"report: outcome={report.outcome}")
+            out.save("report", report=report.model_dump(mode="json"))
         except asyncio.CancelledError:
             out.line("cancelled; the runner wrapped up and hung up")
+        for saved in store.calls.values():
+            lines = [line.model_dump(mode="json") for line in saved.transcript]
+            out.save("transcript", lines=lines, states=saved.states)
+        out.save("events", events=[e.model_dump(mode="json") for e in log.events])
 
 
 async def _show_questions(relay: ConsoleRelay, out: Printer) -> None:
@@ -321,7 +386,9 @@ async def main(args: argparse.Namespace) -> None:
         numbers, TwilioCalls(settings), LineUrls.from_settings(settings)
     )
     line = GuardedTelephony(raw, blocked)
-    out = Printer()
+    mode = ("runner" if args.runner else "manual") + ("-own" if args.own_number else "")
+    out = Printer(None if args.no_save else run_file_for(mode))
+    out.save("run", mode=mode, case_id=case_id, started_at=datetime.now(UTC))
     try:
         if args.runner:
             await with_runner(line, case_id, cases, brief_id, out)
@@ -329,6 +396,7 @@ async def main(args: argparse.Namespace) -> None:
             await interactive(line, case_id, out)
     finally:
         server.should_exit = True
+        out.close()
 
 
 def cli() -> None:
@@ -343,6 +411,9 @@ def cli() -> None:
         "--case", help="a seeded case ID (default: the first user's case)"
     )
     parser.add_argument("--port", type=int, default=8000, help="where ngrok forwards")
+    parser.add_argument(
+        "--no-save", action="store_true", help="don't save the run to smoke_runs/"
+    )
     args = parser.parse_args()
     try:
         asyncio.run(main(args))
