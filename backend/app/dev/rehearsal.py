@@ -1,16 +1,17 @@
 """A dress rehearsal on a Neon test branch, with no WhatsApp, no phone and no API
-key: letter → research → consent → the real call runner on a simulated line →
-report. At every stage it checks the dashboard API and, optionally, screenshots
-the dashboard, then writes a report of anything that looks wrong.
+key: letter → research → consent → the phone worker's job handler on a simulated
+line → report. At every stage it checks the dashboard API and, optionally,
+screenshots the dashboard, then writes a report of anything that looks wrong.
 
     cd backend && python -m app.dev.rehearsal --out ../rehearsal
 
 What's real and what's a stand-in:
-- Real: the database helpers and contracts, the dashboard API, the phone agent's
-  call runner (`run_call`), its DB adapters, its guard and its brief validation.
+- Real: the database helpers and contracts, the dashboard API, the phone worker's
+  job handler (`handle_call_job`: the call runner, the report builder's checks, the
+  `memory_write` it queues), its DB adapters, its guard and its brief validation.
 - Stand-ins: research is `FakeResearch` (contract fixtures), the agency line is a
-  `sim_trees` phone tree, the runner's model is scripted, and the user's consent and
-  answers are written directly.
+  `sim_trees` phone tree, the phone agent's model (menu, phase, report) is
+  scripted, and the user's consent and answers are written directly.
 
 Safety: it only runs against `TEST_DATABASE_URL` (refusing the shared database's
 host) and rebuilds that branch's tables first. It never dials: the line is fake.
@@ -56,16 +57,9 @@ from app.db.messages import append_message
 from app.db.tables import utcnow
 from app.db.writes import orchestrator
 from app.dev.fake_research import FakeResearch, Pacing
-from app.phone.adapters import (
-    DbCallStore,
-    DbCaseReader,
-    DbEventLog,
-    DbNumberSource,
-    load_blocked_values,
-)
+from app.phone.adapters import DbCallStore, DbNumberSource
 from app.phone.clock import SystemClock
 from app.phone.fakes import Answer, FakeRelay, FakeTelephony
-from app.phone.guard import GuardedTelephony
 from app.phone.menu import (
     MenuAction,
     MenuDecision,
@@ -74,10 +68,11 @@ from app.phone.menu import (
     WaitAction,
 )
 from app.phone.phase import PhaseJudgment
-from app.phone.ports import CallDeps
-from app.phone.runner import RunnerConfig, run_call
+from app.phone.report import ReportDraft
+from app.phone.runner import RunnerConfig
 from app.phone.sim_line import Hold, PhoneTree
 from app.phone.sim_trees import TREES
+from app.phone.worker import PhoneDeps, handle_call_job
 from app.settings import Settings, get_settings, to_asyncpg_url
 
 logger = logging.getLogger(__name__)
@@ -120,8 +115,21 @@ def _menu(heard: str) -> MenuAction:
     return WaitAction(kind="wait", reason_en="listening")
 
 
+REPORT_DRAFT = ReportDraft(
+    summary_en="A representative answered and the applicant joined the call.",
+    outcome="partial",
+    reference_number=None,
+    rep_name=None,
+    next_steps_en=["Bring the interview notice and your passport to the interview"],
+    new_deadlines=[],
+    proposed_facts=["The applicant spoke with USCIS about the asylum interview"],
+    followup_needed=True,
+)
+
+
 class ScriptedLlm:
-    """Stands in for Claude in the runner: phase and menu choice from what was heard."""
+    """Stands in for Claude in the phone worker: phase and menu choice from what was
+    heard, and a fixed call report."""
 
     def __init__(
         self,
@@ -134,6 +142,8 @@ class ScriptedLlm:
     async def parse(
         self, *, system: str, user: str, output_type: type, timeout_s: float
     ) -> Any:
+        if output_type is ReportDraft:
+            return REPORT_DRAFT
         heard = user.rsplit("\n", 1)[-1].strip().strip('"')
         if output_type is PhaseJudgment:
             phase, confidence = self._phase(heard)
@@ -389,25 +399,40 @@ class Rehearsal:
                 }[CallState(state)]
                 await rehearsal.check(f"call-{state}", expected)
 
-        payload = jobs.payload_of(job)
-        assert isinstance(payload, CallJob)
-        deps = CallDeps(
-            telephony=GuardedTelephony(line, await load_blocked_values(self.case_id)),
+        # The phone worker's own job handler, with the line and the model faked.
+        llm = ScriptedLlm()
+        deps = PhoneDeps(
+            line_factory=lambda _job: line,
+            menu_llm=llm,
+            report_llm=llm,
             relay=FakeRelay(clock, [Answer(1, after_s=1.0)]),
-            cases=DbCaseReader(),
             calls=Watched(),
-            events=DbEventLog(),
             clock=clock,
-        )
-        report = await run_call(
-            job.id,
-            payload,
-            deps,
-            llm=ScriptedLlm(),
             config=RunnerConfig(hold_limit_s=120),
         )
-        await jobs.finish(job.id, report)
+        report = await handle_call_job(job, deps)
+        if report is None:
+            failed = await reads.get_job(job.id)
+            raise RuntimeError(f"the call job failed: {failed and failed.error}")
+        await self._after_call(report)
         return report
+
+    async def _after_call(self, report: CallReport) -> None:
+        """The report on the dashboard, and the call's facts queued for memory."""
+        stage = await self.check("report", "call_ended")
+        async with httpx.AsyncClient(base_url=self.api, timeout=20) as client:
+            response = await client.get(
+                f"/api/cases/{self.case_id}", params={"lang": "es"}
+            )
+        calls = (response.json().get("calls") or []) if response.is_success else []
+        shown = (calls[-1].get("report") if calls else None) or {}
+        if not shown.get("summary"):
+            stage.problems.append("the call report has no summary on the dashboard")
+        if len(shown.get("next_steps") or []) != len(report.next_steps_en):
+            stage.problems.append("the dashboard doesn't show every next step")
+        memory = await jobs.claim_next(JobType.MEMORY_WRITE)
+        if memory is None or memory.payload.get("source_ref") != report.call_id:
+            stage.problems.append("the call's facts weren't queued as memory_write")
 
     async def _until_stage(self, stage: str, timeout_s: float = 60) -> None:
         """Wait on the case's stage, as the dashboard does."""
@@ -456,7 +481,8 @@ def write_report(
     if report is not None:
         lines += [
             (
-                f"Call outcome: `{report.outcome}`; next steps: {report.next_steps_en or '(none)'}; "
+                f"Call outcome: `{report.outcome}`; summary: {report.summary_en or '(none)'}; "
+                f"next steps: {report.next_steps_en or '(none)'}; "
                 f"transcript `{report.transcript_id}`."
             ),
             "",

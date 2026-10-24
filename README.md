@@ -165,7 +165,7 @@ Step by step, with what it checks and what to do if it fails: [docs/research-liv
 
 ### Rehearse without a phone
 
-`python -m app.dev.rehearsal` (from `backend/`) runs the demo path end to end on your Neon test branch (`TEST_DATABASE_URL`), with no WhatsApp, phone or API key: a letter, research (the fake), consent, then the phone agent's real call runner on a simulated agency line, through to the call report. It rebuilds that branch's tables first and refuses the shared database. At each stage it checks the dashboard API and screenshots the case page, and writes `rehearsal/REPORT.md` with anything that looks wrong.
+`python -m app.dev.rehearsal` (from `backend/`) runs the demo path end to end on your Neon test branch (`TEST_DATABASE_URL`), with no WhatsApp, phone or API key: a letter, research (the fake), consent, then the phone worker's job handler (the real call runner and report checks) on a simulated agency line, through to the call report on the dashboard and the `memory_write` job it queues. It rebuilds that branch's tables first and refuses the shared database. At each stage it checks the dashboard API and screenshots the case page, and writes `rehearsal/REPORT.md` with anything that looks wrong.
 
 For screenshots, serve the test branch on the side (headless Edge is used; `--browser` or `REHEARSAL_BROWSER` points elsewhere, `--no-screens` skips them):
 
@@ -186,7 +186,7 @@ Everything runs on one laptop (the one recording the video). Only the backend is
    ```
 
    Without a static domain, use `ngrok http 8000` and redo steps 2 and 3 every time ngrok restarts.
-2. **Point the backend at it.** In `.env`, set `PUBLIC_BASE_URL=https://<your-name>.ngrok-free.app` (no trailing slash). Keep `DEV_ENDPOINTS=false`, and keep `DEMO_DIAL_NUMBER` set to the mock agency line so the agent never calls the real USCIS (Plan.md C40). Then start the backend without `--reload`, as one process:
+2. **Point the backend at it.** In `.env`, set `PUBLIC_BASE_URL=https://<your-name>.ngrok-free.app` (no trailing slash). This is the one backend that runs the job workers: `RESEARCH_WORKER=true`, `MEMORY_WORKER=true` and `PHONE_WORKER=true`, with `ANTHROPIC_API_KEY` and the Twilio and Cartesia vars set (the startup log names any the phone worker is missing). Keep `DEV_ENDPOINTS=false`, and keep `DEMO_DIAL_NUMBER` set to the mock agency line so the agent never calls the real USCIS (Plan.md C40). Then start the backend without `--reload`, as one process:
 
    ```bash
    uvicorn app.main:app --app-dir backend --port 8000
@@ -194,7 +194,7 @@ Everything runs on one laptop (the one recording the video). Only the backend is
 
 3. **Point Twilio at it.**
    - WhatsApp: in the sandbox settings, set **When a message comes in** to `https://<your-name>.ngrok-free.app/whatsapp`, method POST (details in the WhatsApp steps above).
-   - Voice: the phone agent passes its webhook URLs, built from `PUBLIC_BASE_URL`, when it places each call, so the agent number shouldn't need a console setting. Person 4 confirms this when `phone/` lands.
+   - Voice: nothing to set. The phone agent passes its TwiML and webhook URLs, built from `PUBLIC_BASE_URL`, with each call it places.
 4. **Reset the shared database** to the seeded demo case (ask the team first; it wipes everyone's data): `cd backend && python -m app.db.reset --yes`.
 5. **Run the dashboard** as a production build on live data:
 
