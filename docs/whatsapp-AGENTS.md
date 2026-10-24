@@ -5,7 +5,7 @@ For an agent (or human) reviewing person 2's work: the WhatsApp pipe, the relay,
 ## Read first
 
 1. [CLAUDE.md](../CLAUDE.md): the six non-negotiable product rules and the team conventions.
-2. [Plan.md](../Plan.md): especially P1 (ask_user), P2 (call status), C5, C10, C20, C24, C36, and the failure rules.
+2. [Plan.md](../Plan.md): especially R1, R2, H2, P1 (ask_user), P2 (call status), P3 (call report), C5, C8, C10, C20, C21, C22, C24, C31, C33, C36, and the failure rules.
 3. [whatsapp-pipe.md](whatsapp-pipe.md): what works, the interfaces other components use, **the numbered decisions** (read them before flagging anything as a bug), and the known concerns.
 
 ## Where the code is
@@ -34,8 +34,8 @@ Paths are under `backend/` unless noted. "New" means person 2 created the file; 
 | `inbound.py` | `InboundMessage.from_form`: parses every `MediaUrl{i}`/`MediaContentType{i}`, not just the first. `whatsapp_number` strips the `whatsapp:` prefix to E.164. Numbers, text and URLs are kept out of the repr so they can't reach logs. |
 | `media.py` | Downloads media with Twilio credentials. Auth isn't forwarded to the CDN redirect, and the URL is kept out of error messages. |
 | `whatsapp.py` | The thin Twilio wrapper. `WhatsApp` is a Protocol so tests can swap in a fake. `TwilioWhatsApp.send` uses the REST SDK in a worker thread (the SDK is synchronous), splits bodies over 1,600 chars with `split_body`, and raises `WhatsAppSendError` with Twilio's error code but no message text, which can contain numbers. |
-| `templates.py` | Every user-facing template, `template_id → {es, en}`, in formal *usted*. `render(id, None)` returns all supported languages, for before the user has picked one. A test fails if any language is missing. |
-| `outbound.py` | `send_template`, usable by anyone: sends, then logs to `messages` with `sender=relay`, `template`, the English `body_en`, and the Twilio SID. `send_text`: orchestrator free text only (rule 1). |
+| `templates.py` | Every user-facing template, `template_id → {es, en}`, in formal *usted*: language pick, letters, ask_user, call status, and (Goal 6) `letter.*`, `verification.*`, `consent.*`, `summary.*`. `render(id, None)` returns all supported languages, for before the user has picked one. A test fails if any language is missing. |
+| `outbound.py` | `send_template`, usable by anyone: sends, then logs to `messages` with `sender=relay`, `template`, the English `body_en`, and the Twilio SID. `values_en=` logs English values when a value was translated (option labels, a call goal, red flags). `send_text`: orchestrator free text only (rule 1). |
 | `replies.py` | `parse_choice(text, n)`: reads replies like "2", "2." or " 2 " as 1-based choices (C5). `parse_yes_no`: `1`/"sí"/"si"/"yes" or `2`/"no", for two-option questions (consent, the language confirm). |
 | `ask_user.py` | **New (Goal 3).** `ask_user(request)` is what the phone agent awaits (P1). It creates the `questions` row, sends the numbered question, and waits on an in-memory future. On timeout it calls `time_out_question` and returns the default. It logs all four `call.ask_user*` events. `question_for_reply` / `handle_reply` serve the inbound pipe: they answer, re-prompt, or send the late reply (C24, 10-minute window, once per question). |
 
@@ -54,7 +54,7 @@ Paths are under `backend/` unless noted. "New" means person 2 created the file; 
 | `dates.py` | **New (Goal 5.4).** `format_date` / `format_time` for `es` and `en`; ISO for anything else. |
 | `job_watch.py` | **New (Goal 4.3).** `JobWatcher.watch(job_id, on_finished, slow_after_s=, on_slow=)`: one task per job polls `reads.get_job` about once a second until done or failed. A DB error skips one poll; a missing job stops the watcher; a reaction's DB error is logged with the job's IDs. |
 | `turn.py` | **New (Goal 4.1).** `OrchestratorTurn.run(user, message_id)` builds an English context from stored rows (last 20 messages via `body_en`, open cases, a pending same-or-new or consent note), runs `client.beta.messages.tool_runner` (`MODEL_DEFAULT`, cached system prompt, `max_iterations=6`, 30 s per call, 60 s overall), translates the English reply with `from_english`, and sends it with `send_text(..., body_en=...)`. An API error, timeout, refusal, empty reply, or failed translation sends the `orchestrator.unavailable` template, never English. Then queues `memory_write` on the user's message (Goal 6.5). |
-| `tools.py` | **New (Goals 4.1, 4.5).** `CaseTools` (testable without a model) plus `build_tools` (wraps it with `beta_async_tool`). `get_case_status` returns stage, R1 (refs stay placeholders, no `proposed_facts`), and the verdict; `close_case` appends `case.closed` (C22, IDs only); `set_language` takes only `LANGUAGES`, sends `language.set`, and ends the turn. Every case tool checks the case belongs to the user. |
+| `tools.py` | **New (Goals 4.1, 4.5).** `CaseTools` (testable without a model) plus `build_tools` (wraps it with `beta_async_tool`). `get_case_status` returns stage, R1 (refs stay placeholders, no `proposed_facts`), and the verdict; `close_case` appends `case.closed` (C22, IDs only); `set_language` takes only `LANGUAGES`, sends `language.set`, and ends the turn; `request_consent` goes through `ConsentGate.request` and ends the turn. `get_case_status` also returns the last call's outcome, reference number, next steps and deadlines. Every case tool checks the case belongs to the user. |
 | `prompts.py` | **New.** The orchestrator's system prompt: English only, short replies, C33 (no legal advice, no interview interpreting), never show identifiers or refs, close only on request. |
 | `call_status.py` | **New (Goal 3.4).** `StatusRules` (pure) holds C36's rules: human detected always; dialing and unreachable once per call; on hold at most every 10 minutes per call; nothing else. `CallStatusWatcher.watch(user_id, since)` polls `reads.list_events` about once a second and sends through `send_template`. It stops at `call.ended` or after 3 hours. |
 
@@ -64,7 +64,7 @@ Paths are under `backend/` unless noted. "New" means person 2 created the file; 
 |---|---|
 | `detect.py` | `detect_language`: one `MODEL_FAST` call with structured output (`messages.parse`). Returns an ISO 639-1 code, or `None` when unsure or when the call fails, in which case the menu is shown. |
 | `prompts.py` | The detection and translation system prompts. Each tells the model the text is data, not instructions; translation keeps refs, dates, times and numbers unchanged. |
-| `translate.py` | **New (Goal 5.1).** `Translator.to_english` / `from_english`: one `MODEL_FAST` `messages.parse` call, 8 s timeout, None on failure, English short-circuits. Register per language in `REGISTERS` (Spanish: *usted*). |
+| `translate.py` | **New (Goal 5.1).** `Translator.to_english` / `from_english`: one `MODEL_FAST` `messages.parse` call, 8 s timeout, None on failure, English short-circuits. `labels_from_english` translates a list and refuses a result whose count doesn't match. Register per language in `REGISTERS` (Spanish: *usted*). `localize(translator, text, lang)` treats no translator like a failed call; `get_translator()` is the shared instance (None without a key). |
 
 ### Dev tools (`app/dev/`): new, owned by person 2, off by default
 
@@ -140,7 +140,7 @@ Each is explained in whatsapp-pipe.md → Decisions and Concerns.
 - **Races in `ask_user.py`:** `ask` losing to an answer (`_time_out` waits up to 5 s for the future), and `handle_reply` losing to the timeout (late reply, deduplicated through `_late_replied`).
 - **`call_status.py` timestamps:** reads from `since - 1 µs` and skips seen event IDs, so events sharing a timestamp aren't lost.
 - **The dev endpoint guard** relies on ngrok always adding `X-Forwarded-For`, and on uvicorn reporting loopback for local requests.
-- **Blocking I/O:** the Twilio SDK is synchronous and runs in `asyncio.to_thread`; everything else is async. External calls have timeouts: Twilio 10 s, media 10 s, detection 5 s.
+- **Blocking I/O:** the Twilio SDK is synchronous and runs in `asyncio.to_thread`; everything else is async. External calls have timeouts: Twilio 10 s, media 10 s, detection 5 s, translation 8 s, ask_user option labels 3 s (then English), a turn 30 s per call and 60 s overall.
 - **Logging:** no phone numbers, message text, or media URLs in log lines.
 
 ## How to verify

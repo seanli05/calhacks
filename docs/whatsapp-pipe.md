@@ -24,7 +24,7 @@ This page is the record for the WhatsApp side (relay, orchestrator pipe, call st
 **Goal 4, letter to research (4.2–4.4).** Tested on fakes.
 - **Research starts.** When a batch of photos closes, the orchestrator mints a `case_id` and queues `research_fast` for the new document.
 - **"Same letter or new?"** It's asked from the moment research is queued, not only once a case exists (concern 1 fixed). Answering "same letter" re-runs the fast pass in the same case. If the last fast job is still queued, research reads the new pages anyway, so nothing more is queued.
-- **Finished jobs.** One watcher per queued job polls `get_job` until it's done or failed. After 45 s on the fast pass, the user gets "taking longer" (Plan.md failure rules). The R1 reaction itself is Goal 6.1; for now a finished fast pass is only logged.
+- **Finished jobs.** One watcher per queued job polls `get_job` until it's done or failed. After 45 s on the fast pass, the user gets "taking longer" (Plan.md failure rules). A finished fast pass goes on to the explanation (Goal 6, below).
 - **Turns outside the lock.** The orchestrator turn runs after the per-number routing lock is released, so an ask_user reply never waits behind it (concern 8 fixed).
 - **The Claude turn (4.1, 4.5).** Free text gets a reply from `MODEL_DEFAULT` with six tools (decision 8). It answers questions about a letter from the stored R1 (explanation, appointment, checklist) and the verdict. It refuses legal advice and interview interpreting per C33. It never sees a resolved ref. Text that isn't `1`/`2` while "same letter or new?" is open goes to the turn, which answers and reminds the user to pick.
 - **Translation at the edges (5.1).** Inbound text is translated to English for `messages.body_en` (`MODEL_FAST`), except replies to an open ask_user question. The turn thinks and writes in English, and its reply is translated into the user's language (Spanish register: warm, simple, *usted*). If the model or the translation fails, the user gets the `orchestrator.unavailable` template, never untranslated English. ask_user option labels are translated too (concern 7).
@@ -111,8 +111,12 @@ reply.choice  # 1-based; equals default_option if the user didn't answer in time
 What to expect in `messages`:
 - `sender` is `relay` for templates and `orchestrator` for free text.
 - Templated rows carry `template` and an English `body_en`.
-- Incoming Spanish messages have `body_en = null` until translation lands (Goal 5).
+- Incoming Spanish text has an English `body_en` (`MODEL_FAST`). It's `null` only if the translation failed, or for a reply to an open ask_user question that isn't a bare number. A bare number is logged as is.
 - A user's reply to an ask_user question has `question_id` set.
+- The letter explanation and the post-call summary are `orchestrator` rows with `case_id` set and no `template`. The verdict, consent question, retake request and the after-call offers are `relay` templates with `case_id`.
+- The user's YES to a call is an ordinary inbound row; the call's `consent_message_id` points at it.
+
+New events from the orchestrator: `consent.requested` (`data.agency`), `consent.given` and `consent.declined` (`data.consent_message_id`). The fake phone worker's calls log the same call events as the fake call.
 - Before a user picks a language, incoming messages are logged as the detected language, or `en`. The bilingual language menu is logged as `es`.
 
 The fake call (dev only) leaves rows like a real one: a case, a brief, a failed `call` job, a call, its events, and a `case.closed` event. It also adds one outbound note, `"[dev] Fake call started…"`, that was never sent to WhatsApp. That note is what the fake call's consent pointer references.
@@ -173,7 +177,7 @@ Made to unblock the build; each follows Plan.md where Plan.md speaks. Raise any 
 
 1. **Set things up:** as for the fake call, plus `TWILIO_MOCK_AGENCY_NUMBER` in `.env` if you'll go on to a call.
 2. **Start it** from the same machine: `curl -X POST http://localhost:8000/dev/fake-research`. In PowerShell: `Invoke-RestMethod -Method Post -Uri http://localhost:8000/dev/fake-research`.
-3. **Send a photo of a letter.** Expect "Recibido…", then in the uvicorn log `Research queued`, and about 5 s later `Fast pass done`. The dashboard should show the case with the fixture's I-797C, and about 10 s later the verdict. The explanation message to the user comes with Goal 6.1.
+3. **Send a photo of a letter.** Expect "Recibido…", then in the uvicorn log `Research queued`, and about 5 s later `Fast pass done`. The dashboard should show the case with the fixture's I-797C, and about 10 s later the verdict. On WhatsApp you get the explanation, then the verdict and the consent question; for the call itself, see the next section.
 4. **Also try:** a second photo a minute later (you get "same letter or new?").
 
 ## Try the whole path (fake research + fake phone)
@@ -209,3 +213,4 @@ Made to unblock the build; each follows Plan.md where Plan.md speaks. Raise any 
 - **Retake after `needs_better_image`:** the retake request is built (6.1). Research writes no `cases` row then, so the retake becomes a new letter with a new `case_id`. Decide whether the retake should reuse the case.
 - **`call_recommended` false with a verified letter:** the user hears "no need to call" and isn't offered a call. They can still ask for one, and the turn's `request_consent` works.
 - **Plan.md wording:** Sean to check the wording of the language and photo decisions.
+- **Plan.md's orchestrator tool list (Sean):** it names `start_call`; decision 9 replaces it with the consent gate in code. Proposal: list `request_consent` only and note that the user's YES starts the call.
