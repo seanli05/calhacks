@@ -222,6 +222,7 @@ async def test_resolved_call_becomes_a_valid_report() -> None:
     assert fact.source == FactSource.FROM_CALL
     assert fact.sensitivity == Sensitivity.SENSITIVE
     assert report.transcript_id == "transcript_5"
+    assert report.summary_en == "The representative confirmed the interview."
     assert CallReport.model_validate_json(report.model_dump_json()) == report
 
     [request] = llm.requests
@@ -332,6 +333,7 @@ async def test_identifiers_never_reach_the_report() -> None:
         _draft(
             outcome="partial",
             reference_number=RECEIPT,
+            summary_en=f"The rep read out receipt number {RECEIPT}.",
             next_steps_en=[
                 f"Keep your A-Number {A_NUMBER} handy",
                 "Wait for a new notice",
@@ -345,6 +347,7 @@ async def test_identifiers_never_reach_the_report() -> None:
     )
 
     assert report.reference_number is None
+    assert report.summary_en is None  # it quoted the receipt number
     assert report.next_steps_en == ["Wait for a new notice"]
     assert [f.fact for f in report.proposed_facts] == ["Notice pending"]
     dumped = report.model_dump_json()
@@ -390,6 +393,7 @@ async def test_llm_failure_falls_back_to_the_deterministic_report(
     report = await LlmReportBuilder(FakeReportLlm(error))(_input(RESOLVED))
 
     assert report == await build_report(_input(RESOLVED))
+    assert report.summary_en is None
     assert report.outcome == CallOutcome.PARTIAL
     assert report.followup_needed is True
     assert "call_id=call_5" in caplog.text

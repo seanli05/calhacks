@@ -133,6 +133,7 @@ Manual checks on real phones, and their results: [phone-live-checks.md](phone-li
 | `new_deadlines` | The model; kept if it parses as a date between the call date and two years after |
 | fact `source`, `sensitivity` | Code: `from_call`, always `sensitive` (an immigration fact, C15, C25) |
 | `followup_needed` | The model's answer, forced true for anything short of `resolved` |
+| `summary_en` | The model (two or three sentences for the orchestrator to translate and send); dropped if it carries an identifier. None on the deterministic report |
 
 Any failure (timeout, API error, bad output, a bug) logs with the call and case IDs and falls back to `build_report`, so a report is always saved. Asylum claim details (C34) are kept out by the prompt only; code can't spot them. Manual eval against real Claude: `python -m app.phone.report_eval` (from `backend/`, costs a little).
 

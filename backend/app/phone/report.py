@@ -115,8 +115,7 @@ async def build_report(report: ReportInput) -> CallReport:
 
 class ReportDraft(BaseModel):
     """What the model fills in; code turns it into a `CallReport`. `summary_en`
-    comes first so the model sums up before it fills the fields; `CallReport` has
-    no place for it, so only the eval reads it."""
+    comes first so the model sums up before it fills the fields."""
 
     summary_en: str = Field(description="Two or three sentences on how the call went.")
     outcome: Literal["resolved", "partial", "failed"]
@@ -204,11 +203,16 @@ class LlmReportBuilder:
             transcript_id=report.transcript_id,
             proposed_facts=facts,
             followup_needed=draft.followup_needed or outcome != CallOutcome.RESOLVED,
+            summary_en=self._summary(draft.summary_en),
         )
 
     def _keep(self, items: Sequence[str]) -> list[str]:
         kept = [item.strip() for item in items if item.strip()]
         return [item for item in kept if not self._identifier(item)][:MAX_ITEMS]
+
+    def _summary(self, text: str) -> str | None:
+        text = text.strip()
+        return text if text and not self._identifier(text) else None
 
     def _identifier(self, text: str) -> bool:
         """True if `text` carries an identifier (C34, C35)."""

@@ -106,7 +106,11 @@ def facts_mention(pattern: str) -> Check:
 
 def nothing_matches(pattern: str) -> Check:
     def check(r: CallReport) -> bool:
-        texts = [*r.next_steps_en, *(f.fact for f in r.proposed_facts)]
+        texts = [
+            *r.next_steps_en,
+            *(f.fact for f in r.proposed_facts),
+            r.summary_en or "",
+        ]
         return not any(re.search(pattern, t, re.IGNORECASE) for t in texts)
 
     return check
@@ -393,8 +397,7 @@ async def run() -> int:
             print(f"{'':40}step: {step}")
         for fact in report.proposed_facts:
             print(f"{'':40}fact: {fact.fact}")
-        assert builder.last_draft is not None
-        print(f"{'':40}summary: {builder.last_draft.summary_en}")
+        print(f"{'':40}summary: {report.summary_en}")
     await client.close()
     latencies.sort()
     p50 = latencies[len(latencies) // 2]
