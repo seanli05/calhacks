@@ -94,3 +94,4 @@ Dropped from the starting list: `case number` (USCIS uses receipt number), `good
 - Phase 1 (sources): downloaded court glossaries (Judicial Council 2025 es; Contra Costa/Sacramento set), USCIS en/es page pairs, USCIS Dari/Pashto Afghan pages and PDFs, NYC MOIA Immigration Court 101 in 10 languages. Most Sacramento glossaries are legacy-font or definition-only; see SOURCES.md. Extraction tools in `tools/`.
 - Phase 2 (terms): 75 core terms, list and reasons above.
 - Phase 3 (es): 75 rows, 69 official (USCIS en/es page twins + Judicial Council 2025 glossary), 6 machine. Each official translation checked against the downloaded source text.
+- Phase 4 (fa = Dari): 75 rows, 36 official (USCIS Dari page and flyers, 2 from NYC MOIA's Farsi flyer where Dari is identical), 39 machine. Farsi variant for every row in review_fa.csv (machine rows first). Generator: tools/review_sheet.py.
