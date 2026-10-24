@@ -15,6 +15,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from functools import lru_cache, partial
+from typing import Protocol
 
 from anthropic import AsyncAnthropic
 from sqlalchemy.exc import SQLAlchemyError
@@ -33,6 +34,7 @@ from app.orchestrator.language import (
 )
 from app.orchestrator.letters import Letters
 from app.orchestrator.photos import PHOTO_QUIET_WINDOW_S, PendingPages, PhotoBatcher
+from app.orchestrator.turn import OrchestratorTurn
 from app.relay.ask_user import AskUser, get_ask_user
 from app.relay.inbound import InboundMedia, InboundMessage
 from app.relay.media import MediaDownloadError
@@ -41,11 +43,22 @@ from app.relay.replies import parse_choice
 from app.relay.whatsapp import WhatsApp, WhatsAppSendError, get_whatsapp
 from app.settings import get_settings
 from app.translation.detect import detect_language
+from app.translation.translate import Translator
 
 logger = logging.getLogger(__name__)
 
 LanguageDetector = Callable[[str], Awaitable[LanguageCode | None]]
+ToEnglish = Callable[[str, LanguageCode], Awaitable[str | None]]
 Turn = Callable[[], Awaitable[None]]
+
+
+class TurnRunner(Protocol):
+    """The orchestrator's reply to free text (`OrchestratorTurn.run`)."""
+
+    async def __call__(
+        self, user: tables.User, *, same_or_new_pending: bool = False
+    ) -> None: ...
+
 
 # Before the user picks a language, an undetectable message is logged as English.
 _FALLBACK_LANGUAGE = "en"
@@ -59,11 +72,18 @@ class InboundPipe:
         ask_user: AskUser,
         letters: Letters,
         quiet_window_s: float = PHOTO_QUIET_WINDOW_S,
+        *,
+        to_english: ToEnglish | None = None,
+        turn: TurnRunner | None = None,
     ) -> None:
+        """Without `to_english`, non-English messages are logged with no `body_en`;
+        without `turn`, free text is echoed (no Anthropic key)."""
         self._whatsapp = whatsapp
         self._detect = detect
         self._ask_user = ask_user
         self.letters = letters
+        self._to_english = to_english
+        self._turn = turn
         self.photos = PhotoBatcher(self._letter_ready, quiet_window_s)
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self._turn_locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
@@ -109,8 +129,7 @@ class InboundPipe:
             MessageSender.USER,
             message.body,
             language,
-            # Goal 5: translate into English here, before the row is written.
-            body_en=message.body if language == "en" else None,
+            body_en=await self._english(message, language, answers_question=question),
             media_ids=[media_id for media_id, _ in saved],
             question_id=question.id if question else None,
             twilio_sid=message.message_sid,
@@ -128,10 +147,25 @@ class InboundPipe:
         elif pages:
             await self._letter_pages(user, pages)
         elif (pending := self.photos.pending(user.id)) is not None:
-            await self._same_or_new_answer(user, message.text, pending)
+            return await self._same_or_new_answer(user, message, pending)
         else:
             return partial(self._orchestrator_turn, user, message)
         return None
+
+    async def _english(
+        self,
+        message: InboundMessage,
+        language: LanguageCode,
+        *,
+        answers_question: tables.Question | None,
+    ) -> str | None:
+        """The English for the log (rule 6). Skipped for a reply to an open ask_user
+        question, which is a number and must not wait on a model call."""
+        if language == "en":
+            return message.body
+        if not message.text or answers_question is not None or self._to_english is None:
+            return None
+        return await self._to_english(message.text, language)
 
     async def _save_media(
         self, user_id: UserId, message: InboundMessage
@@ -208,12 +242,18 @@ class InboundPipe:
         await send_template(self._whatsapp, user, "letter.received")
 
     async def _same_or_new_answer(
-        self, user: tables.User, text: str, pending: PendingPages
-    ) -> None:
-        choice = parse_choice(text, 2)
+        self, user: tables.User, message: InboundMessage, pending: PendingPages
+    ) -> Turn | None:
+        """A "1" or "2" settles it; other text goes to the orchestrator turn, which
+        answers and reminds the user to pick (or re-asks, without a turn)."""
+        choice = parse_choice(message.text, 2)
         if choice is None:
+            if self._turn is not None and message.text:
+                return partial(
+                    self._orchestrator_turn, user, message, same_or_new_pending=True
+                )
             await send_template(self._whatsapp, user, "letter.same_or_new")
-            return
+            return None
         self.photos.take_pending(user.id)
         if choice == 1:
             await writes.add_pages(pending.document_id, pending.media_ids)
@@ -228,6 +268,7 @@ class InboundPipe:
         else:
             self.photos.add(user.id, pending.media_ids)
             await send_template(self._whatsapp, user, "letter.received")
+        return None
 
     async def _letter_ready(self, user_id: UserId, media_ids: list[MediaId]) -> None:
         document = await writes.create_document(user_id, media_ids)
@@ -240,11 +281,16 @@ class InboundPipe:
         await self.letters.start(user_id, document.id)
 
     async def _orchestrator_turn(
-        self, user: tables.User, message: InboundMessage
+        self,
+        user: tables.User,
+        message: InboundMessage,
+        *,
+        same_or_new_pending: bool = False,
     ) -> None:
-        """Stub until Goal 4's Claude turn: echo text so the pipe can be tried on a
-        phone."""
-        if message.text:
+        if self._turn is not None:
+            await self._turn(user, same_or_new_pending=same_or_new_pending)
+        elif message.text:
+            # No Anthropic key: echo, so the pipe can still be tried on a phone.
             await send_text(self._whatsapp, user, f"Echo: {message.text}")
 
 
@@ -255,13 +301,22 @@ async def _no_detection(text: str) -> None:
 @lru_cache
 def get_pipe() -> InboundPipe:
     settings = get_settings()
-    detect: LanguageDetector = _no_detection
-    if settings.anthropic_api_key:
-        client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-        detect = partial(detect_language, client, settings.model_fast)
-    else:
-        logger.warning("ANTHROPIC_API_KEY not set: first contact always gets the menu")
     whatsapp = get_whatsapp()
+    letters = Letters(whatsapp, get_job_watcher())
+    if not settings.anthropic_api_key:
+        logger.warning(
+            "ANTHROPIC_API_KEY not set: first contact always gets the menu, nothing "
+            "is translated, and free text is echoed"
+        )
+        return InboundPipe(whatsapp, _no_detection, get_ask_user(), letters)
+    client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+    translator = Translator(client, settings.model_fast)
+    turn = OrchestratorTurn(client, settings.model_default, whatsapp, translator)
     return InboundPipe(
-        whatsapp, detect, get_ask_user(), Letters(whatsapp, get_job_watcher())
+        whatsapp,
+        partial(detect_language, client, settings.model_fast),
+        get_ask_user(),
+        letters,
+        to_english=translator.to_english,
+        turn=turn.run,
     )
