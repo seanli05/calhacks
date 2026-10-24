@@ -6,7 +6,7 @@ You are building the web dashboard: FastAPI routes in `backend/app/api/` over th
 1. [CLAUDE.md](../../CLAUDE.md): product rules and conventions.
 2. [Plan.md](../../Plan.md) → **Events** (C14, C23, C27), **Data model and memory** (C26), **MVP** item 11, **Decisions** (dashboard access is a plain link).
 3. [data-layer-schema.md](data-layer-schema.md): tables and columns.
-4. `README.md` → **Using the database**: which helper module does what.
+4. [data-layer-guide.md](../data-layer-guide.md): how to use the helpers and contracts, case stages, gotchas, open issues.
 
 Plan.md is the source of truth. Don't apply anything from older docs (a PRD or the original Plan.txt).
 
@@ -20,7 +20,8 @@ Chris (person 1) owns the data layer, the dashboard, and deployment. Working sty
 ## State of `main` (as of this doc)
 - **Contracts** (`backend/app/contracts/`): every Plan.md payload as a Pydantic model; `Event` and `EventType` in `events.py`; enums in `common.py`. Import as `from app.contracts import Event`.
 - **Tables** (`backend/app/db/tables.py`): all 16, created on app startup. Class names can match contract names (`Event`, `Verification`, `CaseBrief`), so import the module (`from app.db import tables`) and qualify.
-- **Reset:** `cd backend && python -m app.db.reset --yes` drops, recreates, and seeds one Spanish-speaking user plus the demo I-797C case (verified, so its stage is `awaiting_consent`). It wipes the shared database, so ask Chris first. Use it on the test branch freely.
+- **Reset:** `cd backend && python -m app.db.reset --yes` drops, recreates, and seeds one Spanish-speaking user (fake WhatsApp number) plus the demo I-797C case: refs, R1, a provisional case brief in the shape of `CaseBrief` from `research/models.py`, and a verified verification whose official phone is the mock agency line (`TWILIO_MOCK_AGENCY_NUMBER`, in `.env.example`). Its stage is `awaiting_consent`. The shared database was seeded this way. Reset wipes it for everyone, so ask Chris first; use it on the test branch freely.
+- **Seed is thin for the dashboard:** no messages, facts, profile, or finished call yet, and only two events. Extending the seed in `backend/app/db/reset.py` with fictional dashboard data (a WhatsApp exchange, a few facts, a finished call with transcript and report, the matching events) is in scope for this task; keep every value fictional.
 - **Helpers** the dashboard uses (all async):
   - `app.db.reads`: `list_events(user_id, since)` (returns `Event` contracts, oldest first, `since` exclusive), `list_active_cases(user_id)`, `case_progress(case_id)` (returns a `CaseStage`: `received`, `explaining`, `needs_better_image`, `checking`, `suspicious`, `unknown`, `awaiting_consent`, `calling`, `on_hold`, `connected`, `call_ended`, `closed`), `get_case`, `latest_verification`, `get_brief`, `get_call`, `get_transcript(call_id)`, `get_document`, `get_media`, `get_user`, `get_profile`, `list_facts(user_id, statuses)`, `list_messages(user_id)`.
   - `app.db.deletes`: `delete_fact`, `delete_document` (and its page images), `delete_transcript`, `delete_everything(user_id)`. Each commits with a `*.deleted` event that carries IDs only.
@@ -31,7 +32,7 @@ Chris (person 1) owns the data layer, the dashboard, and deployment. Working sty
 - Python 3.12 isn't installed; use 3.13 in a gitignored `.venv`. Node is 20.15.
 
 ## Scope
-- **Edit:** `backend/app/api/`, `backend/app/main.py` (mount the router only), `backend/app/db/reads.py` (new reads only), `backend/tests/test_api_*.py`, `dashboard/`, README run commands.
+- **Edit:** `backend/app/api/`, `backend/app/main.py` (mount the router only), `backend/app/db/reads.py` (new reads only), `backend/app/db/reset.py` (seed data only), `backend/tests/test_api_*.py`, `dashboard/`, README run commands.
 - **Don't touch:** contracts, other components' packages, Plan.md. The dashboard is a reader plus the delete helper. It never writes any other table (rule 5).
 
 ## Steps (commit after each)
