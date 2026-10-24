@@ -2,6 +2,8 @@
 
 A demo-only phone line, hosted on [Cartesia Line](https://docs.cartesia.ai/line/introduction), that our phone agent calls instead of a real agency. It plays a U.S. Citizenship and Immigration Services contact line for the demo case: an **I-797C asylum interview notice** (Form I-589). The greeting says it's a demonstration line.
 
+It is deliberately **English only**, because that's the barrier the project is about. There's no language menu and no interpreter option, the open steps need spoken English answers, the timeouts are short, and the officer is a brisk English-only rep who uses official terms and doesn't simplify. The officer stays polite: the barrier is the system, not the person.
+
 It has three phases:
 
 1. **Phone tree.** Deterministic, so every demo take behaves the same. It mixes keypad menus with open questions that need a spoken answer.
@@ -11,8 +13,7 @@ It has three phases:
 ## The call
 
 ```
-Greeting + LANGUAGE          "For English, press 1. Para español, oprima el 2."
-  1 ─► MAIN MENU             1 case status · 2 interview/appointment notice · 3 address · 4 work permit · 9 repeat
+Greeting ─► MAIN MENU        1 case status · 2 interview/appointment notice · 3 address · 4 work permit · 9 repeat
          2 ─► APPOINTMENT    1 biometrics · 2 asylum interview · 3 naturalization · * main menu
                 2 ─► RECEIPT (open)       say "ZLA2690012345", or key 2690012345 then #
                        └─► CONFIRM        "I heard Z L A 2 6 9 ... say yes or press 1"
@@ -25,7 +26,7 @@ What each step tests in the phone agent:
 
 | Step | Kind | What it tests |
 |---|---|---|
-| Language, main menu, appointment | Closed (key or spoken number/option name) | Menu choices from the case brief |
+| Main menu, appointment | Closed (key or spoken number/option name) | Menu choices from the case brief |
 | Wrong branches (1, 3, 4) | Dead end, back to main menu | Recovering from a wrong press |
 | Receipt number | Open, spoken or keypad | Reading a `<ref:receipt_number>` aloud; a confirmation loop |
 | Reason for calling | Open, **speech only** (keys get "please say your answer out loud") | Saying the call goal in plain words |
@@ -65,7 +66,7 @@ This folder deploys to Cartesia as its own project, with its own [pyproject.toml
 | `MOCK_AGENCY_OFFICER_MODEL` | yes | | LiteLLM string, e.g. `anthropic/claude-haiku-5-5` (fast model; it's a live voice turn) |
 | `MOCK_AGENCY_HOLD_SECONDS` | no | `45` | Total hold time. Keep it short for the video. |
 | `MOCK_AGENCY_HOLD_ANNOUNCE_EVERY_S` | no | `15` | Gap between hold announcements |
-| `MOCK_AGENCY_NO_INPUT_SECONDS` | no | `12` | Silence before a reprompt (counted from when the prompt is sent) |
+| `MOCK_AGENCY_NO_INPUT_SECONDS` | no | `12` | Silence before a reprompt, counted only once the line stops talking |
 | `MOCK_AGENCY_OFFICER_NAME` | no | `Daniel Reyes` | |
 | `MOCK_AGENCY_IVR_VOICE_ID` | no | agent's default voice | Cartesia voice for the menu |
 | `MOCK_AGENCY_OFFICER_VOICE_ID` | no | agent's default voice | Use a different, warmer voice so the human pickup is obvious on video |
@@ -103,5 +104,5 @@ Then attach a phone number to the agent in the [Cartesia dashboard](https://play
 ## Known limits
 
 - No hold music. Line speaks text only, so hold is announcements with silence in between.
-- Key presses don't cut off a prompt that's already playing; speech does.
+- Like a real line, the caller can't talk over recorded prompts, but can interrupt the officer. Menu and hold prompts always play to the end, and speech that ends mid-prompt is dropped (logged as `ignored_speech_during_prompt`). Key presses register mid-prompt and take effect once the prompt finishes. The officer stops talking when interrupted and responds to what was said.
 - One fixed case. Any other receipt number gets "couldn't find a case".

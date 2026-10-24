@@ -4,9 +4,10 @@ The Line adapter in main.py feeds it key presses, transcripts, and no-input
 timeouts, and plays back the returned IvrTurn. Keeping it pure lets us test
 every path without a call.
 
+English only, like the line it mocks: no language menu and no interpreter option.
+
 Tree:
-    LANGUAGE        closed  1 English, 2 Spanish (unavailable, falls through)
-    MAIN_MENU       closed  1 status, 2 interview notice, 3 address, 4 work permit
+    MAIN_MENU      closed  1 status, 2 interview notice, 3 address, 4 work permit
     APPOINTMENT     closed  1 biometrics, 2 asylum interview, 3 naturalization
     RECEIPT         open    say the receipt number, or key its 10 digits + #
     RECEIPT_CONFIRM closed  yes/1 or no/2
@@ -37,7 +38,6 @@ RECEIPT_KEYPAD_DIGITS = 10
 
 
 class Node(StrEnum):
-    LANGUAGE = "language"
     MAIN_MENU = "main_menu"
     APPOINTMENT = "appointment"
     RECEIPT = "receipt"
@@ -84,7 +84,7 @@ class CallerInfo(BaseModel):
 class PhoneTree:
     def __init__(self, case: MockCase) -> None:
         self.case = case
-        self.node = Node.LANGUAGE
+        self.node = Node.MAIN_MENU
         self.info = CallerInfo()
         self._no_input_count = 0
         self._receipt_attempts = 0
@@ -95,7 +95,7 @@ class PhoneTree:
     # --- inputs -------------------------------------------------------------
 
     def start(self) -> IvrTurn:
-        return IvrTurn(lines=[prompts.GREETING, prompts.LANGUAGE_MENU])
+        return IvrTurn(lines=[prompts.GREETING, prompts.MAIN_MENU])
 
     def press(self, key: str) -> IvrTurn:
         """Handle one DTMF key press."""
@@ -140,11 +140,6 @@ class PhoneTree:
 
     def _choose(self, key: str) -> IvrTurn:
         match self.node, key:
-            case Node.LANGUAGE, "1":
-                return self._go(Node.MAIN_MENU)
-            case Node.LANGUAGE, "2":
-                return self._go(Node.MAIN_MENU, before=[prompts.SPANISH_UNAVAILABLE])
-
             case Node.MAIN_MENU, "1":
                 return self._info_then_main(prompts.CASE_STATUS_INFO)
             case Node.MAIN_MENU, "2":
@@ -181,7 +176,6 @@ class PhoneTree:
         """Let callers say the option name instead of the number."""
         lowered = text.lower()
         keywords: dict[Node, list[tuple[str, str]]] = {
-            Node.LANGUAGE: [("english", "1"), ("español", "2"), ("spanish", "2")],
             Node.MAIN_MENU: [
                 ("status", "1"),
                 ("interview", "2"),
@@ -277,7 +271,6 @@ class PhoneTree:
 
     def _prompt(self) -> str:
         return {
-            Node.LANGUAGE: prompts.LANGUAGE_MENU,
             Node.MAIN_MENU: prompts.MAIN_MENU,
             Node.APPOINTMENT: prompts.APPOINTMENT_MENU,
             Node.RECEIPT: prompts.RECEIPT_PROMPT,

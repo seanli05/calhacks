@@ -19,6 +19,8 @@ from line.agent import TurnEnv
 from line.events import (
     AgentEndCall,
     AgentSendText,
+    AgentTurnEnded,
+    AgentTurnStarted,
     AgentUpdateCall,
     CallEnded,
     CallStarted,
@@ -32,6 +34,8 @@ from line.events import (
 from line.llm_agent import LlmAgent, LlmConfig, end_call
 from line.voice_agent_app import AgentEnv, CallRequest, VoiceAgentApp
 from loguru import logger
+
+SILENCE_POLL_S = 0.25
 
 
 class Phase(StrEnum):
@@ -47,21 +51,40 @@ class MockAgencyLine:
         self.phase = Phase.IVR
         self.tree = PhoneTree(DEMO_CASE)
         self.officer: LlmAgent | None = None
+        self.agent_speaking = False
 
     # --- harness filters --------------------------------------------------------
 
     def should_run(self, event: InputEvent) -> bool:
         """Which events start a new turn. Starting a turn cancels the current one."""
+        self._track_agent_speech(event)
         if isinstance(event, (CallStarted, CallEnded)):
             return True
         if self.phase is Phase.IVR:
+            if isinstance(event, UserTurnEnded) and self.agent_speaking:
+                # Recorded prompts can't be talked over, like a real phone tree.
+                # Speech that ends mid-prompt is echo, noise, or barge-in: drop it.
+                logger.info(f"ignored_speech_during_prompt call_id={self.call_id}")
+                return False
             return isinstance(event, (UserDtmfSent, UserTurnEnded))
         if self.phase is Phase.OFFICER:
             return isinstance(event, UserTurnEnded)
         return False
 
     def should_cancel(self, event: InputEvent) -> bool:
-        return self.phase is not Phase.HOLD and isinstance(event, UserTurnStarted)
+        """The officer stops when talked over; menu prompts and hold don't."""
+        if not isinstance(event, UserTurnStarted):
+            return False
+        if self.phase is Phase.OFFICER:
+            return True
+        return self.phase is Phase.IVR and not self.agent_speaking
+
+    def _track_agent_speech(self, event: InputEvent) -> None:
+        """The harness reports when our TTS starts and stops playing."""
+        if isinstance(event, AgentTurnStarted):
+            self.agent_speaking = True
+        elif isinstance(event, AgentTurnEnded):
+            self.agent_speaking = False
 
     # --- turns ----------------------------------------------------------------
 
@@ -103,12 +126,14 @@ class MockAgencyLine:
     async def _play(self, turn: IvrTurn) -> AsyncIterator[OutputEvent]:
         """Speak a turn, then wait for input, hang up, or go on hold.
 
-        The no-input wait lives inside the turn: any key press or speech starts a
-        new turn, which cancels this one before the timer fires.
+        Prompts are uninterruptible and always play to the end. A key press
+        mid-prompt still starts a new turn, which cancels this one, but the
+        prompt already sent finishes first. The no-input wait lives inside the
+        turn, so any input cancels it before the timer fires.
         """
         while True:
             for line in turn.lines:
-                yield AgentSendText(text=line)
+                yield AgentSendText(text=line, interruptible=False)
             if turn.hang_up:
                 yield AgentEndCall()
                 return
@@ -116,8 +141,20 @@ class MockAgencyLine:
                 async for output in self._hold_then_officer():
                     yield output
                 return
-            await asyncio.sleep(self.settings.no_input_seconds)
+            await self._wait_for_silence(self.settings.no_input_seconds)
             turn = self.tree.no_input()
+
+    async def _wait_for_silence(self, seconds: float) -> None:
+        """Sleep for `seconds` of time when the line itself isn't talking.
+
+        Counting from when the prompt was sent would fire mid-prompt on the
+        long menus.
+        """
+        waited = 0.0
+        while waited < seconds:
+            await asyncio.sleep(SILENCE_POLL_S)
+            if not self.agent_speaking:
+                waited += SILENCE_POLL_S
 
     async def _hold_then_officer(self) -> AsyncIterator[OutputEvent]:
         self.phase = Phase.HOLD
