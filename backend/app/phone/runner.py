@@ -32,6 +32,7 @@ from app.phone.line import (
     AgencyUnreachable,
     Heard,
     NonSpeech,
+    SpeechStarted,
     UserAnswered,
     UserLeft,
     UserUnreachable,
@@ -274,8 +275,31 @@ class _CallRunner(MenuSteps):
                 await self._timer(item)
 
     async def _line_event(self, item: LineInput) -> None:
+        self._track_turn(item)
+        await self._dispatch(item)
+        if isinstance(item.event, Heard | NonSpeech):
+            self.arm_held()
+
+    def _track_turn(self, item: LineInput) -> None:
+        match item.event:
+            case SpeechStarted():
+                self.line_speaking = True
+                self.timers.start("turn_backstop", self.config.turn_backstop_s)
+            case Heard():
+                self._turn_closed(item.at_s)
+            case NonSpeech() if self.line_speaking:
+                self._turn_closed(item.at_s)
+
+    def _turn_closed(self, at_s: float) -> None:
+        self.line_speaking = False
+        self.quiet_since_s = at_s
+        self.timers.cancel("turn_backstop")
+
+    async def _dispatch(self, item: LineInput) -> None:
         state = self.sm.state
         match item.event:
+            case SpeechStarted():
+                self.speech_started()
             case Heard(text=text):
                 self._said("agency", text)
                 if self.passive:
@@ -342,6 +366,12 @@ class _CallRunner(MenuSteps):
                 self.step.flags.append("hold_overdue")
             case "menu_budget" if state == S.MENU and not self.passive:
                 raise MenuGaveUp("menu time budget used up")
+            case "menu_quiet" if state == S.MENU and not self.passive:
+                await self.send_held()
+            case "turn_backstop":
+                self.step.flags.append("turn_never_closed")
+                self._turn_closed(fired.at_s)
+                self.arm_held()
             case "user_backstop" if state == S.BRIDGING:
                 await self._user_unreachable("no_answer")
 
@@ -433,6 +463,7 @@ class _CallRunner(MenuSteps):
             self.menu_spent_s += self.now_s() - self.menu_entered_s
             self.escapes = 0
             self.menu_buffer.clear()
+            self.forget_held()
             if self.ask is not None:
                 self._drop_ask()
                 self.step.flags.append("ask_abandoned")

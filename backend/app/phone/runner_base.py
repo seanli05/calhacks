@@ -24,6 +24,7 @@ from app.phone.ports import CallDeps, LineClosed, TranscriptLine
 from app.phone.report import ReportBuilder
 from app.phone.runner_parts import (
     AskDone,
+    HeldAnswer,
     Input,
     LineEnded,
     LineInput,
@@ -88,6 +89,11 @@ class RunnerBase:
         self.error: str | None = None
 
         self.ask: OpenAsk | None = None
+        self.held: HeldAnswer | None = None
+        self.line_speaking = False
+        """Between `SpeechStarted` and the event that closes the turn."""
+        self.quiet_since_s = 0.0
+        """When the last turn closed."""
         self._ask_seq = itertools.count(1)
         self._dropped: list[asyncio.Task[None]] = []
         self.menu_entered_s = 0.0
