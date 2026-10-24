@@ -78,7 +78,7 @@ Files: `runner.py` (lifecycle, dispatch, hold, the person, the bridge), `runner_
 | Piece | What it does |
 |---|---|
 | Order | Callbacks and streams arrive in any order. The line only moves forward: answered once, gone once. Streams are numbered; a close counts only for the current one |
-| Turns (`listener.py`) | VAD stop 0.5 s; fragments join until 1 s of quiet (plus up to 1 s for speech-to-text's last fragment); cut at 25 s. Every `SpeechStarted` is closed by one `Heard`, or `NonSpeech` if it had no words |
+| Turns (`listener.py`) | VAD start 0.5 s (so breaths and clicks don't open a turn; watch for a missed bare "Hello?"), VAD stop 0.5 s; fragments join until 1 s of quiet (plus up to 0.5 s for speech-to-text's last fragment, which a wordless turn waits out in full); cut at 25 s. Every `SpeechStarted` is closed by one `Heard`, or `NonSpeech` if it had no words |
 | `NonSpeech` | Between turns, every 5 s, `seconds` = the stretch so far; `music` if most 20 ms frames were above `LOUD_RMS`, else `silence`. Text is never dropped as music: a rep's lone "Hello?" after hold music must reach the classifier |
 | `say` | Queues the speech and a Twilio `mark` after it; returns when Twilio echoes the mark (the audio played). No mark within the spoken length + 5 s: logs and carries on. Cancelling it sends Twilio `clear` |
 | `press_keys` (C37) | REST update to `<Play digits="w…">` + a new stream; returns once that stream is up. None within 8 s: the agency hung up (`AgencyHungUp`), or we hang up; either way `LineClosed` |

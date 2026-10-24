@@ -53,8 +53,9 @@ class TurnTiming:
     merge_gap_s: float = 1.0
     """Quiet that closes a turn. Longer than the pauses between a menu's options,
     short enough for the < 5 s human → ring target."""
-    final_grace_s: float = 1.0
-    """Extra wait for speech-to-text's last fragment after the gap."""
+    final_grace_s: float = 0.5
+    """Extra wait for speech-to-text's last fragment after the gap. Cartesia sends
+    nothing for a turn with no words, so a wordless turn waits all of it."""
     max_turn_s: float = 25.0
     nonspeech_every_s: float = 5.0
 

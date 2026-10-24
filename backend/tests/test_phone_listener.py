@@ -37,16 +37,17 @@ def test_a_late_last_fragment_is_waited_for() -> None:
     turns = TurnAssembler(now=0)
     turns.speech_started(1.0)
     turns.speech_stopped(2.0)
-    assert turns.tick(3.5) == []  # the gap passed, but speech-to-text hasn't answered
-    turns.transcript("Please hold.", 3.6)
-    assert turns.tick(3.7) == [Heard(text="Please hold.")]
+    assert turns.tick(3.2) == []  # the gap passed, but speech-to-text hasn't answered
+    turns.transcript("Please hold.", 3.3)
+    assert turns.tick(3.4) == [Heard(text="Please hold.")]
 
 
-def test_a_turn_with_no_words_closes_as_non_speech() -> None:
+def test_a_turn_with_no_words_closes_as_non_speech_soon_after_the_gap() -> None:
     turns = TurnAssembler(now=0)
     turns.speech_started(1.0)
     turns.speech_stopped(2.0)
-    assert turns.tick(4.0) == [NonSpeech(sound="silence", seconds=3.0)]
+    assert turns.tick(3.4) == []
+    assert turns.tick(3.5) == [NonSpeech(sound="silence", seconds=2.5)]
 
 
 def test_a_wordless_turn_during_music_is_music() -> None:
