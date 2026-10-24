@@ -13,11 +13,12 @@ Owner: person 1. Ask before changing the schema, the contracts, or another write
 | Contracts (every Plan.md payload) | `backend/app/contracts/` | Done. `CaseBrief` is still a placeholder `dict` (persons 3 and 4 define it) |
 | Tables (all 16) | `backend/app/db/tables.py` | Done; created on app startup |
 | Helpers (reads, writes, jobs, events, messages, deletes) | `backend/app/db/` | Done; tested against Postgres |
-| Reset and demo seed | `python -m app.db.reset` | Done; seed values still being confirmed with the team |
-| WhatsApp webhook | `backend/app/relay/webhook.py` | Echo bot; not yet writing to the DB |
-| Orchestrator, translation, memory writer, phone agent | their packages | Not on `main` yet |
-| Research agent | branch `research_agent`, top-level `research/` | Has its own models; not yet on the shared contracts (see [Open issues](#open-issues)) |
-| Dashboard | `docs/specs/task-c-dashboard.md` | Not started |
+| Reset and demo seed | `python -m app.db.reset` | Done (`--after-call` adds a finished call) |
+| WhatsApp pipe, relay, ask_user, call-status messages | `backend/app/relay/`, `orchestrator/` | On `main`; writes `users`, `media`, `documents`, `messages`, `questions`, events. Status: [whatsapp-pipe.md](whatsapp-pipe.md) |
+| Orchestrator's Claude turn, translation, memory writer | their packages | Not on `main` yet |
+| Phone agent | `backend/app/phone/` | State machine and menu decider on `main`; the call runner (dial, hold, bridge, report) not yet |
+| Research agent | branch `research_agent`, top-level `research/` | Has its own models; not yet on the shared contracts (see [Open issues](#open-issues)). `app/dev/fake_research.py` stands in for it |
+| Dashboard and its API | `dashboard/`, `backend/app/api/` | Done. What components must write to show up: [dashboard-AGENTS.md](dashboard-AGENTS.md) |
 
 ## Setup
 
