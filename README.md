@@ -103,10 +103,10 @@ Full guide, with per-component recipes: [docs/data-layer-guide.md](docs/data-lay
 The webhook returns empty TwiML at once and handles the message in a background task (`orchestrator/pipe.py`); every reply goes out through the Twilio REST API (`relay/whatsapp.py`) and is logged to `messages`. The pipe needs `DATABASE_URL`; without `ANTHROPIC_API_KEY`, language detection is skipped and first contact always gets the language menu. What a new number sees:
 
 - **Language pick:** a text first message gets a one-tap confirm in the detected language; a photo-only one gets the bilingual menu.
-- **Photos:** photos sent within 6 s of each other become one letter (`documents` row). Once a case exists, a new photo gets "same letter or new?".
-- **Other text:** echoed back until the orchestrator's Claude turn lands (Goal 4).
+- **Photos:** photos sent within 6 s of each other become one letter (`documents` row), and the orchestrator queues the research fast pass for it. Once research has started, a new photo gets "same letter or new?".
+- **Other text:** answered by the orchestrator's Claude turn (it explains letters, never gives legal advice). Replies are written in English and translated into the user's language. Without `ANTHROPIC_API_KEY`, text is echoed back instead.
 
-Reply templates live in `relay/templates.py` (`en` and `es`). Status, interfaces (ask_user, call status), decisions, and open concerns for the WhatsApp side: [docs/whatsapp-pipe.md](docs/whatsapp-pipe.md). To see ask_user and the call-status messages on your phone without the phone agent, set `DEV_ENDPOINTS=true` and use `POST /dev/fake-call` (local only; steps in that doc).
+Reply templates live in `relay/templates.py` (`en` and `es`). Status, interfaces (ask_user, call status), decisions, and open concerns for the WhatsApp side: [docs/whatsapp-pipe.md](docs/whatsapp-pipe.md). To see ask_user and the call-status messages on your phone without the phone agent, set `DEV_ENDPOINTS=true` and use `POST /dev/fake-call` (local only; steps in that doc). `POST /dev/fake-research` stands in for the research agent the same way.
 
 ### Deploying for the demo
 

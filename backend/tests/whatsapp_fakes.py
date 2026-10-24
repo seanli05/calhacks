@@ -9,16 +9,24 @@ from typing import Any
 
 from app.contracts import (
     AskUserRequest,
+    Component,
     Event,
+    EventType,
+    FactStatus,
+    JobPayload,
+    JobStatus,
+    JobType,
     MessageDirection,
     MessageSender,
     QuestionStatus,
 )
 from app.db import tables
+from app.db.progress import CaseStage, compute_stage
 from app.db.tables import utcnow
 from app.relay.inbound import InboundMedia, InboundMessage
 from app.relay.media import DownloadedMedia, MediaDownloadError
 from app.relay.whatsapp import WhatsAppSendError
+from pydantic import BaseModel
 
 NUMBER = "+15105550123"
 QUIET_S = 0.05
@@ -38,6 +46,10 @@ class FakeDB:
         self.calls: dict[str, tables.Call] = {}
         self.questions: dict[str, tables.Question] = {}
         self.events: list[Event] = []
+        self.jobs: dict[str, tables.Job] = {}
+        self.verifications: dict[str, tables.Verification] = {}
+        self.profiles: dict[str, tables.Profile] = {}
+        self.facts: list[tables.Fact] = []
 
     # Relay: questions (race-safe like the real helpers: only an open row closes)
 
@@ -126,6 +138,55 @@ class FakeDB:
         self.calls[call.id] = call
         return call
 
+    # Jobs
+
+    async def enqueue(
+        self,
+        payload: JobPayload,
+        created_by: Component,
+        user_id: str,
+        case_id: str | None = None,
+    ) -> tables.Job:
+        job = tables.Job(
+            type=JobType(payload.job),
+            created_by=created_by,
+            user_id=user_id,
+            case_id=case_id,
+            payload=payload.model_dump(mode="json"),
+        )
+        self.jobs[job.id] = job
+        return job
+
+    async def get_job(self, job_id: str) -> tables.Job | None:
+        job = self.jobs.get(job_id)
+        return tables.Job(**job.model_dump()) if job else None
+
+    async def claim_next(self, job_type: JobType) -> tables.Job | None:
+        for job in self.jobs.values():
+            if job.type == job_type and job.status == JobStatus.QUEUED:
+                job.status = JobStatus.RUNNING
+                return tables.Job(**job.model_dump())
+        return None
+
+    async def finish(self, job_id: str, result: BaseModel) -> None:
+        self.finish_job(job_id, result)
+
+    async def fail(self, job_id: str, error: str) -> None:
+        self.fail_job(job_id, error)
+
+    def jobs_of(self, job_type: JobType) -> list[tables.Job]:
+        return [j for j in self.jobs.values() if j.type == job_type]
+
+    def finish_job(self, job_id: str, result: BaseModel | None = None) -> None:
+        job = self.jobs[job_id]
+        job.status = JobStatus.DONE
+        job.result = result.model_dump(mode="json") if result else {}
+
+    def fail_job(self, job_id: str, error: str) -> None:
+        job = self.jobs[job_id]
+        job.status = JobStatus.FAILED
+        job.error = error
+
     # Orchestrator: users, media, letters
 
     async def get_or_create_user(self, whatsapp_number: str) -> tables.User:
@@ -182,8 +243,45 @@ class FakeDB:
     async def list_messages(self, user_id: str) -> list[tables.Message]:
         return [m for m in self.messages if m.user_id == user_id]
 
+    def _closed(self, case_id: str) -> bool:
+        return any(
+            e.type == EventType.CASE_CLOSED and e.case_id == case_id
+            for e in self.events
+        )
+
     async def list_active_cases(self, user_id: str) -> list[tables.Case]:
-        return [c for c in reversed(self.cases) if c.user_id == user_id]
+        return [
+            c
+            for c in reversed(self.cases)
+            if c.user_id == user_id and not self._closed(c.id)
+        ]
+
+    async def case_progress(self, case_id: str) -> CaseStage:
+        case = next(c for c in self.cases if c.id == case_id)
+        verification = self.verifications.get(case_id)
+        return compute_stage(
+            closed=self._closed(case_id),
+            latest_call_state=None,
+            latest_verification=verification.status if verification else None,
+            fast_job=None,
+            deep_job=None,
+            fast_result=(case.fast_result or {}).get("status"),
+        )
+
+    async def latest_verification(self, case_id: str) -> tables.Verification | None:
+        return self.verifications.get(case_id)
+
+    async def get_profile(self, user_id: str) -> tables.Profile | None:
+        return self.profiles.get(user_id)
+
+    async def list_facts(
+        self, user_id: str, statuses: Sequence[FactStatus] | None = None
+    ) -> list[tables.Fact]:
+        return [
+            f
+            for f in self.facts
+            if f.user_id == user_id and (statuses is None or f.status in statuses)
+        ]
 
     def outbound_templates(self) -> list[str | None]:
         return [m.template for m in self.messages if m.direction == "out"]

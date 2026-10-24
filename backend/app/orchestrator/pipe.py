@@ -3,6 +3,11 @@
 Order per message: user row → media saved → inbound logged → routed. Routing order:
 a reply to an ask_user question (the call is waiting), then the language pick, photo
 grouping, a "same letter or new?" answer, or an orchestrator turn.
+
+One number's messages are routed one at a time, under a per-number lock. An
+orchestrator turn (slow: a Claude call) runs after that lock is released, under a
+second per-number lock, so a reply to an open ask_user question never waits behind it
+(whatsapp-pipe.md, concern 8).
 """
 
 import asyncio
@@ -10,22 +15,26 @@ import logging
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from functools import lru_cache, partial
+from typing import Protocol
 
 from anthropic import AsyncAnthropic
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.contracts import MessageDirection, MessageSender
-from app.contracts.common import DocumentId, LanguageCode, MediaId, UserId
-from app.db import reads, tables
+from app.contracts.common import LanguageCode, MediaId, UserId
+from app.db import tables
 from app.db.messages import append_message
 from app.db.writes import orchestrator as writes
+from app.orchestrator.job_watch import get_job_watcher
 from app.orchestrator.language import (
     LanguageStep,
     answer_to_prompt,
     last_language_prompt,
     prompt_for,
 )
+from app.orchestrator.letters import Letters
 from app.orchestrator.photos import PHOTO_QUIET_WINDOW_S, PendingPages, PhotoBatcher
+from app.orchestrator.turn import OrchestratorTurn
 from app.relay.ask_user import AskUser, get_ask_user
 from app.relay.inbound import InboundMedia, InboundMessage
 from app.relay.media import MediaDownloadError
@@ -34,10 +43,22 @@ from app.relay.replies import parse_choice
 from app.relay.whatsapp import WhatsApp, WhatsAppSendError, get_whatsapp
 from app.settings import get_settings
 from app.translation.detect import detect_language
+from app.translation.translate import Translator
 
 logger = logging.getLogger(__name__)
 
 LanguageDetector = Callable[[str], Awaitable[LanguageCode | None]]
+ToEnglish = Callable[[str, LanguageCode], Awaitable[str | None]]
+Turn = Callable[[], Awaitable[None]]
+
+
+class TurnRunner(Protocol):
+    """The orchestrator's reply to free text (`OrchestratorTurn.run`)."""
+
+    async def __call__(
+        self, user: tables.User, *, same_or_new_pending: bool = False
+    ) -> None: ...
+
 
 # Before the user picks a language, an undetectable message is logged as English.
 _FALLBACK_LANGUAGE = "en"
@@ -49,26 +70,48 @@ class InboundPipe:
         whatsapp: WhatsApp,
         detect: LanguageDetector,
         ask_user: AskUser,
+        letters: Letters,
         quiet_window_s: float = PHOTO_QUIET_WINDOW_S,
+        *,
+        to_english: ToEnglish | None = None,
+        turn: TurnRunner | None = None,
     ) -> None:
+        """Without `to_english`, non-English messages are logged with no `body_en`;
+        without `turn`, free text is echoed (no Anthropic key)."""
         self._whatsapp = whatsapp
         self._detect = detect
         self._ask_user = ask_user
+        self.letters = letters
+        self._to_english = to_english
+        self._turn = turn
         self.photos = PhotoBatcher(self._letter_ready, quiet_window_s)
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._turn_locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     async def handle(self, message: InboundMessage) -> None:
-        """Runs as a background task per webhook. One number's messages are handled
-        one at a time, in arrival order, so a burst of photos can't race."""
-        async with self._locks[message.whatsapp_number]:
-            try:
-                await self._handle(message)
-            except WhatsAppSendError as exc:
-                logger.error("Reply to sid=%s failed: %s", message.message_sid, exc)
-            except (SQLAlchemyError, OSError):
-                logger.exception("Handling sid=%s failed", message.message_sid)
+        """Runs as a background task per webhook. One number's messages are routed
+        one at a time, in arrival order, so a burst of photos can't race; an
+        orchestrator turn runs after the routing lock is released."""
+        number = message.whatsapp_number
+        async with self._locks[number]:
+            turn = await self._guarded(message, self._handle(message))
+        if turn is not None:
+            async with self._turn_locks[number]:
+                await self._guarded(message, turn())
 
-    async def _handle(self, message: InboundMessage) -> None:
+    async def _guarded[T](
+        self, message: InboundMessage, work: Awaitable[T]
+    ) -> T | None:
+        try:
+            return await work
+        except WhatsAppSendError as exc:
+            logger.error("Reply to sid=%s failed: %s", message.message_sid, exc)
+        except (SQLAlchemyError, OSError):
+            logger.exception("Handling sid=%s failed", message.message_sid)
+        return None
+
+    async def _handle(self, message: InboundMessage) -> Turn | None:
+        """Route the message; returns the orchestrator turn to run, if any."""
         user = await writes.get_or_create_user(message.whatsapp_number)
         saved, failed = await self._save_media(user.id, message)
 
@@ -86,8 +129,7 @@ class InboundPipe:
             MessageSender.USER,
             message.body,
             language,
-            # Goal 5: translate into English here, before the row is written.
-            body_en=message.body if language == "en" else None,
+            body_en=await self._english(message, language, answers_question=question),
             media_ids=[media_id for media_id, _ in saved],
             question_id=question.id if question else None,
             twilio_sid=message.message_sid,
@@ -97,7 +139,7 @@ class InboundPipe:
         if question is not None and await self._ask_user.handle_reply(
             user, question, message.text
         ):
-            return
+            return None
 
         pages = [media_id for media_id, item in saved if item.is_letter_page]
         if step is not None:
@@ -105,9 +147,25 @@ class InboundPipe:
         elif pages:
             await self._letter_pages(user, pages)
         elif (pending := self.photos.pending(user.id)) is not None:
-            await self._same_or_new_answer(user, message.text, pending)
+            return await self._same_or_new_answer(user, message, pending)
         else:
-            await self._orchestrator_turn(user, message)
+            return partial(self._orchestrator_turn, user, message)
+        return None
+
+    async def _english(
+        self,
+        message: InboundMessage,
+        language: LanguageCode,
+        *,
+        answers_question: tables.Question | None,
+    ) -> str | None:
+        """The English for the log (rule 6). Skipped for a reply to an open ask_user
+        question, which is a number and must not wait on a model call."""
+        if language == "en":
+            return message.body
+        if not message.text or answers_question is not None or self._to_english is None:
+            return None
+        return await self._to_english(message.text, language)
 
     async def _save_media(
         self, user_id: UserId, message: InboundMessage
@@ -175,7 +233,7 @@ class InboundPipe:
             return
         # Research has started on a letter: the gap alone can't say whether this
         # is page 2 or a new letter (C20), so ask.
-        document_id = await _latest_active_letter(user.id)
+        document_id = await self.letters.active_letter(user.id)
         if document_id is not None:
             self.photos.hold_for_answer(user.id, document_id, pages)
             await send_template(self._whatsapp, user, "letter.same_or_new")
@@ -184,12 +242,18 @@ class InboundPipe:
         await send_template(self._whatsapp, user, "letter.received")
 
     async def _same_or_new_answer(
-        self, user: tables.User, text: str, pending: PendingPages
-    ) -> None:
-        choice = parse_choice(text, 2)
+        self, user: tables.User, message: InboundMessage, pending: PendingPages
+    ) -> Turn | None:
+        """A "1" or "2" settles it; other text goes to the orchestrator turn, which
+        answers and reminds the user to pick (or re-asks, without a turn)."""
+        choice = parse_choice(message.text, 2)
         if choice is None:
+            if self._turn is not None and message.text:
+                return partial(
+                    self._orchestrator_turn, user, message, same_or_new_pending=True
+                )
             await send_template(self._whatsapp, user, "letter.same_or_new")
-            return
+            return None
         self.photos.take_pending(user.id)
         if choice == 1:
             await writes.add_pages(pending.document_id, pending.media_ids)
@@ -200,10 +264,11 @@ class InboundPipe:
                 len(pending.media_ids),
             )
             await send_template(self._whatsapp, user, "letter.pages_added")
-            # Goal 4: re-run the fast pass on the updated letter.
+            await self.letters.pages_added(user, pending.document_id)
         else:
             self.photos.add(user.id, pending.media_ids)
             await send_template(self._whatsapp, user, "letter.received")
+        return None
 
     async def _letter_ready(self, user_id: UserId, media_ids: list[MediaId]) -> None:
         document = await writes.create_document(user_id, media_ids)
@@ -213,23 +278,20 @@ class InboundPipe:
             document.id,
             len(media_ids),
         )
-        # Goal 4.2: mint case_id and enqueue research_fast for this document.
+        await self.letters.start(user_id, document.id)
 
     async def _orchestrator_turn(
-        self, user: tables.User, message: InboundMessage
+        self,
+        user: tables.User,
+        message: InboundMessage,
+        *,
+        same_or_new_pending: bool = False,
     ) -> None:
-        """Stub until Goal 4's Claude turn: echo text so the pipe can be tried on a
-        phone."""
-        if message.text:
+        if self._turn is not None:
+            await self._turn(user, same_or_new_pending=same_or_new_pending)
+        elif message.text:
+            # No Anthropic key: echo, so the pipe can still be tried on a phone.
             await send_text(self._whatsapp, user, f"Echo: {message.text}")
-
-
-async def _latest_active_letter(user_id: UserId) -> DocumentId | None:
-    """The newest document of the newest active case, if research has started."""
-    for case in await reads.list_active_cases(user_id):
-        if case.document_ids:
-            return case.document_ids[-1]
-    return None
 
 
 async def _no_detection(text: str) -> None:
@@ -239,10 +301,22 @@ async def _no_detection(text: str) -> None:
 @lru_cache
 def get_pipe() -> InboundPipe:
     settings = get_settings()
-    detect: LanguageDetector = _no_detection
-    if settings.anthropic_api_key:
-        client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-        detect = partial(detect_language, client, settings.model_fast)
-    else:
-        logger.warning("ANTHROPIC_API_KEY not set: first contact always gets the menu")
-    return InboundPipe(get_whatsapp(), detect, get_ask_user())
+    whatsapp = get_whatsapp()
+    letters = Letters(whatsapp, get_job_watcher())
+    if not settings.anthropic_api_key:
+        logger.warning(
+            "ANTHROPIC_API_KEY not set: first contact always gets the menu, nothing "
+            "is translated, and free text is echoed"
+        )
+        return InboundPipe(whatsapp, _no_detection, get_ask_user(), letters)
+    client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+    translator = Translator(client, settings.model_fast)
+    turn = OrchestratorTurn(client, settings.model_default, whatsapp, translator)
+    return InboundPipe(
+        whatsapp,
+        partial(detect_language, client, settings.model_fast),
+        get_ask_user(),
+        letters,
+        to_english=translator.to_english,
+        turn=turn.run,
+    )
