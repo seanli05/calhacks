@@ -166,6 +166,10 @@ class CallReport(Contract):
     transcript_id: TranscriptId
     proposed_facts: list[ProposedFact]
     followup_needed: bool
+    summary_en: str | None = None
+    """Two or three sentences on how the call went, for the orchestrator to send in
+    the user's language. None when the report was built without reading the call
+    (it never reached a person, or the model failed)."""
 
 
 class QuestionSource(Contract):

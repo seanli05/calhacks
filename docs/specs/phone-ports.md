@@ -35,9 +35,9 @@ The call runner talks to the outside world only through the Protocols in `ports.
 
 ## The runner (1e)
 
-`run_call(job_id, job, deps, *, llm, observer, config, report_builder) -> CallReport` runs one call and returns its saved report. It raises only if the call can't be created or the report can't be saved. The Phase 4 worker wraps it: `claim_next`, build `CallDeps` (with `load_blocked_values` → `GuardedTelephony`), `run_call`, then `finish` or `fail`. The runner refuses a `telephony` that isn't a `GuardedTelephony`, so C35 holds by construction and identifier values never reach it.
+`run_call(job_id, job, deps, *, llm, observer, config, report_builder) -> CallReport` runs one call and returns its saved report. It raises only if the call can't be created or the report can't be saved. The worker (`worker.py`) wraps it: `claim_next`, build `CallDeps` (with `load_blocked_values` → `GuardedTelephony`), `run_call` with an `LlmReportBuilder`, then `finish` or `fail` (see The call report and the worker, below). The runner refuses a `telephony` that isn't a `GuardedTelephony`, so C35 holds by construction and identifier values never reach it.
 
-Files: `runner.py` (lifecycle, dispatch, hold, the person, the bridge), `runner_menu.py` (menu and ask_user), `runner_base.py` (shared state, logging, classify, transcript, observer), `runner_parts.py` (config, inbox inputs, timers), `executor.py` (C37), `call_lines.py` (the fixed lines to the rep), `report.py` (stand-in P3 builder), `observe.py` (`StepRecord`).
+Files: `runner.py` (lifecycle, dispatch, hold, the person, the bridge), `runner_menu.py` (menu and ask_user), `runner_base.py` (shared state, logging, classify, transcript, observer), `runner_parts.py` (config, inbox inputs, timers), `executor.py` (C37), `call_lines.py` (the fixed lines to the rep), `report.py` (the P3 builder; below), `observe.py` (`StepRecord`).
 
 **Shape.** One inbox, one handler at a time. A pump task reads `events()` and stamps each event on arrival; the ask_user task and the timers (hold limit, user-answer backstop, menu budget, menu quiet, turn backstop) only post to the inbox. Model calls are awaited inside a handler, and whatever arrives meanwhile waits. Wrap-up is a `finally`: every exit (hang-up, timeout, crash) cancels the background work, hangs up, saves the transcript and the report, and fires `REPORT_SAVED`.
 
@@ -120,6 +120,24 @@ Manual checks on real phones, and their results: [phone-live-checks.md](phone-li
 - Dari (or any language past `en`/`es`) needs a `JOIN_PROMPTS` entry; Twilio may have no Dari voice, so it will likely be a pre-recorded clip played with `<Play>`.
 - Not yet run live: the agency hanging up first after the bridge (spike row 5).
 - No `bridging → hold`: a "person" who transfers after the ring can't be undone (state.py).
+
+## The call report and the worker (Phase 4)
+
+**Report** (`report.py`, prompt in `report_prompts.py`, client in `report_llm.py`). Calls that never reached a person (no answer, hold timeout, hang-up, abort, applicant unreachable) get the deterministic `build_report`, with no model call; it's still the runner's default. A connected call gets `LlmReportBuilder`: one Claude call (`settings.model_default`) over the brief's goal and dates, the call date, and the transcript (repeated hold lines collapsed; a very long call keeps its start and end). The model drafts; code owns the rest:
+
+| Field | Who decides |
+|---|---|
+| `outcome` | The state machine for unconnected calls; the model picks `resolved`, `partial`, or `failed` for connected ones |
+| `reference_number`, `rep_name` | The model, kept only if found in what the agency side said (digits read out one by one, "oh" as zero, count) |
+| `next_steps_en`, `proposed_facts` | The model, at most five each; an item that looks like a receipt number or A-Number, or carries one of the case's identifier values, is dropped (C34, C35) |
+| `new_deadlines` | The model; kept if it parses as a date between the call date and two years after |
+| fact `source`, `sensitivity` | Code: `from_call`, always `sensitive` (an immigration fact, C15, C25) |
+| `followup_needed` | The model's answer, forced true for anything short of `resolved` |
+| `summary_en` | The model (two or three sentences for the orchestrator to translate and send); dropped if it carries an identifier. None on the deterministic report |
+
+Any failure (timeout, API error, bad output, a bug) logs with the call and case IDs and falls back to `build_report`, so a report is always saved. Asylum claim details (C34) are kept out by the prompt only; code can't spot them. Manual eval against real Claude: `python -m app.phone.report_eval` (from `backend/`, costs a little).
+
+**Worker** (`worker.py`). `PhoneWorker` polls `claim_next(JobType.CALL)` about once a second and runs each call in its own task. `handle_call_job` builds `CallDeps` from `PhoneDeps` (the real DB and relay adapters by default; the line from a `LineFactory`), runs the call, then `jobs.finish(job_id, report)` and, if the report proposes facts, enqueues a `MemoryWriteJob` (`from_call`, `source_ref` = the call ID). The runner creates the `calls` row (C7) through `DbCallStore`, so the only table writes are `writes.phone` plus `jobs`. A call that ended badly is still `done`, with that outcome in its report; the job is `failed` (error: the exception's type name only) only when there's no report: a bad payload, or the call couldn't be created or its report saved. A failed `memory_write` enqueue is logged and leaves the job `done`. `main.py` starts it when `PHONE_WORKER=true` (default false) and every live-call setting is set (`missing_settings`: the Anthropic, Twilio and Cartesia keys, the agent number and voice, `PUBLIC_BASE_URL`); otherwise it logs what's missing and starts nothing. `real_deps(settings)` makes a new `TwilioTelephony` per job (`twilio_lines`), with the job's `user_language` for the join gate. Only the deployed backend sets `PHONE_WORKER=true` on the shared database, and never alongside the dev fake phone (`POST /dev/fake-phone`), which claims the same `call` jobs.
 
 ## Open, with person 2 (`relay/ask_user.py`)
 
