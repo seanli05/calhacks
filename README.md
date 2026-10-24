@@ -2,7 +2,7 @@
 
 *Name TBD (shortlist: Kinvoy, Unhold).*
 
-A WhatsApp agent that helps limited-English families deal with government letters. Send a photo of a letter, and the agent:
+A WhatsApp agent that helps immigrant families deal with immigration letters, starting with the USCIS I-797C asylum interview notice. Send a photo of a letter, and the agent:
 
 1. explains it in your language: what it is, the deadline, and what's being asked;
 2. checks that it's legitimate by comparing the letter's phone number with the agency's official one;

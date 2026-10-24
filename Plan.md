@@ -1,6 +1,6 @@
 # Cal Hacks Agent System Spec (v3)
 
-Oct 23, 2026 · @Sean Li · v3 edits by @Chris, for team sign-off
+Oct 23, 2026 · @Sean Li · v3 edits by @Chris, for team sign-off · use-case update (C30–C35) by @Sean Li
 
 > **About this version.** This is Plan.txt (v2) restyled as Markdown, with fixes for contradictions and missing pieces found while planning the schema, plus the team's product decisions. Every change is tagged inline as **[C#]** and justified in [Changes from v2](#changes-from-v2). Untagged text is v2 unchanged apart from formatting. Once everyone signs off, this is the plan we build against.
 >
@@ -8,9 +8,11 @@ Oct 23, 2026 · @Sean Li · v3 edits by @Chris, for team sign-off
 
 ## Overview
 
-We're building a WhatsApp-based agent that helps limited-English families deal with government letters: it explains the letter in their language, checks that it's legitimate, then calls the agency, navigates the phone menu, waits on hold, and rings the user when a human picks up. Name still undecided (shortlist: Kinvoy, Unhold).
+We're building a WhatsApp-based agent that helps immigrant families deal with immigration letters. It explains the notice in their language, says who has to show up, what to bring, and by when, and checks that the notice is really from USCIS. Then it calls the agency, navigates the phone menu, waits on hold, and rings the user when a human picks up. Name still undecided (shortlist: Kinvoy, Unhold). **[C30]**
 
-**Core loop:** letter photo on WhatsApp → explanation in the user's language → legitimacy check → user consents → agent calls the agency and holds → user's phone rings when a human answers → summary on WhatsApp.
+**Core document [C30]:** USCIS Form I-797C, Notice of Action, scheduling an asylum interview (case type I-589, Application for Asylum and for Withholding of Removal). It carries a receipt number, the applicant's A-Number, the interview location, date, and time, and dense rules the family must follow. Missing the interview, or showing up without a qualified interpreter, can get the asylum application dismissed or referred to an immigration judge. Families who can't read English well are the ones most likely to miss those rules.
+
+**Core loop:** notice photo on WhatsApp → explanation and checklist in the user's language → legitimacy check → user consents → agent calls the USCIS Contact Center and holds → user's phone rings when a human answers → summary on WhatsApp.
 
 ### Design principles
 
@@ -19,9 +21,11 @@ We're building a WhatsApp-based agent that helps limited-English families deal w
 - Agents pass IDs and short JSON payloads plus a short handoff note, and pull details from Postgres through tools.
 - English internally; the user's language only at the edges.
 - The agent never impersonates the user and never dials a number that hasn't been verified.
+- Explain, don't advise: the agent explains what the notice says and what it requires. It never gives legal advice on the asylum case and never acts as the interview interpreter. **[C33]**
 
 ### What changed since the first doc
 
+- Target users are immigrant families, and the core document is the USCIS I-797C asylum interview notice. **[C30]**
 - WhatsApp (Twilio sandbox) is the primary channel; the web app is a secondary dashboard for the call timeline and memory.
 - Live translation during the call and the copilot screen are now stretch goals; the user handles the live conversation.
 - Postgres instead of Convex.
@@ -61,21 +65,29 @@ We're building a WhatsApp-based agent that helps limited-English families deal w
 | C27 | Events that concern facts or documents carry their IDs, never their content. The feed looks up the text when it renders and shows "(deleted [date])" once it's gone. | Events are never updated (C2), so an event holding a fact's text would keep showing data the user deleted, on screen in the memory demo. |
 | C28 | Out of the MVP: fallback language, fact expiry (`expires_at`, `expired`, the v2 rule "expire stale facts"), supersede logic (the `supersedes` column stays), and the `glossary_lookup` job (moves with stretch goal #3; the hand-seeded glossary stays). **Needs Sean's OK:** supersede logic and expiry were v2 rules. | Scope rule: none of these is visible in the MVP demo. Supersede matters for stretch goal #5 (memory on a second visit). |
 | C29 | The open questions are answered; see [Decisions](#decisions). The demo letter is always addressed to the user, the user's phone is always their WhatsApp number, the dashboard uses a plain link (no per-user access), and no call audio is stored. | Team decisions. |
+| C30 | Main use case changes to immigrant families. The core document is the USCIS Form I-797C asylum interview notice (I-589), replacing the Medi-Cal renewal letter in the MVP scope, examples, relay templates, glossary seed, and mock line. The mock line copies the USCIS Contact Center menu. | Team decision. The notice has high stakes (a missed interview or a missing interpreter can end the case), a hard date, and rules that are hard to follow in English. That makes the explanation and checklist matter. |
+| C31 | R1 gains `appointment` (interview date, time, and location ref) and `checklist_en` (who must come, interpreter rules, what to bring, related deadlines, each with a citation). `deadline` stays as the earliest date the user must act. | The notice is an appointment, not a form to return, and most of what the family needs to do is in the "who should come" and "what to bring" sections. Without these fields the orchestrator would have to dig them out of `explanation_en`. |
+| C32 | Verification adapts to USCIS notices. The I-797C prints no phone number (only `uscis.gov/contactcenter`), so `letter_phone_matches` can be `null`. Research checks the form number and edition, that every URL is on `uscis.gov`, and the receipt number's format, and looks up the official Contact Center number on `uscis.gov`. Immigration red flags: demands for payment, gift cards or wire transfers, threats of arrest or deportation, non-`.gov` links, "notario" offers. | The v2 check (letter phone vs. official phone) has nothing to compare on this notice. Immigration scams are common and target exactly this audience. |
+| C33 | Explain, don't advise. The agent explains what the notice says and requires but gives no legal advice on the asylum case (eligibility, what to say at the interview, whether to hire someone). When asked, it says so and points to free legal help (stretch #14). The agent never offers to be the interview interpreter. **Needs team OK:** propose adding this to the non-negotiable rules in CLAUDE.md. | Advice on an asylum case is legal practice; a wrong answer can cost someone their case. The notice requires a human interpreter who meets specific rules. |
+| C34 | Immigration data handling. Receipt number, A-Number, interview location, and date of birth are always `<ref:...>` values. Details of the asylum claim (country of nationality, reasons for leaving) are never extracted into facts, briefs, or events, even if the user mentions them. Immigration facts are always held as `pending_consent` (C15). | Asylum applicants can be put at risk if their data leaks. "Store less" from the memory rules becomes concrete. |
+| C35 | The phone agent never types or says the A-Number, receipt number, or date of birth, in the phone menu or to the representative. The mock line's menu doesn't ask for them. If a real menu requires one, the agent takes the path that doesn't need it (e.g., "speak to a representative") or asks the user via ask_user which path to take; the user gives identifiers in their own voice once bridged. **Needs team decision:** whether entering the receipt number in a menu counts as answering a verification question (rule 3). | USCIS menus ask for these numbers, and they function as identity checks. Rule 3 forbids the agent answering for the user; this picks the strict reading until the team decides. |
 
 ## MVP and stretch goals
 
-**MVP scope:** one document type (e.g., a Medi-Cal renewal letter) and one non-English language (e.g., Spanish), end to end.
+**MVP scope:** one document type, the USCIS I-797C asylum interview notice **[C30]**, and one non-English language (Spanish), end to end. The demo notice is a sample with made-up values; never a real person's notice.
+
+**Demo call goal:** confirm the interview appointment is still on, and ask what the family should do if their interpreter can't come. (The notice warns that showing up without a qualified interpreter counts as failing to appear.)
 
 ### MVP
 
-1. User sends a photo of the letter (optionally a voice note) on WhatsApp and picks their language.
-2. Explanation in the user's language with key facts: deadline, case number, what's being asked.
-3. Legitimacy check: letter's phone number vs. the agency's official number, with verdict and evidence.
+1. User sends a photo of the notice (optionally a voice note) on WhatsApp and picks their language.
+2. Explanation in the user's language: what the notice is, interview date, time, and place, and a checklist of who must come (dependents, an interpreter who meets the notice's rules), what to bring, and related deadlines. **[C31]**
+3. Legitimacy check: form, URLs, and receipt number format checked against USCIS, official Contact Center number found on `uscis.gov`, with verdict and evidence. **[C32]**
 4. Case brief: structured JSON plus handoff note.
 5. Explicit consent on WhatsApp before any call.
-6. Agent calls the mock agency line, navigates the menu, waits on hold.
+6. Agent calls the mock USCIS Contact Center line, navigates the menu, waits on hold.
 7. At least one ask_user moment on WhatsApp when the agent is unsure.
-8. Human detection, brief intro to the caseworker, then a regular phone call rings the user.
+8. Human detection, brief intro to the representative, then a regular phone call rings the user.
 9. Post-call summary on WhatsApp: reference number, next steps, deadline.
 10. Basic memory: profile plus extracted facts.
 11. Web dashboard: live call timeline (a feed in the user's language **[C23]**), case view, "What we know about you" page.
@@ -86,17 +98,19 @@ We're building a WhatsApp-based agent that helps limited-English families deal w
 ### Stretch goals (in order of demo value)
 
 1. Voice-note replies: transcribe the user's voice notes; reply with audio in their language.
-2. Live captions of the caseworker, translated.
+2. Live captions of the representative, translated.
 3. Automatic glossary research for new terms, with a visible log line.
-4. A second language, ideally lower-resource, with a before/after translation comparison.
+4. A second language, ideally lower-resource (e.g., Haitian Creole or Dari), with a before/after translation comparison.
 5. Memory in action on a second visit.
-6. Scam letter demo flagged with clear reasons.
-7. Suggested replies on a copilot screen during the call.
-8. Requesting the agency's interpreter in the phone menu.
-9. A second document type.
-10. Live interpreter mode.
-11. Jev for menu and hold decisions.
-12. Browser use to check case status on an agency portal.
+6. Scam letter demo: a fake "USCIS" letter demanding a fee by phone, flagged with clear reasons. **[C32]**
+7. Interview reminders on WhatsApp: the attorney remote-participation deadline (10 days before) and a day-before reminder with the checklist. Needs a pre-approved WhatsApp template, since it falls outside the 24-hour reply window.
+8. Suggested replies on a copilot screen during the call.
+9. Choosing the Contact Center's Spanish-language option in the phone menu.
+10. A second document type (e.g., an I-797C biometrics appointment notice).
+11. Live interpreter mode on agency calls (never at the asylum interview itself **[C33]**).
+12. Jev for menu and hold decisions.
+13. Browser use to check case status on `uscis.gov` with the receipt number, with the user's consent.
+14. Pointing the user to free legal help nearby (DOJ-recognized organizations and accredited representatives). **[C33]**
 
 ## Agents and shared modules
 
@@ -117,17 +131,19 @@ Three agents plus four shared modules. Only the orchestrator converses with the 
 - Groups several photos of one letter into one document, asking by text when unsure. **[C20]**
 - Asks for consent before every call, including retries. **[C21]**
 - Suggests closing a case when a call resolves with no follow-up; closes it when the user agrees. **[C22]**
+- Sends the interview checklist from R1 along with the explanation. **[C31]**
 
 **Tools:** `start_research`, `get_case_status`, `request_consent`, `start_call`, `get_profile`, `list_active_cases`, `close_case` **[C22]**.
 
-**Does not:** parse documents, browse the web, place calls, or write facts directly (the memory writer does that after each reply).
+**Does not:** parse documents, browse the web, place calls, write facts directly (the memory writer does that after each reply), give legal advice on the asylum case, or offer to interpret at the interview. When asked for advice, it explains what the notice says, says it can't advise, and points to legal help. **[C33]**
 
 ### Research agent
 
 **Does:**
 
-- **Fast pass** (fast model with vision, target under 30 s): letter → structured facts with citations → short English explanation → proposed document facts.
-- **Deep pass** (most capable model, runs in the background): legitimacy check via web search/fetch on official domains, official phone lookup, case brief with handoff note, call plan.
+- **Fast pass** (fast model with vision, target under 30 s): notice → structured facts with citations → appointment and checklist **[C31]** → short English explanation → proposed document facts.
+- **Deep pass** (most capable model, runs in the background): legitimacy check via web search/fetch on `uscis.gov` **[C32]**, official Contact Center number lookup, case brief with handoff note, call plan.
+- Never extracts details of the asylum claim (country of nationality, reasons for leaving) into facts, briefs, or events. **[C34]**
 - Queues unknown jargon terms for the glossary worker.
 - Stores the real values behind `<ref:...>` placeholders in `case_refs`. **[C11]**
 
@@ -140,10 +156,10 @@ Three agents plus four shared modules. Only the orchestrator converses with the 
 - Runs the call state machine: dialing → menu → hold → human detected → bring in user → wrap-up.
 - Menu decisions from the case brief, with an explicit "unsure" option that triggers ask_user.
 - Hold vs. human detection: voice activity detection, then a quick Claude check when speech follows music.
-- Briefly introduces itself to the caseworker, then calls the user into a conference.
+- Briefly introduces itself to the representative as an automated assistant calling for the applicant, then calls the user into a conference.
 - Writes every decision to the events table and produces the call report.
 
-**Does not:** message the user free-form (status and questions go through the relay), reason about the user's wider situation beyond the brief, or dial any number other than the verified official one.
+**Does not:** message the user free-form (status and questions go through the relay), reason about the user's wider situation beyond the brief, dial any number other than the verified official one, or type or say the A-Number, receipt number, or date of birth **[C35]**.
 
 ### Shared modules (not agents)
 
@@ -202,18 +218,29 @@ Trigger: user sends a photo or PDF. Relay acknowledges immediately. Each documen
 
 ### R1. Research → Orchestrator (fast result)
 
-Trigger: parsing done. Orchestrator translates and sends the explanation, ending with "I'm checking that this letter is legitimate." Proposed facts go to the memory writer; the deep pass starts automatically.
+Trigger: parsing done. Orchestrator translates and sends the explanation and checklist, ending with "I'm checking that this letter is legitimate." Proposed facts go to the memory writer; the deep pass starts automatically.
 
 If `status` is `needs_better_image`, the other fields are empty and the orchestrator asks for a new photo using `image_issue` as the tip. **[C9]**
 
+`appointment` is `null` for notices with no appointment. `checklist_en` items have a `kind` of `who_must_come`, `bring`, or `deadline`. `deadline` is the earliest date the user must act. **[C31]** Receipt number, A-Number, and interview location are always refs. **[C34]**
+
 ```json
 { "case_id": "case_123", "status": "ok", "image_issue": null,
-  "doc_type": "medi_cal_renewal", "issuer": "Alameda County SSA",
-  "deadline": "2026-11-15", "what_is_asked": "Return renewal form + proof of income",
-  "key_facts": [{ "field": "case_number", "ref": "<ref:case_number>", "citation": "p1" }],
-  "explanation_en": "This is a Medi-Cal renewal notice...",
+  "doc_type": "uscis_i797c_asylum_interview", "issuer": "USCIS",
+  "deadline": "2026-11-18", "what_is_asked": "Attend asylum interview with dependents and a qualified interpreter",
+  "appointment": { "date": "2026-11-18", "time": "08:30",
+                   "location_ref": "<ref:interview_location>", "citation": "p1" },
+  "checklist_en": [
+    { "kind": "who_must_come", "item": "All dependents listed on the I-589", "citation": "p1 §I" },
+    { "kind": "who_must_come", "item": "An interpreter if you are not fluent in English: 18 or older, not your attorney or a witness, not working for your country's government, no pending asylum case of their own", "citation": "p1 §I" },
+    { "kind": "bring", "item": "ID for you and each dependent (name, date of birth, place of birth, nationality)", "citation": "p1 §II" },
+    { "kind": "bring", "item": "Original and one copy of relationship documents (marriage or birth certificates)", "citation": "p1 §II" },
+    { "kind": "deadline", "item": "If your attorney will join remotely, their election form is due 10 days before the interview", "citation": "p1 §I" } ],
+  "key_facts": [{ "field": "receipt_number", "ref": "<ref:receipt_number>", "citation": "p1" },
+                { "field": "a_number", "ref": "<ref:a_number>", "citation": "p1" }],
+  "explanation_en": "This is a notice from USCIS scheduling your asylum interview...",
   "urgency": "high", "verification": "pending",
-  "proposed_facts": [{ "fact": "Enrolled in Medi-Cal", "source": "from_document" }] }
+  "proposed_facts": [{ "fact": "Has an asylum interview scheduled", "source": "from_document" }] }
 ```
 
 ### R2. Research → Orchestrator (deep result)
@@ -222,19 +249,22 @@ Trigger: verification and brief done.
 
 ```json
 { "case_id": "case_123",
-  "verification": { "status": "verified", "official_phone": "+1...",
-                    "letter_phone_matches": true, "evidence": ["https://..."], "red_flags": [] },
+  "verification": { "status": "verified", "official_phone": "+18003755283",
+                    "letter_phone_matches": null,
+                    "evidence": ["https://www.uscis.gov/contactcenter"], "red_flags": [] },
   "call_recommended": true, "brief_id": "brief_77",
-  "call_goal_en": "Confirm renewal received; ask what's missing" }
+  "call_goal_en": "Confirm the interview is still scheduled; ask what to do if the interpreter can't come" }
 ```
 
 Verification `status` is one of `pending`, `verified`, `suspicious`, `unknown`. **[C18]**
+
+`letter_phone_matches` is `null` when the letter prints no phone number, as on the I-797C. Checks for USCIS notices: form number and edition date, every URL on `uscis.gov`, receipt number format. Red flags: demands for payment, gift cards, or wire transfers; threats of arrest or deportation; non-`.gov` links; "notario" offers. The official number is always looked up on `uscis.gov` at run time, never taken from the letter or hard-coded. **[C32]**
 
 - **Verified + call recommended** → orchestrator asks for consent.
 - **Suspicious** → warn the user; never offer a call to the letter's number.
 - **Unknown** → explain and ask the user how to proceed.
 
-The case brief (`brief_77`) stays in Postgres: JSON fields (doc type, issuer, deadline, call goal, expected menu path, questions to ask, must_not_do, glossary terms, `<ref:...>` facts) plus a handoff note, likely caseworker questions with where the answers live, contingencies, and open uncertainties.
+The case brief (`brief_77`) stays in Postgres: JSON fields (doc type, issuer, deadline, appointment, call goal, expected menu path, questions to ask, must_not_do, glossary terms, `<ref:...>` facts) plus a handoff note, likely representative questions with where the answers live, contingencies, and open uncertainties. `must_not_do` always includes: never give the A-Number, receipt number, or date of birth **[C35]**; never discuss the asylum claim **[C34]**.
 
 ### H2. Orchestrator → Phone
 
@@ -254,9 +284,12 @@ Option numbers are 1-based: `choice: 1` is the first option, matching what the u
 
 A reply that arrives after the timeout gets a templated answer saying which option the agent already chose and why, and is logged as `call.ask_user_late_reply`. **[C24]**
 
+If a menu asks for the A-Number, receipt number, or date of birth, the agent never enters it. It takes the path that doesn't need it or asks the user which path to take; the user gives identifiers in their own voice once bridged. **[C35]**
+
 ```json
 { "question_id": "question_3", "call_id": "call_5", "template": "menu_choice",
-  "options_en": ["Renewals", "Report a change"], "default_option": 1, "timeout_s": 45 }
+  "options_en": ["Speak to a representative about an appointment", "Case status"],
+  "default_option": 1, "timeout_s": 45 }
 ```
 
 ### P2. Phone → User via relay (status)
@@ -265,10 +298,10 @@ Only these events message the user; everything else goes to events and the dashb
 
 | Event | Message |
 |---|---|
-| `call.dialing` | "Calling Medi-Cal now." |
+| `call.dialing` | "Calling USCIS now." |
 | `call.on_hold` | "On hold." At most every 10 minutes. |
 | `call.human_detected` | "Someone picked up. I'm calling you now; please answer." |
-| `call.user_unreachable` | Agent tells the caseworker the account holder will call back and ends the call; orchestrator follows up. |
+| `call.user_unreachable` | Agent tells the representative the account holder will call back and ends the call; orchestrator follows up. |
 
 ### P3. Phone → Orchestrator (call report)
 
@@ -278,9 +311,9 @@ Trigger: call ends. Orchestrator sends the summary in the user's language; the m
 { "call_id": "call_5", "case_id": "case_123",
   "outcome": "resolved | partial | failed | user_unreachable",
   "reference_number": "R-55821", "rep_name": "Maria",
-  "next_steps_en": ["Upload pay stubs by Nov 10"],
-  "new_deadlines": ["2026-11-10"], "transcript_id": "transcript_5",
-  "proposed_facts": [{ "fact": "Renewal received Oct 20", "source": "from_call" }],
+  "next_steps_en": ["Interview is still on for Nov 18", "If the interpreter can't come, contact the asylum office before the interview to ask to reschedule"],
+  "new_deadlines": ["2026-11-17"], "transcript_id": "transcript_5",
+  "proposed_facts": [{ "fact": "Asylum interview confirmed for Nov 18", "source": "from_call" }],
   "followup_needed": true }
 ```
 
@@ -290,9 +323,9 @@ Trigger: call ends. Orchestrator sends the summary in the user's language; the m
 { "job": "research_deep", "case_id": "case_123", "user_id": "user_9", "document_ids": ["doc_1"] }
 
 { "job": "memory_write", "user_id": "user_9", "source": "from_call", "source_ref": "call_5",
-  "proposed_facts": [{ "fact": "Renewal received Oct 20", "source": "from_call" }] }
+  "proposed_facts": [{ "fact": "Asylum interview confirmed for Nov 18", "source": "from_call" }] }
 
-{ "job": "glossary_lookup", "term": "redetermination", "language": "es", "case_id": "case_123" }
+{ "job": "glossary_lookup", "term": "withholding of removal", "language": "es", "case_id": "case_123" }
 ```
 
 ### Events [C14]
@@ -303,7 +336,7 @@ Every event uses one envelope:
 { "event_id": "event_88", "created_at": "2026-10-25T10:03:12Z",
   "type": "call.menu_choice", "source": "phone_agent",
   "case_id": "case_123", "call_id": "call_5", "job_id": "job_12",
-  "summary_en": "Pressed 2 (Renewals)", "data": { "digit": "2", "heard": "..." } }
+  "summary_en": "Pressed 2 (Appointments)", "data": { "digit": "2", "heard": "..." } }
 ```
 
 Starter type list (persons 1 and 4 finalize; the four in P2 are the only ones that message the user):
@@ -358,8 +391,8 @@ A case has no stored status; its progress is computed from its verification, job
 - Facts marked inferred are tentative; agents confirm them before acting.
 - New facts supersede old ones rather than piling up (income, address). Post-MVP. **[C28]**
 - Per-agent views: research sees the full profile; the phone agent sees only what the brief needs.
-- Sensitive data: store less (e.g., "pending green card application," not full history), ask before saving sensitive facts, encrypt sensitive fields, expire stale facts (post-MVP **[C28]**), and let the user view and delete everything on the "What we know about you" page.
-- Sensitive categories: immigration, income, health. **[C25]**
+- Sensitive data: store less (e.g., "has an asylum interview scheduled," not the claim or history), ask before saving sensitive facts, encrypt sensitive fields, expire stale facts (post-MVP **[C28]**), and let the user view and delete everything on the "What we know about you" page.
+- Sensitive categories: immigration, income, health. **[C25]** Immigration facts are always held as `pending_consent`. Receipt number, A-Number, interview location, and date of birth live only in `case_refs`. Asylum claim details (country of nationality, reasons for leaving) are never stored as facts, even if the user says them. **[C34]**
 - Asking before saving: the memory writer holds a sensitive fact as `pending_consent`; the orchestrator asks the user on its next turn; the memory writer marks it `active` on yes and deletes it on no. **[C15]**
 - Deleting: the user can delete any fact, letter, or transcript, or everything at once. Deletes erase the data and leave a dated line in the feed. **[C26]**
 
@@ -372,12 +405,15 @@ Decided now so nobody improvises during the build.
 | Fast pass takes over 45 s | Orchestrator says it's taking longer and keeps waiting |
 | Unreadable photo | Research returns `needs_better_image`; orchestrator asks for a new photo with tips |
 | Verification unknown | No automatic call offer; orchestrator explains and asks the user |
-| Letter looks like a scam | Warn the user with reasons; never call the letter's number |
+| Letter looks like a scam | Warn the user with reasons; never call the letter's number. USCIS-specific red flags in R2 **[C32]** |
+| User asks for legal advice on their case | Explain what the notice says, say the agent can't give legal advice, point to legal help **[C33]** |
+| User asks the agent to interpret at the interview | Explain that USCIS requires a human interpreter, repeat the notice's rules for who qualifies **[C33]** |
+| Phone menu asks for A-Number, receipt number, or date of birth | Never enter it; take the path that doesn't need it or ask_user **[C35]** |
 | ask_user times out | Use the default (safest) option and log it |
 | Hold exceeds max | Hang up, report failed, offer to retry later (a retry asks for consent again **[C21]**) |
 | ask_user answered after timeout | Tell the user what the agent already chose and why; show it in the feed **[C24]** |
-| User doesn't answer bridged call in 30 s | `user_unreachable`: tell caseworker the account holder will call back, end call, orchestrator follows up |
-| Caseworker asks for identity verification | The user handles it in their own voice; the agent never answers for them |
+| User doesn't answer bridged call in 30 s | `user_unreachable`: tell the representative the account holder will call back, end call, orchestrator follows up |
+| Representative asks for identity verification (A-Number, receipt number, date of birth) | The user handles it in their own voice; the agent never answers for them |
 
 ## Tech stack and sponsor tracks
 
@@ -401,7 +437,7 @@ Thin harness: official SDKs plus Pipecat for the call. No LangChain, LangGraph, 
 ### Sponsor tracks
 
 - **Strong fits:** Cartesia (speech), Microsoft Built for the Real World / Customer Impact (theme).
-- **Only if the feature is real in the demo:** Apify (bulk glossary crawling), Armadin (scam detection and data protection).
+- **Only if the feature is real in the demo:** Apify (bulk glossary crawling), Armadin (scam detection and data protection; a closer fit now that immigration scams and asylum data handling are core **[C32] [C34]**).
 - Check the Cal Hacks rules for any cap on how many tracks one project can enter.
 
 ## Team split and timeline
@@ -410,7 +446,7 @@ Thin harness: official SDKs plus Pipecat for the call. No LangChain, LangGraph, 
 |---|---|---|
 | 1 | Postgres schema (incl. jobs), DB helpers, dashboard (timeline, case view, memory page, WhatsApp mirror), deployment | FastAPI, SQLModel, Next.js, ngrok |
 | 2 | Orchestrator, WhatsApp webhook (media download), translation module, memory writer, message relay | Anthropic SDK, Twilio WhatsApp |
-| 3 | Research agent (fast + deep pass), glossary seed + worker, mock agency line | Anthropic SDK (vision, citations, web tools), Twilio `<Gather>` |
+| 3 | Research agent (fast + deep pass), glossary seed + worker, mock USCIS Contact Center line | Anthropic SDK (vision, citations, web tools), Twilio `<Gather>` |
 | 4 | Phone agent: call state machine, menu decisions, hold/human detection, ask_user, bridge, call report | Pipecat, Twilio Media Streams, Cartesia, Anthropic SDK |
 
 Person 2 has the most surface area; if it bottlenecks, move the message relay to person 1.
@@ -435,8 +471,10 @@ Person 2 has the most surface area; if it bottlenecks, move the message relay to
 - [ ] Two Twilio numbers: agent and mock agency
 - [ ] Prove DTMF key presses mid-call on the mock line
 - [ ] Anthropic and Cartesia API keys
-- [ ] Pick the demo document and language; find the official translated version of that form
-- [ ] Seed 20–30 glossary terms from it
+- [ ] Make the demo notice: a sample I-797C asylum interview notice with made-up receipt number, A-Number, location, and date (never a real notice)
+- [ ] Map the real USCIS Contact Center phone menu and copy it on the mock line (without receipt number entry **[C35]**)
+- [ ] Find USCIS's official Spanish wording for the notice's terms
+- [ ] Seed 20–30 glossary terms from it (e.g., asylum, withholding of removal, dependent, interpreter, accredited representative, A-Number, receipt number, parole, immigration judge)
 - [ ] Check Cal Hacks track rules and caps
 - [ ] Decide the project name
 
@@ -446,7 +484,11 @@ Product decisions made by the team while planning the schema **[C29]**:
 
 | Topic | Decision |
 |---|---|
+| Target users | Immigrant families **[C30]**. |
+| Core document | USCIS I-797C asylum interview notice (I-589) **[C30]**. |
 | Scope | Build what the demo shows. The letter is always addressed to the user. |
+| Legal advice | None. Explain what the notice says, point to legal help, never interpret at the interview **[C33]**. |
+| Immigration identifiers | Always refs; the agent never gives them on a call **[C34] [C35]**. |
 | Language | The user selects their language. |
 | Which phone we ring | Always the user's WhatsApp number. |
 | Long letters | Several photos form one document **[C20]**. |
