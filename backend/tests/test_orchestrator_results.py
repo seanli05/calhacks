@@ -230,7 +230,8 @@ async def test_dari_explanation_dates_the_interview_in_dari(
 
     [message] = db.messages
     body = message.body_original
-    assert body.startswith(f"[fa] {result.summary_en}")
+    summary = (result.explanation_en or "").split("\n\n")[0]
+    assert body.startswith(f"[fa] {summary}\n\n")
     assert "مصاحبهٔ شما: چهارشنبه ۱۸ نومبر ۲۰۲۶، ساعت ۸:۳۰ صبح" in body
     assert "2026-11-18" not in body and "8:30" not in body
     assert body.endswith(render("letter.checking", "fa"))
