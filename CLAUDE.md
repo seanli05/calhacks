@@ -62,7 +62,7 @@ Every change must keep these true. If one would be broken, stop and raise it wit
 
 ### Configuration and secrets
 - All config (API keys, model IDs, phone numbers, URLs) comes from environment variables through a single settings object. No hard-coded keys, numbers, or model names in the code.
-- Never log or commit secrets, real letters, phone numbers, or personal data. Use placeholder refs for sensitive values in payloads and logs.
+- Never log or commit secrets, real letters, personal phone numbers, or personal data. Use placeholder refs for sensitive values in payloads and logs. Our own demo service numbers (the mock agency line) may go in `.env.example`, never in code.
 - Prompts live in their own files or constants next to the agent that uses them, not inline inside long functions.
 
 ### Async and latency
