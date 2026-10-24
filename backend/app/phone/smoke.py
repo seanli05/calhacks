@@ -212,10 +212,43 @@ def run_file_for(mode: str) -> Path:
     return RUNS_DIR / f"{stamp}-{mode}.jsonl"
 
 
+class Keyboard:
+    """Lines typed at the terminal, read by the event loop rather than a thread, so
+    the script can exit while nobody is typing."""
+
+    def __init__(self) -> None:
+        self._lines: asyncio.Queue[str | None] = asyncio.Queue()
+        self._loop = asyncio.get_running_loop()
+        self._fd = sys.stdin.fileno()
+        self._loop.add_reader(self._fd, self._ready)
+
+    def _ready(self) -> None:
+        text = sys.stdin.readline()
+        if not text:  # EOF
+            self.close()
+            self._lines.put_nowait(None)
+        else:
+            self._lines.put_nowait(text.strip())
+
+    async def line(self, until: asyncio.Task[Any]) -> str | None:
+        """The next line, or None at EOF or once `until` finishes."""
+        getting = asyncio.ensure_future(self._lines.get())
+        await asyncio.wait({getting, until}, return_when=asyncio.FIRST_COMPLETED)
+        if getting.done():
+            return getting.result()
+        getting.cancel()
+        return None
+
+    def close(self) -> None:
+        self._loop.remove_reader(self._fd)
+
+
 # The two modes
 
 
-async def interactive(line: GuardedTelephony, case_id: CaseId, out: Printer) -> None:
+async def interactive(
+    line: GuardedTelephony, case_id: CaseId, keyboard: Keyboard, out: Printer
+) -> None:
     call_id = new_id("call")
     sid = await line.dial_agency(call_id, case_id)
     out.line(f"dialed (call_id={call_id} sid={sid}); type say/keys/hangup")
@@ -228,7 +261,7 @@ async def interactive(line: GuardedTelephony, case_id: CaseId, out: Printer) -> 
     watcher = asyncio.create_task(watch())
     try:
         while not watcher.done():
-            command = await _read_line(watcher)
+            command = await keyboard.line(watcher)
             if command is None or command in ("hangup", "quit"):
                 break
             verb, _, rest = command.partition(" ")
@@ -253,6 +286,7 @@ async def with_runner(
     case_id: CaseId,
     cases: CaseReader,
     brief_id: str,
+    keyboard: Keyboard,
     out: Printer,
 ) -> None:
     clock = SystemClock()
@@ -281,7 +315,7 @@ async def with_runner(
     out.line("runner started; type a number to answer a question, or hangup")
     try:
         while not call.done():
-            command = await _read_line(call)
+            command = await keyboard.line(call)
             if command is None or command in ("hangup", "quit"):
                 call.cancel()
                 break
@@ -316,30 +350,34 @@ async def _show_questions(relay: ConsoleRelay, out: Printer) -> None:
         await asyncio.sleep(0.2)
 
 
-async def _read_line(until: asyncio.Task[object]) -> str | None:
-    """One line from stdin, or None at EOF or once `until` finishes."""
-    reading = asyncio.ensure_future(asyncio.to_thread(sys.stdin.readline))
-    await asyncio.wait({reading, until}, return_when=asyncio.FIRST_COMPLETED)
-    if not reading.done():
-        return None  # the thread finishes on the next Enter; nothing waits for it
-    text = reading.result()
-    return text.strip() if text else None
-
-
 # Setup
 
 
-async def serve(port: int) -> uvicorn.Server:
-    app = FastAPI(title="phone smoke test")
-    app.include_router(router)
-    server = uvicorn.Server(
-        uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
-    )
-    asyncio.create_task(server.serve())
-    async with asyncio.timeout(_SERVER_START_S):
-        while not server.started:
-            await asyncio.sleep(0.05)
-    return server
+class Server:
+    """The phone routes, served in this process."""
+
+    def __init__(self, port: int) -> None:
+        app = FastAPI(title="phone smoke test")
+        app.include_router(router)
+        self._server = uvicorn.Server(
+            uvicorn.Config(
+                app, host="127.0.0.1", port=port, log_level="warning", lifespan="off"
+            )
+        )
+        self._task: asyncio.Task[None] | None = None
+
+    async def start(self) -> None:
+        self._task = asyncio.create_task(self._server.serve())
+        async with asyncio.timeout(_SERVER_START_S):
+            while not self._server.started:
+                if self._task.done():
+                    self._task.result()  # raises why it failed, e.g. port in use
+                await asyncio.sleep(0.05)
+
+    async def stop(self) -> None:
+        self._server.should_exit = True
+        if self._task is not None:
+            await asyncio.wait({self._task}, timeout=_SERVER_START_S)
 
 
 async def demo_case() -> CaseId:
@@ -359,6 +397,7 @@ async def main(args: argparse.Namespace) -> None:
     logging.basicConfig(
         level=logging.INFO, format="%(levelname)s %(name)s: %(message)s"
     )
+    logging.getLogger("twilio").setLevel(logging.WARNING)  # every request, verbatim
     pipecat_logger.remove()
     pipecat_logger.add(sys.stderr, level="WARNING")  # its debug logs carry speech
 
@@ -381,7 +420,8 @@ async def main(args: argparse.Namespace) -> None:
         blocked = await load_blocked_values(case_id)
 
     await numbers.official_dial_number(case_id)  # refuse now, not mid-call
-    server = await serve(args.port)
+    server = Server(args.port)
+    await server.start()
     raw = TwilioTelephony(
         numbers, TwilioCalls(settings), LineUrls.from_settings(settings)
     )
@@ -389,13 +429,16 @@ async def main(args: argparse.Namespace) -> None:
     mode = ("runner" if args.runner else "manual") + ("-own" if args.own_number else "")
     out = Printer(None if args.no_save else run_file_for(mode))
     out.save("run", mode=mode, case_id=case_id, started_at=datetime.now(UTC))
+    keyboard = Keyboard()
     try:
         if args.runner:
-            await with_runner(line, case_id, cases, brief_id, out)
+            await with_runner(line, case_id, cases, brief_id, keyboard, out)
         else:
-            await interactive(line, case_id, out)
+            await interactive(line, case_id, keyboard, out)
     finally:
-        server.should_exit = True
+        keyboard.close()
+        await line.hang_up()
+        await server.stop()
         out.close()
 
 
