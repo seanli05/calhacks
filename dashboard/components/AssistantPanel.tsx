@@ -73,7 +73,7 @@ export function AssistantPanel({ userId, className = "" }: { userId: string; cla
           ) : (
             <div key={m.id} className={`${styles.msg} ${m.direction === "in" ? styles.in : styles.out}`}>
               {m.body}
-              {m.body_en && m.language !== "en" && <small>{m.body_en}</small>}
+              {m.body_en && m.language !== "en" && m.body_en !== m.body && <small>{m.body_en}</small>}
             </div>
           ),
         )}

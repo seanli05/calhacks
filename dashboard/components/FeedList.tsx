@@ -6,6 +6,7 @@ import { useNow } from "@/lib/api/hooks";
 import type { FeedItem } from "@/lib/api/types";
 import { relativeTime, shortDate } from "@/lib/format";
 import { useLang, useStrings } from "@/lib/i18n";
+import { englishBelow } from "@/lib/localized";
 
 import { Icon, iconForEvent } from "./Icon";
 import styles from "./FeedList.module.css";
@@ -39,7 +40,7 @@ export function FeedList({ items, className = "" }: { items: FeedItem[]; classNa
               {item.deleted_at && (
                 <span className={styles.deleted}> {t.deleted(shortDate(item.deleted_at, lang))}</span>
               )}
-              {lang !== "en" && <small>{item.text.en}</small>}
+              {englishBelow(item.text, lang) && <small>{item.text.en}</small>}
             </span>
             <span className={styles.when}>{relativeTime(item.at, lang, now)}</span>
           </li>

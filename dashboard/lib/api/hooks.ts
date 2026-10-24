@@ -10,6 +10,25 @@ import { api, DATA_MODE } from "./client";
 import { subscribe } from "./fixtures";
 import type { FeedItem } from "./types";
 
+/**
+ * Runs `task` now, then again `intervalMs` after each run settles. Never overlaps,
+ * so a slow API gets one request at a time instead of a growing pile. Returns stop.
+ */
+function repeat(task: () => Promise<unknown>, intervalMs: number): () => void {
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const loop = () => {
+    task().finally(() => {
+      if (!stopped) timer = setTimeout(loop, intervalMs);
+    });
+  };
+  loop();
+  return () => {
+    stopped = true;
+    clearTimeout(timer);
+  };
+}
+
 export interface Polled<T> {
   data: T | null;
   error: Error | null;
@@ -46,12 +65,11 @@ export function usePoll<T>(load: () => Promise<T>, key: string, intervalMs = 100
           if (alive) setError(err instanceof Error ? err : new Error(String(err)));
         },
       );
-    run();
-    const timer = setInterval(run, intervalMs);
+    const stop = repeat(run, intervalMs);
     const unsubscribe = DATA_MODE === "fixtures" ? subscribe(run) : () => {};
     return () => {
       alive = false;
-      clearInterval(timer);
+      stop();
       unsubscribe();
     };
   }, [key, intervalMs, tick]);
@@ -94,11 +112,10 @@ export function useFeed(userId: string): { items: FeedItem[]; error: Error | nul
           if (alive) setError(err instanceof Error ? err : new Error(String(err)));
         },
       );
-    run();
-    const timer = setInterval(run, 1000);
+    const stop = repeat(run, 1000);
     return () => {
       alive = false;
-      clearInterval(timer);
+      stop();
     };
   }, [userId, lang, epoch]);
 

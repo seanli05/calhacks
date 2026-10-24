@@ -11,6 +11,7 @@ import { useFeed, useNow, usePoll } from "@/lib/api/hooks";
 import type { Memory } from "@/lib/api/types";
 import { relativeTime, shortDate } from "@/lib/format";
 import { useLang, useStrings } from "@/lib/i18n";
+import { englishBelow } from "@/lib/localized";
 
 import { DeleteEverything } from "./DeleteEverything";
 import { FADE_MS, MemoryRow } from "./MemoryRow";
@@ -129,7 +130,7 @@ export function MemoryView({ userId }: { userId: string }) {
                       () => api.deleteFact(f.id),
                       <div className={styles.item}>
                         <span className={styles.text}>“{f.fact.text}”</span>
-                        {lang !== "en" && <small className={styles.en}>{f.fact.en}</small>}
+                        {englishBelow(f.fact, lang) && <small className={styles.en}>{f.fact.en}</small>}
                         <span className={styles.meta}>
                           {f.sensitivity === "sensitive" && <span className="pill warn">{t.sensitive}</span>}
                           {f.status === "pending_consent" && <span className="pill warn">{t.pendingConsent}</span>}

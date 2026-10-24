@@ -7,6 +7,7 @@ import { duration } from "@/lib/format";
 import { stringsFor, useLang } from "@/lib/i18n";
 import type { CaseStrings } from "@/lib/i18n/strings/en/case";
 import { isHumanMoment, isLive, isWarning } from "@/lib/stage";
+import { englishBelow } from "@/lib/localized";
 
 import styles from "./CallHero.module.css";
 
@@ -93,7 +94,7 @@ export function CallHero({ detail, onOpenTranscript }: { detail: CaseDetail; onO
               <span className={styles.bullet}>?</span>
               <span>
                 {q.text}
-                {lang !== "en" && <small>{q.en}</small>}
+                {englishBelow(q, lang) && <small>{q.en}</small>}
               </span>
             </li>
           ))}
@@ -108,7 +109,7 @@ export function CallHero({ detail, onOpenTranscript }: { detail: CaseDetail; onO
                 <span className={styles.bullet}>✓</span>
                 <span>
                   {step.text}
-                  {lang !== "en" && <small>{step.en}</small>}
+                  {englishBelow(step, lang) && <small>{step.en}</small>}
                 </span>
               </li>
             ))}
