@@ -6,7 +6,7 @@ Guidance for anyone (human or Claude) writing code in this repo.
 
 A Cal Hacks project: a WhatsApp agent that helps limited-English families with government letters. It explains the letter in the user's language, checks that it's legitimate, calls the agency, waits on hold, and rings the user when a human picks up.
 
-Three agents (orchestrator, research, phone) plus shared modules (translation, memory writer, message relay, glossary worker), coordinated through Postgres. The full spec (data model, handoff payloads, failure rules) lives in the team spec doc. Treat it as the source of truth and don't restate it here.
+Three agents (orchestrator, research, phone) plus shared modules (translation, memory writer, message relay, glossary worker), coordinated through Postgres. The full spec (data model, handoff payloads, failure rules) lives in [Plan.md](Plan.md). Treat it as the source of truth and don't restate it here.
 
 Four people build this in parallel over one weekend. Everything below exists so we can do that without stepping on each other.
 
