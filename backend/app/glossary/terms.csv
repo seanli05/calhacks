@@ -149,3 +149,78 @@ dismissal,fa,لغو درخواست (dismissal),machine,,,"USCIS closes the appli
 security check,fa,بررسی امنیتی,official,https://www.uscis.gov/humanitarian/information-for-afghan-nationals-dari,"USCIS Information for Afghan Nationals (Dari page): ""conduct additional background and security checks""",Source has the plural 'بررسی های امنیتی'. Same in Farsi
 check-in,fa,ثبت حضور,machine,,,Arriving and checking in at the asylum office. farsi: پذیرش
 disability accommodation,fa,تسهیلات برای افراد دارای معلولیت,machine,,,"The one case where USCIS provides the interpreter (deaf or hard of hearing). Same in Farsi"
+asylum,ne,शरण,machine,,,
+affirmative asylum,ne,अफर्मेटिभ शरण (affirmative asylum),machine,,,"Means applying to USCIS directly, not in court. A literal 'सकारात्मक' would read as 'positive', so the English is kept"
+asylum interview,ne,शरण अन्तर्वार्ता,machine,,,Seed term
+asylum office,ne,शरण कार्यालय,machine,,,
+asylum officer,ne,शरण अधिकृत,machine,,,
+asylum application,ne,शरण आवेदन,machine,,,
+application for asylum and for withholding of removal,ne,शरण तथा निष्कासन रोक्काका लागि आवेदन,machine,,,Form I-589 title
+withholding of removal,ne,निष्कासन रोक्का,machine,,,A protection that stops the US from sending someone back to a country where they would be harmed
+convention against torture,ne,यातनाविरुद्धको महासन्धि,machine,,,Short form of the UN convention's Nepali name
+grant of asylum,ne,शरण प्रदान,machine,,,
+applicant,ne,आवेदक,machine,,,
+principal applicant,ne,मुख्य आवेदक,machine,,,
+dependent,ne,आश्रित,machine,,,Seed term. A family member included on the asylum application
+derivative,ne,आश्रित सदस्य (derivative),machine,,,USCIS's word for a spouse or child included on the application who gets status through the main applicant
+spouse,ne,पति/पत्नी,machine,,,'जीवनसाथी' also possible
+unmarried child,ne,अविवाहित सन्तान,machine,,,Under 21 in this context
+family member,ne,परिवारको सदस्य,machine,,,
+interpreter,ne,दोभाषे,machine,,,"Seed term. The NYC MOIA Nepali flyer writes 'दोभासे सेवा' for 'interpretation is available'; both spellings are used"
+qualified interpreter,ne,योग्य दोभाषे,machine,,,"Someone who meets USCIS's rules: fluent in English and the applicant's language, 18 or older, not the lawyer, a witness, or a home-government employee"
+contract interpreter,ne,करार दोभाषे,machine,,,USCIS's own phone interpreter who only checks the family's interpreter; not the family's interpreter
+interview notice,ne,अन्तर्वार्ता सूचना,machine,,,
+appointment notice,ne,भेटघाट सूचना,machine,,,Nepali speakers in the US often say 'अपोइन्टमेन्ट'
+notice of action,ne,कारबाही सूचना (Notice of Action),machine,,,Form I-797C title; English kept so the family can match the printed letter
+receipt notice,ne,प्राप्ति सूचना,machine,,,The earlier notice USCIS sends after an application is filed
+receipt number,ne,रसिद नम्बर,machine,,,
+a-number,ne,A-नम्बर (A-number),official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 1: ""you will need your A-number""",Word extracted clean
+case status,ne,केसको स्थिति,machine,,,'मुद्दा' would suggest a lawsuit; 'केस' is how Nepali speakers in the US refer to an immigration application
+failure to appear,ne,उपस्थित नहुनु,machine,,,Not attending the interview
+exceptional circumstances,ne,असाधारण परिस्थिति,machine,,,USCIS's standard for rescheduling a missed interview
+reschedule,ne,समय पुनः निर्धारण गर्नु,machine,,,
+reschedule request,ne,समय पुनर्निर्धारण अनुरोध,machine,,,
+biometrics,ne,बायोमेट्रिक विवरण,machine,,,"Fingerprints, photo and signature"
+biometric services appointment,ne,बायोमेट्रिक सेवा भेटघाट,machine,,,
+application support center,ne,आवेदन सहायता केन्द्र (ASC),machine,,,Where biometrics are taken
+fingerprints,ne,औँलाको छाप,machine,,,'औँठाछाप' means thumbprint only
+identity document,ne,परिचयपत्र,machine,,,Any document that proves identity
+passport,ne,राहदानी,machine,,,Colloquially 'पासपोर्ट'
+travel document,ne,यात्रा कागजात,machine,,,
+arrival-departure record,ne,आगमन-प्रस्थान अभिलेख,machine,,,Form I-94
+original document,ne,सक्कल कागजात,machine,,,
+birth certificate,ne,जन्मदर्ता प्रमाणपत्र,machine,,,
+marriage certificate,ne,विवाह दर्ता प्रमाणपत्र,machine,,,
+certified translation,ne,प्रमाणित अनुवाद,machine,,,A translation the translator certifies as complete and correct
+evidence,ne,प्रमाण,machine,,,
+oath,ne,शपथ,machine,,,
+witness,ne,साक्षी,machine,,,
+confidential,ne,गोप्य,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 2: ""free and confidential immigration legal help""",Word extracted clean
+attorney,ne,कानुन व्यवसायी,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 1: ""The government will not provide you with an attorney""",'वकिल' is also common
+accredited representative,ne,मान्यताप्राप्त प्रतिनिधि,machine,,,Works for a Department of Justice-recognized organization; may give legal help
+free legal help,ne,निःशुल्क कानुनी सहायता,machine,,,"Extraction uncertain: the NYC MOIA Nepali flyer (p. 2) has 'free and confidential immigration legal help' as 'निःःशुल्क र गोप्य अध्यागमन कानुनी सहायता', with a doubled visarga"
+legal advice,ne,कानुनी सल्लाह,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 1: ""It is not legal advice""",Words extracted clean
+notario,ne,नोटारियो (notario),machine,,,A notary (notario) is not a lawyer and may not give legal help in the US; a common scam
+fraud,ne,जालसाजी,machine,,,
+scam,ne,ठगी,machine,,,
+contact center,ne,सम्पर्क केन्द्र,machine,,,USCIS Contact Center
+field office,ne,क्षेत्रीय कार्यालय,machine,,,
+immigration court,ne,अध्यागमन अदालत,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 1: title ""Immigration Court 101""",Words extracted clean
+immigration judge,ne,अध्यागमन न्यायाधीश,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 1: ""There will be an Immigration Judge""",Words extracted clean
+hearing,ne,सुनुवाइ,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 1: ""Check information for your hearing""",Word extracted clean
+referral to immigration court,ne,अध्यागमन अदालतमा प्रेषण,machine,,,USCIS sends the case to an immigration judge instead of deciding it
+removal proceedings,ne,निष्कासन कारबाही,machine,,,A case in immigration court that can end in removal from the US
+deportation,ne,देश निकाला,official,https://www.nyc.gov/assets/immigrants/downloads/pdf/Immigration-Court-101-2026-Nepali.pdf,"NYC MOIA Immigration Court 101 (Nepali, 2026), p. 1: ""You could be deported""",Words extracted clean
+employment authorization document,ne,रोजगारी अनुमति कागजात (EAD),machine,,,
+work permit,ne,कार्य अनुमतिपत्र,machine,,,"Avoid 'श्रम स्वीकृति', which in Nepal means a permit to work abroad"
+parole,ne,प्यारोल (अस्थायी प्रवेश अनुमति),machine,,,"Immigration parole: permission to be in the US for a time. In Nepali 'प्यारोल' can also mean release from prison; the parenthesis makes the meaning clear"
+deadline,ne,अन्तिम म्याद,machine,,,
+mailing address,ne,हुलाक ठेगाना,machine,,,
+change of address,ne,ठेगाना परिवर्तन,machine,,,
+decision,ne,निर्णय,machine,,,
+approval,ne,स्वीकृति,machine,,,"The NYC MOIA Nepali flyer uses 'स्वीकृत' for 'approved' (adjective)"
+denial,ne,अस्वीकृति,machine,,,"The NYC MOIA Nepali flyer uses 'अस्वीकृत' for 'denied' (adjective)"
+dismissal,ne,खारेजी,machine,,,"USCIS closes the application without deciding it, e.g. after a missed interview; different from a denial"
+security check,ne,सुरक्षा जाँच,machine,,,
+check-in,ne,उपस्थिति दर्ता,machine,,,Arriving and checking in at the asylum office
+disability accommodation,ne,अपाङ्गताका लागि उचित व्यवस्था,machine,,,The one case where USCIS provides the interpreter (deaf or hard of hearing)
