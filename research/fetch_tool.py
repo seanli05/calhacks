@@ -8,12 +8,14 @@ tests and the demo fallback offline.
 
 import asyncio
 import hashlib
+import io
 import ipaddress
 import json
 import re
 import socket
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from html import escape
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 
@@ -21,8 +23,10 @@ import httpx
 import tldextract
 from bs4 import BeautifulSoup
 from pydantic import BaseModel
+from pypdf import PdfReader
+from pypdf.errors import PyPdfError
 
-from research.hints import BLOCKED_DOMAINS, ID_SHAPED_PATTERNS
+from research.hints import BLOCKED_DOMAINS, ID_SHAPED_PATTERNS, REGISTRY_DOCUMENTS
 
 TIMEOUT_S = 10.0
 MAX_BYTES = 2 * 1024 * 1024
@@ -120,6 +124,36 @@ def extract_links(html: str, base_url: str) -> list[str]:
     return links
 
 
+def registry_document_type(url: str, content_type: str) -> str | None:
+    """The configured non-HTML type `url` may return (REGISTRY_DOCUMENTS), if it does."""
+    for prefix, allowed in REGISTRY_DOCUMENTS:
+        if url.startswith(prefix) and content_type.startswith(allowed):
+            return allowed
+    return None
+
+
+def _pdf_as_html(body: bytes) -> str:
+    """A registry PDF's text in a <pre>, laid out as printed so each label stays
+    on the line of its value (Phone: vs Fax:)."""
+    try:
+        reader = PdfReader(io.BytesIO(body))
+        text = "\n".join(
+            page.extract_text(extraction_mode="layout") or "" for page in reader.pages
+        )
+    except PyPdfError as exc:
+        raise FetchRefused(f"could not read the PDF: {exc}") from exc
+    return f"<html><body><pre>{escape(text)}</pre></body></html>"
+
+
+def _json_as_html(body: bytes) -> str:
+    """A registry API's JSON, pretty-printed in a <pre> and otherwise unchanged."""
+    try:
+        data = json.loads(body)
+    except ValueError as exc:
+        raise FetchRefused(f"could not read the JSON: {exc}") from exc
+    return f"<html><body><pre>{escape(json.dumps(data, indent=1))}</pre></body></html>"
+
+
 async def fetch_page(
     url: str, *, http: httpx.AsyncClient, resolve: Resolver = system_resolver
 ) -> FetchedPage:
@@ -148,7 +182,10 @@ async def fetch_page(
                     current = urljoin(current, location)
                     continue
                 content_type = response.headers.get("content-type", "").lower()
-                if not content_type.startswith(ALLOWED_CONTENT_TYPES):
+                document = registry_document_type(current, content_type)
+                if document is None and not content_type.startswith(
+                    ALLOWED_CONTENT_TYPES
+                ):
                     raise FetchRefused(
                         f"content type {content_type!r} is not HTML or text"
                     )
@@ -158,7 +195,12 @@ async def fetch_page(
                     if len(body) >= MAX_BYTES:
                         del body[MAX_BYTES:]
                         break
-                html = body.decode(response.encoding or "utf-8", errors="replace")
+                if document == "application/pdf":
+                    html = await asyncio.to_thread(_pdf_as_html, bytes(body))
+                elif document == "application/json":
+                    html = _json_as_html(bytes(body))
+                else:
+                    html = body.decode(response.encoding or "utf-8", errors="replace")
                 recorded = response.headers.get(RECORDED_AT_HEADER)
                 return FetchedPage(
                     url=url,

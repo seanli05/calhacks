@@ -1,0 +1,49 @@
+{
+ "doc_type": "eviction_court_summons",
+ "call_purpose": "Ask the clerk how to file an answer to the eviction summons",
+ "fetched_urls": [
+  "https://www.alameda.courts.ca.gov/divisions/civil",
+  "https://www.alameda.courts.ca.gov/self-help/self-help-center",
+  "https://www.alameda.courts.ca.gov/general-information/phone-fax-numbers",
+  "https://www.alameda.courts.ca.gov/location/oakland-rene-c-davidson-courthouse"
+ ],
+ "submission": {
+  "issuer_official_domain": "alameda.courts.ca.gov",
+  "official_phone": "510-267-6911",
+  "phone_source_url": "https://www.alameda.courts.ca.gov/general-information/phone-fax-numbers",
+  "phone_label": "Clerk's Office (Unlawful Detainers, Small Claims, Civil Restraining Orders)",
+  "phone_purpose": "Clerk's office for unlawful detainer (eviction) cases, including filing questions",
+  "alternative_contacts": [
+   {
+    "name": "Self-Help Center Office",
+    "purpose": "Free help for people without a lawyer, including preparing an answer to an eviction (unlawful detainer) summons",
+    "phone": "510-272-1393",
+    "source_url": "https://www.alameda.courts.ca.gov/general-information/phone-fax-numbers"
+   },
+   {
+    "name": "Main Court Directory",
+    "purpose": "General court switchboard; also listed for René C. Davidson Courthouse, 1225 Fallon Street",
+    "phone": "510-891-6000",
+    "source_url": "https://www.alameda.courts.ca.gov/general-information/phone-fax-numbers"
+   }
+  ],
+  "evidence": [
+   {
+    "signal": "issuer",
+    "url": "https://www.alameda.courts.ca.gov/divisions/civil",
+    "note": "Official site of the Superior Court of California, County of Alameda; Civil page says unlawful detainer cases are assigned to Dept. 511 at Hayward Hall of Justice"
+   },
+   {
+    "signal": "return_address",
+    "url": "https://www.alameda.courts.ca.gov/location/oakland-rene-c-davidson-courthouse",
+    "note": "René C. Davidson Courthouse, 1225 Fallon Street Oakland, CA 94612 (handles civil filings), phone 510-891-6000"
+   },
+   {
+    "signal": "url_domains",
+    "url": "https://www.alameda.courts.ca.gov/general-information/phone-fax-numbers",
+    "note": "The letter's printed URL www.alameda.courts.ca.gov is the court's own site"
+   }
+  ],
+  "notes": "The court's Self-Help Center page (/self-help/self-help-center) returned a 403. The Phone & Fax Numbers page lists 510-267-6911 for 'Clerk's Office (Unlawful Detainers, Small Claims, Civil Restraining Orders)'. It appears under the Family Division heading, which looks like a page layout quirk, and it is the same number listed for the Civil Division clerk. The Self-Help Center number 510-272-1393 is on the same page. The site also had a banner saying the eCourt public portal is temporarily unavailable. I did not fetch any official page about form SUM-130."
+ }
+}

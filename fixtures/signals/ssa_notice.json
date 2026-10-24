@@ -1,0 +1,18 @@
+{
+  "doc_type": "ssa_benefits_notice",
+  "call_purpose": "Ask when the next benefit payment will arrive",
+  "signals": {
+    "letterhead": "Social Security Administration",
+    "urls": [
+      "www.ssa.gov"
+    ],
+    "form_ids": [],
+    "phones": [
+      {
+        "number": "+18005550100",
+        "label": "Social Security",
+        "quote": "call us toll-free at 1-800-555-0100"
+      }
+    ]
+  }
+}

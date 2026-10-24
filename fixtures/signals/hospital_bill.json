@@ -1,0 +1,19 @@
+{
+  "doc_type": "hospital_bill_statement",
+  "call_purpose": "Ask for an itemized bill and about financial assistance",
+  "signals": {
+    "letterhead": "Example Medical Center",
+    "return_address": "100 Main Street, Springfield, ST 00000",
+    "urls": [
+      "www.examplemedical.org/pay"
+    ],
+    "form_ids": [],
+    "phones": [
+      {
+        "number": "+12025550151",
+        "label": "Patient billing",
+        "quote": "Billing questions: (202) 555-0151"
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "doc_type": "housing_authority_recertification",
+  "call_purpose": "Ask to reschedule the annual recertification appointment",
+  "signals": {
+    "letterhead": "Example Housing Authority",
+    "return_address": "100 Main Street, Springfield, ST 00000",
+    "urls": [
+      "www.examplehousing.org"
+    ],
+    "form_ids": [],
+    "phones": [
+      {
+        "number": "+12025550161",
+        "label": "Main office",
+        "quote": "Call (202) 555-0161"
+      }
+    ]
+  }
+}

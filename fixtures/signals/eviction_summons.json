@@ -1,0 +1,16 @@
+{
+  "doc_type": "eviction_court_summons",
+  "call_purpose": "Ask the clerk how to file an answer to the eviction summons",
+  "signals": {
+    "letterhead": "Superior Court of California, County of Example",
+    "county": "Example",
+    "return_address": "100 Main Street, Springfield, ST 00000",
+    "urls": [
+      "www.example.courts.ca.gov"
+    ],
+    "form_ids": [
+      "SUM-130 [Rev. January 1, 2024]"
+    ],
+    "phones": []
+  }
+}

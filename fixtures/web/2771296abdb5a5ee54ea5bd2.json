@@ -1,0 +1,10 @@
+{
+ "url": "https://socialservices.alamedacountyca.gov/sites/acssa/contact-us/;jsessionid=1E40D24F804ADBE4340B24E8A7598D12",
+ "fetched_at": "2026-10-24T09:13:42.746031+00:00",
+ "status_code": 301,
+ "headers": {
+  "content-type": "text/html; charset=iso-8859-1",
+  "location": "http://socialservices.alamedacountyca.gov/contact-us/;jsessionid=1E40D24F804ADBE4340B24E8A7598D12"
+ },
+ "body": "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">\n<html><head>\n<title>301 Moved Permanently</title>\n</head><body>\n<h1>Moved Permanently</h1>\n<p>The document has moved <a href=\"http://socialservices.alamedacountyca.gov/contact-us/;jsessionid=1E40D24F804ADBE4340B24E8A7598D12\">here</a>.</p>\n</body></html>\n"
+}

@@ -55,8 +55,24 @@ If an agency site blocks our fetch (uscis.gov returns 403), save its contact pag
 ```bash
 python -m research.cli seed fixtures/web/seed/uscis_contactcenter.html \
   --url https://www.uscis.gov/contactcenter --phone +18003755283 --captured 2026-10-23
-# other issuers: add --purpose (case_questions, renewal, housing_case, general)
+# other issuers: add --purpose (case_questions, renewal, housing_case, medicare_questions,
+# benefits_questions, eviction_case, billing, general)
 ```
+
+Run the deep pass alone on a signals file. `--record` saves every fetched page and the model's claims to `fixtures/web/`; `--replay` re-checks them offline with no network or model:
+
+```bash
+python -m research.cli deep --signals fixtures/signals/uscis_interview.json --replay
+python -m research.cli deep --signals fixtures/signals/housing_authority_oakland.json --record
+```
+
+Letter types and who vouches for the official number (config in `research/hints.py`, checks in `research/deep_verify.py`):
+
+| Trust model | Letter types | Number accepted when |
+|---|---|---|
+| `gov_issuer` | USCIS, immigration court, Medicare, SSA, county benefits (anchored on the CDSS county-office list), eviction court | Found on a fetched page of the issuer's own .gov site, or its official directory/list entry when allowed |
+| `registry_linked` | Housing authority (HUD PHA list PDF), hospital/clinic (CMS NPI Registry API) | Found in the org's own entry in the registry, or on a site that entry links to |
+| `unverifiable_private` | Property manager | Never; only .gov alternatives (court self-help, tenant office) keep a number |
 
 The dev page takes a photo or PDF upload and shows the explanation, checklist, verdict, official phone with its trust chain, and the event log. Tick "fake passes" to run without an API key, or "skip deep" for extraction only. For redacted test copies, "simulate redacted fields" assumes a blacked-out case number has the issuer's expected shape; the verdict is then labeled SIMULATED (dev page only, never the real flow). Nothing is saved.
 
