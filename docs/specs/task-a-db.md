@@ -80,4 +80,5 @@ Once tasks A and B are both merged, write `docs/specs/task-c-dashboard.md`, a se
 - The dashboard from Plan.md: live feed in the user's language (C23), case view (letter facts, verdict, brief), "What we know about you" page (view + delete, C26), WhatsApp mirror. Legible at 1080p screen-recording size.
 - The API it needs (FastAPI routes in `backend/app/api/` over the read and delete helpers), Next.js in `dashboard/`, polling about once a second.
 - Then deployment: ngrok for the Twilio webhooks.
+- **A design gate as its first step:** before writing any dashboard code, the agent discusses design and visuals with Chris (layout, look, what each screen shows on video) and records the agreed design in the doc. Building starts only after Chris approves it.
 Merge it to `main` and tell Chris it's ready.
