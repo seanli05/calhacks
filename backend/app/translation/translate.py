@@ -2,8 +2,9 @@
 into English on the way in, the orchestrator's English replies into the user's
 language on the way out.
 
-A second language is a `REGISTERS` entry, not code. Glossary grounding (5.3) and the
-dates-survive check (5.4) come later.
+A second language is a `REGISTERS` entry, not code. Each prompt carries the glossary
+terms the text uses (`translation/glossary.py`, 5.3). The dates-survive check (5.4)
+comes later.
 """
 
 import logging
@@ -15,6 +16,7 @@ from pydantic import BaseModel
 
 from app.contracts.common import LanguageCode
 from app.settings import get_settings
+from app.translation.glossary import Glossary
 from app.translation.prompts import (
     FROM_ENGLISH_SYSTEM,
     LABELS_FROM_ENGLISH_SYSTEM,
@@ -50,16 +52,20 @@ class Translator:
         client: AsyncAnthropic,
         model: str,
         timeout_s: float = TRANSLATE_TIMEOUT_S,
+        glossary: Glossary | None = None,
     ) -> None:
+        """Without `glossary`, prompts carry no glossary terms."""
         self._client = client
         self._model = model
         self._timeout_s = timeout_s
+        self._glossary = glossary
 
     async def to_english(self, text: str, language: LanguageCode) -> str | None:
         """`text` in English, or None if the call fails. English is returned as is."""
         if language == "en":
             return text
         system = TO_ENGLISH_SYSTEM.format(language=_name(language))
+        system += await self._glossary_section(text, language, source_is_english=False)
         return await self._translate(text, system, language)
 
     async def from_english(self, text_en: str, language: LanguageCode) -> str | None:
@@ -69,6 +75,9 @@ class Translator:
         system = FROM_ENGLISH_SYSTEM.format(
             language=_name(language),
             register=REGISTERS.get(language, _DEFAULT_REGISTER),
+        )
+        system += await self._glossary_section(
+            text_en, language, source_is_english=True
         )
         return await self._translate(text_en, system, language)
 
@@ -82,6 +91,9 @@ class Translator:
         system = LABELS_FROM_ENGLISH_SYSTEM.format(
             language=_name(language),
             register=REGISTERS.get(language, _DEFAULT_REGISTER),
+        )
+        system += await self._glossary_section(
+            "\n".join(labels_en), language, source_is_english=True
         )
         try:
             response = await self._client.messages.parse(
@@ -114,6 +126,15 @@ class Translator:
             logger.warning("Label translation came back unusable language=%s", language)
             return None
         return translated.labels
+
+    async def _glossary_section(
+        self, text: str, language: LanguageCode, *, source_is_english: bool
+    ) -> str:
+        if self._glossary is None:
+            return ""
+        return await self._glossary.section(
+            text, language, source_is_english=source_is_english
+        )
 
     async def _translate(
         self, text: str, system: str, language: LanguageCode
@@ -151,7 +172,9 @@ def get_translator() -> Translator | None:
     if not settings.anthropic_api_key:
         return None
     return Translator(
-        AsyncAnthropic(api_key=settings.anthropic_api_key), settings.model_fast
+        AsyncAnthropic(api_key=settings.anthropic_api_key),
+        settings.model_fast,
+        glossary=Glossary(),
     )
 
 

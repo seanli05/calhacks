@@ -43,3 +43,11 @@ The input is JSON with a "labels" list. Return the same number of labels, in the
 """
     + _PASS_THROUGH
 )
+
+# Appended to a translation prompt when the text uses glossary terms. {lines} is one
+# "- source → target" line per term.
+GLOSSARY_SECTION = """
+
+Glossary: these terms appear in the text. Translate them as given here, the way \
+USCIS and the courts say them, changing only number or gender to fit the sentence.
+{lines}"""

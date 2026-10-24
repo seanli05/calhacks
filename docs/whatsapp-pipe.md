@@ -29,6 +29,7 @@ This page is the record for the WhatsApp side (relay, orchestrator pipe, call st
 - **Turns outside the lock.** The orchestrator turn runs after the per-number routing lock is released, so an ask_user reply never waits behind it (concern 8 fixed).
 - **The Claude turn (4.1, 4.5).** Free text gets a reply from `MODEL_DEFAULT` with seven tools (decision 8; `ask_official_source` added Oct 24, below). It answers questions about a letter from the stored R1 (explanation, appointment, checklist) and the verdict. It refuses legal advice and interview interpreting per C33. It never sees a resolved ref. Text that isn't `1`/`2` while "same letter or new?" is open goes to the turn, which answers and reminds the user to pick.
 - **Translation at the edges (5.1).** Inbound text is translated to English for `messages.body_en` (`MODEL_FAST`), except replies to an open ask_user question. The turn thinks and writes in English, and its reply is translated into the user's language (Spanish register: warm, simple, *usted*). If the model or the translation fails, the user gets the `orchestrator.unavailable` template, never untranslated English. ask_user option labels are translated too (concern 7).
+- **Glossary grounding (5.3).** Every translation prompt (inbound, replies, ask_user labels) lists the glossary terms the text uses, read with `get_glossary(lang)` and cached 10 minutes per language, so replies say "entrevista de asilo" and "oficial de asilo" the way USCIS does. Matching ignores case, accents and a plural ending ("interpretes" finds "intérprete"); a `<ref:...>` placeholder never matches. If the glossary read fails or takes over 2 s, the text is translated without it, and the read is retried after 30 s. The glossary must be loaded on the database (`python -m app.glossary.load`, again after a reset); an empty table means no grounding, not an error.
 - **Fake research agent.** `POST /dev/fake-research` claims research jobs and finishes them from the contract fixtures, so the path can be tried before the research agent is on `main`.
 
 **Goal 6, results to the user (6.1–6.5).** Tested on fakes, including the whole path with the fake phone worker.
@@ -76,7 +77,7 @@ This page is the record for the WhatsApp side (relay, orchestrator pipe, call st
 | Official-source answers to the user's questions (C38) | `orchestrator/research_questions.py` |
 | Memory writer: job worker, extraction, the C25/C34 filter, profile, events | `memory/worker.py`, `writer.py`, `extract.py`, `filters.py` |
 | Asking before saving (C15): the question and its answer | `orchestrator/fact_consent.py`, `memory/consent.py` |
-| Translation to and from English | `translation/translate.py` |
+| Translation to and from English; glossary terms in the prompts | `translation/translate.py`, `glossary.py` |
 | Preset glossary (person 2 owns it): `terms.csv`, loaded with `python -m app.glossary.load` | `glossary/` |
 | Fake phone agent and `POST /dev/fake-call`; fake research and `POST /dev/fake-research`; fake phone worker and `POST /dev/fake-phone` (dev only) | `backend/app/dev/` |
 | Test fakes and fixtures for all of the above | `backend/tests/whatsapp_fakes.py`, `conftest.py` |

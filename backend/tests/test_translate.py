@@ -1,11 +1,15 @@
-"""Minimal two-way translation (Goal 5.1) on a fake Anthropic client."""
+"""Two-way translation (Goal 5.1) and glossary grounding (5.3) on a fake Anthropic
+client and a fake glossary read."""
 
+import asyncio
 from types import SimpleNamespace
 from typing import Any
 
 import anthropic
 import httpx2
+from app.translation.glossary import Glossary
 from app.translation.translate import Translator, _Labels, _Translated
+from sqlalchemy.exc import OperationalError
 
 
 class _FakeAnthropic:
@@ -33,9 +37,9 @@ class _FakeAnthropic:
         return SimpleNamespace(parsed_output=parsed)
 
 
-def translator(client: _FakeAnthropic) -> Translator:
+def translator(client: _FakeAnthropic, glossary: Glossary | None = None) -> Translator:
     fake: Any = client
-    return Translator(fake, "model-fast")
+    return Translator(fake, "model-fast", glossary=glossary)
 
 
 async def test_english_needs_no_call() -> None:
@@ -116,3 +120,127 @@ async def test_english_labels_need_no_call() -> None:
 
     assert await translator(client).labels_from_english(OPTIONS, "en") == OPTIONS
     assert client.requests == []
+
+
+TERMS = [
+    ("asylum interview", "entrevista de asilo"),
+    ("asylum", "asilo"),
+    ("interpreter", "intérprete"),
+    ("receipt number", "número de recibo"),
+    ("case status", "estatus de caso"),
+    ("deadline", "plazo límite"),
+]
+
+
+class _FakeGlossaryRead:
+    def __init__(self, fail: bool = False) -> None:
+        self.calls: list[str] = []
+        self.fail = fail
+
+    async def __call__(self, language: str) -> list[SimpleNamespace]:
+        self.calls.append(language)
+        if self.fail:
+            raise OperationalError("select", {}, OSError("connection refused"))
+        return [SimpleNamespace(term=t, translation=tr) for t, tr in TERMS]
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+async def test_from_english_carries_only_the_terms_the_text_uses() -> None:
+    client = _FakeAnthropic("Traiga un intérprete a su entrevista de asilo.")
+
+    await translator(client, Glossary(_FakeGlossaryRead())).from_english(
+        "Bring an interpreter to your asylum interview.", "es"
+    )
+
+    system = client.requests[0]["system"]
+    assert "- asylum interview → entrevista de asilo" in system
+    assert "- interpreter → intérprete" in system
+    assert "- asylum → asilo" in system
+    assert "plazo límite" not in system
+    assert "estatus de caso" not in system
+
+
+async def test_to_english_matches_without_accents_and_in_the_plural() -> None:
+    """Users type "interpretes" for "intérpretes"; the term still applies."""
+    client = _FakeAnthropic("Can I bring interpreters?")
+
+    await translator(client, Glossary(_FakeGlossaryRead())).to_english(
+        "¿Puedo llevar interpretes?", "es"
+    )
+
+    assert "- intérprete → interpreter" in client.requests[0]["system"]
+
+
+async def test_a_ref_placeholder_is_not_a_glossary_term() -> None:
+    client = _FakeAnthropic("Su número es <ref:receipt_number>.")
+
+    await translator(client, Glossary(_FakeGlossaryRead())).from_english(
+        "Your number is <ref:receipt_number>.", "es"
+    )
+
+    assert "Glossary" not in client.requests[0]["system"]
+
+
+async def test_labels_are_grounded_too() -> None:
+    client = _FakeAnthropic(labels=["Hablar con un representante", "Estado"])
+
+    await translator(client, Glossary(_FakeGlossaryRead())).labels_from_english(
+        OPTIONS, "es"
+    )
+
+    assert "- case status → estatus de caso" in client.requests[0]["system"]
+
+
+async def test_english_reads_no_glossary() -> None:
+    read = _FakeGlossaryRead()
+
+    await translator(_FakeAnthropic("unused"), Glossary(read)).from_english(
+        "hello", "en"
+    )
+
+    assert read.calls == []
+
+
+async def test_glossary_is_read_once_per_language_until_it_expires() -> None:
+    read, clock = _FakeGlossaryRead(), _Clock()
+    grounded = translator(_FakeAnthropic("ok"), Glossary(read, ttl_s=600, clock=clock))
+
+    await grounded.from_english("asylum", "es")
+    await grounded.to_english("asilo", "es")
+    clock.now = 601
+    await grounded.from_english("asylum", "es")
+
+    assert read.calls == ["es", "es"]
+
+
+async def test_a_failed_glossary_read_doesnt_stop_translation() -> None:
+    read, clock = _FakeGlossaryRead(fail=True), _Clock()
+    client = _FakeAnthropic("Su entrevista de asilo.")
+    grounded = translator(client, Glossary(read, clock=clock))
+
+    assert await grounded.from_english("Your asylum interview.", "es") == (
+        "Su entrevista de asilo."
+    )
+    await grounded.from_english("Your asylum interview.", "es")
+
+    assert "Glossary" not in client.requests[0]["system"]
+    assert read.calls == ["es"]  # not retried on every translation
+
+
+async def test_a_slow_glossary_read_times_out() -> None:
+    async def hang(language: str) -> list[SimpleNamespace]:
+        await asyncio.sleep(10)
+        return []
+
+    client = _FakeAnthropic("Hola.")
+
+    assert await translator(client, Glossary(hang, timeout_s=0.01)).from_english(
+        "Hello.", "es"
+    ) == ("Hola.")
