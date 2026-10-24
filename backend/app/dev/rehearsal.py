@@ -194,6 +194,10 @@ class Browser:
             self._proc.kill()
 
     async def _call(self, method: str, **params: Any) -> dict[str, Any]:
+        """One DevTools call; a browser that stops answering fails the run."""
+        return await asyncio.wait_for(self._call_once(method, **params), 30)
+
+    async def _call_once(self, method: str, **params: Any) -> dict[str, Any]:
         self._n += 1
         await self._ws.send(
             json.dumps({"id": self._n, "method": method, "params": params})
@@ -380,7 +384,7 @@ class Rehearsal:
                     CallState.HUMAN_DETECTED: "connected",
                     CallState.BRIDGING: "connected",
                     CallState.CONNECTED: "connected",
-                    CallState.WRAP_UP: "connected",
+                    CallState.WRAP_UP: "call_ended",
                     CallState.ENDED: "call_ended",
                 }[CallState(state)]
                 await rehearsal.check(f"call-{state}", expected)

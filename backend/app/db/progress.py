@@ -32,7 +32,9 @@ _CALL_STAGES = {
     CallState.HUMAN_DETECTED: CaseStage.CONNECTED,
     CallState.BRIDGING: CaseStage.CONNECTED,
     CallState.CONNECTED: CaseStage.CONNECTED,
-    CallState.WRAP_UP: CaseStage.CONNECTED,
+    # Wrap-up: the line is closed and the report is being written. From the user's
+    # side the call is over, and it may never have reached a person.
+    CallState.WRAP_UP: CaseStage.CALL_ENDED,
     CallState.ENDED: CaseStage.CALL_ENDED,
 }
 

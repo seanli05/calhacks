@@ -73,6 +73,7 @@ def _stage(**overrides: object) -> CaseStage:
         ({"latest_call_state": "hold"}, CaseStage.ON_HOLD),
         ({"latest_call_state": "human_detected"}, CaseStage.CONNECTED),
         ({"latest_call_state": "connected"}, CaseStage.CONNECTED),
+        ({"latest_call_state": "wrap_up"}, CaseStage.CALL_ENDED),
         ({"latest_call_state": "ended"}, CaseStage.CALL_ENDED),
         ({"closed": True, "latest_call_state": "hold"}, CaseStage.CLOSED),
     ],

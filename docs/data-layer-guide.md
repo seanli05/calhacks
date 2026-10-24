@@ -192,8 +192,8 @@ Reads plus `app.db.deletes`: `delete_fact`, `delete_document` (and its images), 
 | `awaiting_consent` | Verified, no call yet |
 | `calling` | Latest call is `dialing` or `menu` |
 | `on_hold` | Latest call is `hold` |
-| `connected` | Latest call is `human_detected`, `bridging`, `connected`, or `wrap_up` |
-| `call_ended` | Latest call is `ended` |
+| `connected` | Latest call is `human_detected`, `bridging`, or `connected` |
+| `call_ended` | Latest call is `wrap_up` (hung up, report being written) or `ended` |
 | `closed` | A `case.closed` event exists (C22) |
 
 `reads.list_active_cases(user_id)` returns every case that isn't `closed`.

@@ -100,4 +100,4 @@ async def test_after_call_seed_has_report_and_transcript(
     texts = [item["text"]["text"] for item in feed]
     assert "We chose option 2 in the menu" in texts
     assert "You said yes to the call" in texts
-    assert texts[-1] == "The call ended after 14 minutes"
+    assert texts[-1] == "The call ended after 14 min"

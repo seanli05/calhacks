@@ -199,8 +199,8 @@ TEMPLATES: dict[str, Variants] = {
         "es": ["No pudimos comunicarnos contigo por teléfono"],
     },
     "call.ended": {
-        "en": ["The call ended after {minutes} minutes", "The call ended"],
-        "es": ["La llamada terminó después de {minutes} minutos", "La llamada terminó"],
+        "en": ["The call ended after {minutes} min", "The call ended"],
+        "es": ["La llamada terminó después de {minutes} min", "La llamada terminó"],
     },
     "memory.fact_saved": {
         "en": ["Saved: {fact}", "We saved a fact about you"],
