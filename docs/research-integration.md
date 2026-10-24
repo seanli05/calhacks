@@ -35,14 +35,43 @@ User sends a letter photo
 
 ## Decisions (person 1, Oct 24)
 
-1. **The contracts adopt research's richer models.** Research's shapes go into `app.contracts`, and their `CaseBrief` becomes the contract. The fields are mostly additive, so existing callers keep working. `DeepResult.brief_id` becomes optional, because a suspicious letter gets no brief. One exception: sensitivity stays `normal` / `sensitive` (the value `facts` already stores), so research renames `high` to `sensitive`.
+1. **The contracts adopt research's richer models**, limited to the fields person 3 marks as needed in the table below. Those shapes go into `app.contracts`, and their `CaseBrief` becomes the contract. The fields are mostly additive, so existing callers keep working. `DeepResult.brief_id` becomes optional, because a suspicious letter gets no brief. One exception: sensitivity stays `normal` / `sensitive` (the value `facts` already stores), so research renames `high` to `sensitive`.
 2. **`needs_user_input` stays.** Research uses it when the photos come from different letters: the orchestrator groups photos sent within 6 seconds into one letter, and only research can see that they don't belong together. It needs a small new flow, described in "The `needs_user_input` flow" below.
 3. **Signals travel in the deep job.** The fast pass's `signals` (letterhead, phones, URLs, form IDs; no personal data) and `call_purpose` go into `ResearchDeepJob` when the fast pass queues the deep pass. There's no schema change and no reset.
 4. **The demo dials the mock line, decided on the phone side.** Research saves the real official number it finds, so the dashboard shows the true verification. When `DEMO_DIAL_NUMBER` is set, `reads.official_dial_number` returns that number instead, and only for a case that passes the same verified check. The phone agent still has exactly one way to get a number, and an unverified case still gets none. **Team note:** this means the number dialed is no longer the verified number itself. It's a deliberate demo exception to rule 2, so leave `DEMO_DIAL_NUMBER` unset only once the agent should call real agencies.
 
+## Where research differs from the contracts today
+
+Each row is something `app.contracts` would reject once research writes through the real helpers. The contracts forbid unknown fields, so it fails loudly. Locations are on branch `research_agent` (top-level `research/`) and on `main`, as of Oct 24.
+
+**Person 3: fill in "Needed?"** with `yes` (the agent depends on it), `nice` (useful, but the agent works without it), or `no` (drop it on your side). Person 1 adds to the contracts only the `yes` and `nice` rows. Rows marked "fix on research's side" aren't a choice.
+
+| # | Mismatch | Research code | Contract on `main` | Needed? |
+|---|---|---|---|---|
+| 1 | R1 status `needs_user_input` (+ `question_en`) | `research/models.py:25`, `:94` | `backend/app/contracts/common.py:77` (`FastResultStatus`), `results.py:44` (`FastResult`) | (kept; see "The `needs_user_input` flow") |
+| 2 | R1 `key_dates` | `research/models.py:98` | `backend/app/contracts/results.py:44` | |
+| 3 | `KeyFact`: `value` or `ref` (ref optional), plus `quote` and `page`; no `citation` | `research/models.py:49`–`56` | `backend/app/contracts/results.py:24`–`27` (ref and citation required) | |
+| 4 | `Appointment.time` optional | `research/models.py:71` | `backend/app/contracts/results.py:32` (required) | |
+| 5 | `Appointment.location_ref` optional | `research/models.py:72` | `backend/app/contracts/results.py:34` (required) | |
+| 6 | `ProposedFact.sensitivity` | `research/models.py:85` | `backend/app/contracts/jobs.py:20` | |
+| 7 | Sensitivity value `high` | `research/models.py:23` | `backend/app/contracts/common.py:48` (`normal` / `sensitive`) | Fix on research's side: rename to `sensitive` |
+| 8 | `Verification.signals` | `research/models.py:155` | `backend/app/contracts/results.py:65` | |
+| 9 | R2 `official_phone_purpose` | `research/models.py:170` | `backend/app/contracts/results.py:75` (`DeepResult`) | |
+| 10 | R2 `alternative_contacts` | `research/models.py:171` | `backend/app/contracts/results.py:75` | |
+| 11 | R2 `brief_id` optional (no brief for a suspicious letter) | `research/models.py:173` | `backend/app/contracts/results.py:81` (required) | Contract changes: research is right |
+| 12 | Deep job `answers` | `research/models.py:238`, read at `research/jobs.py:220` | `backend/app/contracts/jobs.py:36` (`ResearchDeepJob`) | |
+| 13 | Deep pass needs `signals` and `call_purpose` from the fast pass | `research/sim/store.py:39`–`40`, `research/models.py:254`–`255` | `backend/app/db/tables.py:123` (`cases` has no columns for them) | Decided: add them to `ResearchDeepJob` |
+| 14 | Proposed facts in the `memory_write` job carry `sensitivity` | `research/jobs.py:133` | `backend/app/contracts/jobs.py:59` (`MemoryWriteJob`) | Follows row 6 |
+| 15 | Jobs have no `user_id` | `research/sim/store.py:43`, `:86` | `backend/app/db/jobs.py:27` (`enqueue` requires it) | Fix on research's side: pass `user_id` |
+| 16 | Events have no `user_id` | `research/sim/store.py:53`, `:100`, `research/events.py:70` | `backend/app/contracts/events.py:83` (required) | Fix on research's side: pass `user_id` |
+| 17 | Event types `research.fast_slow`, `fast_failed`, `deep_failed`, `search`, `fetch`, `check` | `research/events.py:17`–`25` | `backend/app/contracts/events.py:20` (`EventType`) | |
+| 18 | `CaseBrief` model | `research/models.py` (`CaseBrief`) | `backend/app/contracts/brief.py` (a plain dict) | Not a violation; becomes the contract (decision 1) |
+
+Not violations: `ResearchFastJob` matches. The safety handling also matches Plan.md: refs, `LeakGuard`, the required `must_not_do`, and never using the letter's phone number.
+
 ## Step 1: person 1's prep (lands before the integration)
 
-These touch person 1's code, so person 1 makes them in one PR.
+These touch person 1's code, so person 1 makes them in one PR, **after person 3 fills in the table above**. The list below is the full set; drop whatever person 3 marked `no`.
 
 **Contracts (`backend/app/contracts/`):**
 - `FastResultStatus` gains `needs_user_input`, and `FastResult` gains `question_en` and `key_dates`.
