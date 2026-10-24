@@ -80,7 +80,7 @@ The **call panel** at the top of the case view is driven by the `calls` row and 
 
 **Hold timer:** starts at the **first** `call.on_hold` event of the call. Emit `call.on_hold` when hold begins; repeating it is fine (the orchestrator throttles messages to the user).
 
-**Events:** the call rows of the table above, each with `call_id`. Also `call.menu_heard`, `call.user_dialed`, `call.user_unreachable`.
+**Events:** the call rows of the table above, each with `call_id`. Also `call.user_dialed` and `call.user_unreachable`. `call.menu_heard` is logged for debugging but kept out of the feed, since it fires on every menu prompt.
 
 **After the call:**
 - `save_transcript(call_id, lines)`: each line `{"at", "speaker": "agent" | "agency" | "user", "text"}`. Any other speaker breaks the transcript sheet.

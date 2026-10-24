@@ -53,18 +53,19 @@ class MenuSteps(RunnerBase):
         """1c and 1b in parallel; 1b's answer is dropped if the line left the menu
         or spoke again meanwhile."""
         heard = " ".join(self.menu_buffer)
-        deciding = asyncio.ensure_future(
-            self._timed(
+        history = list(self.menu_history)
+
+        async def decide() -> MenuAction:
+            # The model call is made inside the task, so a task cancelled before it
+            # starts (1c fired first) leaves no never-awaited coroutine behind.
+            return await self._timed(
                 "decide",
                 menu.decide(
-                    heard,
-                    self.brief,
-                    self.menu_history,
-                    client=self.llm,
-                    call_id=self.call_id,
+                    heard, self.brief, history, client=self.llm, call_id=self.call_id
                 ),
             )
-        )
+
+        deciding = asyncio.ensure_future(decide())
         try:
             if reading is None:
                 reading = await self._classify(self.menu_buffer[-1], at_s)

@@ -34,9 +34,11 @@ from string import Formatter
 Variants = dict[str, list[str]]
 
 HIDDEN: frozenset[str] = frozenset(
-    {"research.search", "research.fetch", "research.check"}
+    {"research.search", "research.fetch", "research.check", "call.menu_heard"}
 )
-"""The deep pass's step log: many per check, for debugging, never in the feed."""
+"""Step logs, many per check or call, for debugging, never in the feed: the deep
+pass's lookups, and every menu prompt the phone agent hears (its choices still
+show as `call.menu_choice`; the case view's headline says it's in the menu)."""
 
 TEMPLATES: dict[str, Variants] = {
     "case.created": {

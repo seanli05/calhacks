@@ -137,6 +137,18 @@ The live end-to-end test runs the demo letter through the worker, a real databas
 RESEARCH_E2E=1 pytest backend/tests/research/test_e2e_live.py
 ```
 
+### Rehearse without a phone
+
+`python -m app.dev.rehearsal` (from `backend/`) runs the demo path end to end on your Neon test branch (`TEST_DATABASE_URL`), with no WhatsApp, phone or API key: a letter, research (the fake), consent, then the phone agent's real call runner on a simulated agency line, through to the call report. It rebuilds that branch's tables first and refuses the shared database. At each stage it checks the dashboard API and screenshots the case page, and writes `rehearsal/REPORT.md` with anything that looks wrong.
+
+For screenshots, serve the test branch on the side (headless Edge is used; `--browser` or `REHEARSAL_BROWSER` points elsewhere, `--no-screens` skips them):
+
+```bash
+DATABASE_URL_UNPOOLED=<TEST_DATABASE_URL> RESEARCH_WORKER=false uvicorn app.main:app --app-dir backend --port 8001
+cd dashboard && BACKEND_URL=http://localhost:8001 NEXT_PUBLIC_DATA=live npx next dev -p 3001
+cd backend && python -m app.dev.rehearsal --out ../rehearsal
+```
+
 ### Deploying for the demo
 
 Everything runs on one laptop (the one recording the video). Only the backend is public, through ngrok, so Twilio can reach it. The dashboard stays on `localhost`.
