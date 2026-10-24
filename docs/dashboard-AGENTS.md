@@ -98,6 +98,6 @@ cd dashboard && npm install && npm run dev  # http://localhost:3000, live data b
 - `curl localhost:8000/api/users/<user>/feed?lang=es`: every line you emitted should read as a specific Spanish sentence, not a generic one or your `summary_en`.
 - `curl localhost:8000/api/cases/<case>?lang=es`: your fields are there.
 - No phone agent yet? `DEV_ENDPOINTS=true` and `POST /dev/fake-call` (person 2's, see [whatsapp-pipe.md](whatsapp-pipe.md)) plays a scripted call through the real tables. It creates its own throwaway case.
-- **Test against your own Neon branch** (`neon branch create --name <you>`) or ask before writing to the shared database; it's what the demo runs on.
+- **Test against your own Neon branch** (ask person 1) or ask before writing to the shared database; it's what the demo runs on. Against the shared database, run with `RESEARCH_WORKER=false` and `DEV_ENDPOINTS` off: only the deployed backend claims jobs there.
 
 Something the dashboard should show but can't? Ask person 1. Don't edit `app/api/` or `dashboard/`.

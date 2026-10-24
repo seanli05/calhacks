@@ -68,6 +68,10 @@ NEXT_PUBLIC_DATA=fixtures npm run dev   # on fake data, no backend needed
 
 ### Using the database
 
+**Which database.** The deployed backend, the dashboard, live run-throughs and the demo all use the shared database (`DATABASE_URL`). Tests and `app.dev.rehearsal` use your own Neon branch (`TEST_DATABASE_URL`), never the shared one, because they drop every table. Ask person 1 for a branch; the URLs go in your `.env`/`.env.local`, never in git.
+
+**One job worker on the shared database.** Only the deployed backend claims jobs there. A laptop backend on the shared database, with `RESEARCH_WORKER=true` and a key, would race it for research jobs, possibly running older code. So locally, against the shared database, set `RESEARCH_WORKER=false` and leave `DEV_ENDPOINTS` off (the fake research and fake call write rows and send WhatsApp messages). To run the workers yourself, point the backend at your own branch.
+
 Import only your own writer module, plus the shared ones. That's how "one writer per table" is enforced.
 
 Full guide, with per-component recipes: [docs/data-layer-guide.md](docs/data-layer-guide.md).
@@ -80,7 +84,7 @@ Full guide, with per-component recipes: [docs/data-layer-guide.md](docs/data-lay
 | `app.db.events` / `app.db.messages` | `append_event` (everyone); `append_message` (orchestrator, relay) |
 | `app.db.deletes` | The "What we know about you" page (through the dashboard API) |
 
-`case_progress(case_id)` returns one of `received`, `explaining`, `needs_better_image`, `checking`, `suspicious`, `unknown`, `awaiting_consent`, `calling`, `on_hold`, `connected`, `call_ended`, `closed`.
+`case_progress(case_id)` returns one of `received`, `explaining`, `needs_better_image`, `needs_answer`, `checking`, `suspicious`, `unknown`, `awaiting_consent`, `calling`, `on_hold`, `connected`, `call_ended`, `closed`.
 
 ### WhatsApp (Twilio sandbox + ngrok)
 
@@ -219,7 +223,7 @@ ruff format . && ruff check --fix .   # format + lint
 pytest                                # tests
 ```
 
-DB helper tests (`backend/tests/test_db_helpers.py`) are skipped unless `TEST_DATABASE_URL` is set (env or `.env.local`; person 1 has the URL). Point it at a separate Neon branch (`neon branch create --name test`), never the shared database: the tests drop and rebuild every table.
+DB helper tests (`backend/tests/test_db_helpers.py`) are skipped unless `TEST_DATABASE_URL` is set (env or `.env.local`; person 1 has the URL). Point it at your own Neon branch (ask person 1), never the shared database: the tests drop and rebuild every table.
 
 - Work on a branch, open small PRs, and merge to `main` often.
 - Read [CLAUDE.md](CLAUDE.md) before writing code. It has the product rules that can't be broken and the team's engineering conventions.

@@ -74,7 +74,8 @@ ruff format . && ruff check --fix . && pytest         # before every push
 
 - **Database:** one shared Neon Postgres; URLs are in the repo-root `.env.local` (ask person 1). It's already seeded with the demo case.
 - **`python -m app.db.reset --yes`** (run from `backend/`) wipes the shared database for everyone. Ask the team first.
-- **DB tests** run only when `TEST_DATABASE_URL` points at the separate Neon `test` branch. A full run with them takes about a minute.
+- **DB tests** run only when `TEST_DATABASE_URL` points at your own Neon branch (never the shared database; they drop every table). A full run with them takes about a minute.
+- **Only the deployed backend claims jobs on the shared database.** Running locally against it, set `RESEARCH_WORKER=false` and keep `DEV_ENDPOINTS` off; to run workers or dev endpoints, use your own branch. README → "Using the database".
 
 ## Git
 

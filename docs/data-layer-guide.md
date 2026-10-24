@@ -25,7 +25,8 @@ Owner: person 1. Ask before changing the schema, the contracts, or another write
 - Database: one shared Neon Postgres. URLs live in the repo-root `.env.local` (gitignored; ask person 1). `settings.py` converts Neon's URL for asyncpg and prefers the unpooled one.
 - Startup (`uvicorn app.main:app --app-dir backend`) creates any missing tables. It never alters existing ones; a column change needs a reset.
 - `cd backend && python -m app.db.reset --yes` drops every table, recreates them, and seeds the demo case; `--empty` skips the seed. **It wipes the shared database for everyone**, so ask the team first. Without `--yes` it only prints the target host.
-- DB tests use `TEST_DATABASE_URL`, a separate Neon branch named `test`. Never point it at the shared database (the tests check this and refuse).
+- DB tests use `TEST_DATABASE_URL`, your own Neon branch (ask person 1). Never point it at the shared database (the tests check this and refuse).
+- Only the deployed backend claims jobs on the shared database. Against it locally, set `RESEARCH_WORKER=false` and keep `DEV_ENDPOINTS` off.
 
 ## The import rule (one writer per table)
 
