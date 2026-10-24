@@ -13,9 +13,12 @@ import logging
 
 import anthropic
 from anthropic import AsyncAnthropic
+from sqlalchemy.exc import SQLAlchemyError
 
-from app.contracts import MessageDirection
-from app.db import reads, tables
+from app.contracts import Component, FactSource, MemoryWriteJob, MessageDirection
+from app.contracts.common import MessageId
+from app.db import jobs, reads, tables
+from app.orchestrator.consent import ConsentGate
 from app.orchestrator.prompts import ORCHESTRATOR_SYSTEM
 from app.orchestrator.tools import CaseTools, build_tools
 from app.relay.outbound import send_template, send_text
@@ -39,20 +42,42 @@ class OrchestratorTurn:
         model: str,
         whatsapp: WhatsApp,
         translator: Translator,
+        consent: ConsentGate | None = None,
         turn_timeout_s: float = TURN_TIMEOUT_S,
     ) -> None:
         self._client = client
         self._model = model
         self._whatsapp = whatsapp
         self._translator = translator
+        self._consent = consent
         self._turn_timeout_s = turn_timeout_s
 
     async def run(
-        self, user: tables.User, *, same_or_new_pending: bool = False
+        self,
+        user: tables.User,
+        message_id: MessageId,
+        *,
+        same_or_new_pending: bool = False,
+        consent_pending: bool = False,
     ) -> None:
-        """Reply to the user's latest message, which the pipe has already logged."""
-        tools = CaseTools(user, self._whatsapp)
-        context = await build_context(user, same_or_new_pending=same_or_new_pending)
+        """Reply to the user's latest message (`message_id`), which the pipe has
+        already logged; then queue the memory writer on it (Goal 6.5)."""
+        await self._reply(
+            user,
+            same_or_new_pending=same_or_new_pending,
+            consent_pending=consent_pending,
+        )
+        await _queue_memory_write(user, message_id)
+
+    async def _reply(
+        self, user: tables.User, *, same_or_new_pending: bool, consent_pending: bool
+    ) -> None:
+        tools = CaseTools(user, self._whatsapp, self._consent)
+        context = await build_context(
+            user,
+            same_or_new_pending=same_or_new_pending,
+            consent_pending=consent_pending,
+        )
         try:
             async with asyncio.timeout(self._turn_timeout_s):
                 reply_en = await self._ask_claude(tools, context)
@@ -63,8 +88,8 @@ class OrchestratorTurn:
             logger.error("Turn timed out user_id=%s", user.id)
             reply_en = None
         user = tools.user
-        if tools.language_switched:
-            return  # the language template already answered
+        if tools.language_switched or tools.consent_requested:
+            return  # a template already answered
         if reply_en is None:
             await send_template(self._whatsapp, user, UNAVAILABLE)
             return
@@ -104,7 +129,27 @@ class OrchestratorTurn:
         return text.strip() or None
 
 
-async def build_context(user: tables.User, *, same_or_new_pending: bool) -> str:
+async def _queue_memory_write(user: tables.User, message_id: MessageId) -> None:
+    """Plan.md → Jobs: the memory writer runs after each orchestrator reply, on the
+    user's message. It extracts and filters the facts itself (C34)."""
+    try:
+        await jobs.enqueue(
+            MemoryWriteJob(
+                user_id=user.id,
+                source=FactSource.USER_SAID,
+                source_ref=message_id,
+                proposed_facts=[],
+            ),
+            Component.ORCHESTRATOR,
+            user.id,
+        )
+    except SQLAlchemyError:
+        logger.exception("Memory write not queued user_id=%s", user.id)
+
+
+async def build_context(
+    user: tables.User, *, same_or_new_pending: bool, consent_pending: bool = False
+) -> str:
     """The turn's user message: recent conversation in English, open cases, and any
     pending question. Built from stored rows only; refs are never resolved."""
     messages = (await reads.list_messages(user.id))[-HISTORY_MESSAGES:]
@@ -128,6 +173,13 @@ async def build_context(user: tables.User, *, same_or_new_pending: bool) -> str:
             "the same letter (1) or a new letter (2), and they haven't answered with "
             "a number. Answer their message, then remind them to reply 1 or 2."
             "</pending>"
+        )
+    if consent_pending:
+        parts.append(
+            "<pending>We asked whether we may call USCIS for the user (1 yes, 2 no), "
+            "and they haven't answered with a number. Answer their message, then "
+            "remind them to reply 1 if they want the call or 2 if not. A yes in "
+            "words isn't enough: the call starts only from their reply.</pending>"
         )
     parts.append("Reply to the user's latest message.")
     return "\n".join(parts)

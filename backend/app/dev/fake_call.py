@@ -58,15 +58,29 @@ async def run_fake_call(
     call_status: CallStatusWatcher,
     pacing: Pacing | None = None,
 ) -> None:
-    """Dialing → menu → ask_user → on hold ×N → human → joined → ended → case closed."""
+    """The scripted call, then the throwaway case is closed."""
     pacing = pacing or Pacing()
     started = utcnow()
     case_id, call_id = await _create_rows(user)
     logger.info("Fake call started user_id=%s call_id=%s", user.id, call_id)
-    # What the orchestrator will do when it queues a real call job (Goal 6.3).
+    # What the orchestrator does when it queues a real call job (Goal 6.3).
     call_status.watch(user.id, since=started)
-    emit = _Emitter(user.id, case_id, call_id)
+    emit = Emitter(user.id, case_id, call_id)
+    await play_call(emit, call_id, ask_user, pacing)
+    # Close the throwaway case so it doesn't look like a real open letter (C22).
+    await emit(
+        EventType.CASE_CLOSED,
+        "Closed the fake call's case",
+        source=Component.ORCHESTRATOR,
+    )
+    logger.info("Fake call finished user_id=%s call_id=%s", user.id, call_id)
 
+
+async def play_call(
+    emit: "Emitter", call_id: CallId, ask_user: AskUser, pacing: Pacing
+) -> None:
+    """Dialing → menu → ask_user → on hold ×N → human → joined → ended. Shared with
+    the fake phone worker (fake_phone.py)."""
     await emit(EventType.CALL_DIALING, "Dialing USCIS (fake call)", agency="USCIS")
     await asyncio.sleep(pacing.step_s)
     await phone.set_call_state(call_id, CallState.MENU)
@@ -100,13 +114,6 @@ async def run_fake_call(
     await asyncio.sleep(pacing.step_s)
     await phone.set_call_state(call_id, CallState.ENDED)
     await emit(EventType.CALL_ENDED, "Call ended (fake call)", minutes=1)
-    # Close the throwaway case so it doesn't look like a real open letter (C22).
-    await emit(
-        EventType.CASE_CLOSED,
-        "Closed the fake call's case",
-        source=Component.ORCHESTRATOR,
-    )
-    logger.info("Fake call finished user_id=%s call_id=%s", user.id, call_id)
 
 
 async def _create_rows(user: tables.User) -> tuple[CaseId, CallId]:
@@ -141,7 +148,7 @@ async def _create_rows(user: tables.User) -> tuple[CaseId, CallId]:
     return case.id, call.id
 
 
-class _Emitter:
+class Emitter:
     """Logs events the way the phone agent will: every call event carries call_id."""
 
     def __init__(self, user_id: UserId, case_id: CaseId, call_id: CallId) -> None:
