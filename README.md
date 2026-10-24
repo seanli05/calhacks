@@ -47,6 +47,16 @@ Run the backend (from the repo root, with the venv active):
 uvicorn app.main:app --app-dir backend --reload   # http://localhost:8000/health
 ```
 
+### WhatsApp (Twilio sandbox + ngrok)
+
+1. Install ngrok (version 3.20 or newer; run `ngrok update` if needed) and add your token: `ngrok config add-authtoken <token>`.
+2. Run `ngrok http 8000` and copy the `https://...` URL.
+3. In `.env`, set `PUBLIC_BASE_URL` to that URL (no trailing slash) and fill in `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`. Restart the server; `--reload` doesn't pick up `.env` changes.
+4. In the Twilio console, go to **Messaging → Try it out → Send a WhatsApp message → Sandbox settings** and set **When a message comes in** to `POST <PUBLIC_BASE_URL>/whatsapp`. New accounts land on a "Try out WhatsApp" page with no webhook setting; switch to the legacy Console (account menu) to get the sandbox page with the **Sandbox settings** tab.
+5. From your phone, send the join code shown on that page to the sandbox number shown there.
+
+`/whatsapp` checks Twilio's request signature against `PUBLIC_BASE_URL` and the auth token, so both must match the account whose sandbox points at you. If you get Twilio's default "Configure your WhatsApp Sandbox's Inbound URL" reply, the webhook URL isn't saved. For now the bot echoes text and replies to photos with their type and size.
+
 ## Repo layout
 
 | Path | What | Owner |

@@ -3,8 +3,10 @@
 from fastapi import FastAPI
 
 from app.db.engine import ping
+from app.relay.webhook import router as whatsapp_router
 
 app = FastAPI(title="calhacks")
+app.include_router(whatsapp_router)
 
 
 @app.get("/health")
