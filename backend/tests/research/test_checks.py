@@ -3,6 +3,9 @@
 from datetime import UTC, date, datetime
 
 import pytest
+from app.contracts import (
+    SignalResult,
+)
 from app.research.checks import (
     address_on_page,
     case_number_shape,
@@ -15,7 +18,6 @@ from app.research.checks import (
     phone_on_page,
 )
 from app.research.fetch_tool import FetchedPage
-from app.research.models import SignalResult
 
 PHONE = "+18005550100"
 

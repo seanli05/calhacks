@@ -1,9 +1,10 @@
-"""Job handlers: the only research code that touches the Store.
+"""Job handlers: the only research code that touches the database.
 
-Each handler takes a `jobs` row, reads what it needs, runs one pass, writes the
-tables research owns (`cases`, `case_refs`, `verifications`, `case_briefs`),
-queues follow-up jobs, and logs events. Passes come in through `ResearchDeps`
-so tests and `--fake` swap them without code changes.
+Each handler takes a claimed `jobs` row (already `running`), reads what it needs,
+runs one pass, writes the tables research owns (`cases`, `case_refs`,
+`verifications`, `case_briefs`) through `app.db.writes.research`, queues
+follow-up jobs, and logs events. Passes come in through `ResearchDeps` so tests
+and `--fake` swap them without code changes.
 """
 
 import asyncio
@@ -15,39 +16,36 @@ from typing import Any
 
 import httpx
 from anthropic import APIError, AsyncAnthropic
+from pydantic import BaseModel
 
+from app.contracts import (
+    Component,
+    DeepResult,
+    FactSource,
+    FastResult,
+    JobPayload,
+    LegitimacySignals,
+    MemoryWriteJob,
+    QuestionAnswer,
+    ResearchDeepJob,
+    ResearchFastJob,
+    ResearchQuestionJob,
+    Verification,
+)
+from app.db import jobs as db_jobs
+from app.db import reads, tables
+from app.db.writes import research as writes
 from app.research import events as ev
 from app.research.brief import build_brief
 from app.research.deep_pass import LogFn, run_deep_pass
 from app.research.events import EventLog, LeakGuard
-from app.research.fast_pass import run_fast_pass
-from app.research.models import (
-    R1,
-    R2,
-    CaseBrief,
-    DeepFindings,
-    FastPassOutput,
-    LegitimacySignals,
-    QuestionAnswer,
-    ResearchDeepPayload,
-    ResearchFastPayload,
-    ResearchQuestionPayload,
-    Verification,
-)
+from app.research.fast_pass import FastPassError, run_fast_pass
+from app.research.fetch_tool import registered_domain
+from app.research.models import CaseRecord, DeepFindings, FastPassOutput
 from app.research.preprocess import ContentBlock, UnsupportedMedia, to_content_blocks
 from app.research.question import answer_question, letter_context
-from app.research.sim.settings import ResearchSettings
-from app.research.sim.store import CaseRecord, Job, JobType, Store
 from app.research.verify_cache import VerifyCache
-
-# SIM: drop this fallback when Track A lands fast_pass.FastPassError
-try:
-    from app.research.fast_pass import FastPassError
-except ImportError:
-
-    class FastPassError(RuntimeError):  # type: ignore[no-redef]
-        """The fast pass can't produce a trustworthy R1."""
-
+from app.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +65,7 @@ QuestionFn = Callable[..., Awaitable[QuestionAnswer]]
 class ResearchDeps:
     """Everything a handler calls out to. Defaults are the real passes."""
 
-    settings: ResearchSettings
+    settings: Settings
     anthropic: AsyncAnthropic | None = None
     http: httpx.AsyncClient | None = None
     fast_pass_fn: FastPassFn = run_fast_pass
@@ -81,7 +79,7 @@ class ResearchDeps:
     question_timeout_s: float = QUESTION_TIMEOUT_S
 
 
-async def handle_research_fast(job: Job, store: Store, deps: ResearchDeps) -> None:
+async def handle_research_fast(job: tables.Job, deps: ResearchDeps) -> None:
     """Run a `research_fast` job end to end (H1 -> R1).
 
     Reads the documents, runs the fast pass, writes `cases` and `case_refs`,
@@ -89,77 +87,71 @@ async def handle_research_fast(job: Job, store: Store, deps: ResearchDeps) -> No
     `research.fast_*` events, and sets the job result to R1.
     """
     guard = LeakGuard()
-    log = EventLog(store, guard, case_id=job.case_id, job_id=job.job_id)
+    log = EventLog(guard, user_id=job.user_id, case_id=job.case_id, job_id=job.id)
     try:
-        await _run_fast(job, store, deps, guard, log)
+        await _run_fast(job, deps, guard, log)
     except (FastPassError, TimeoutError) as exc:
         error = (
             f"fast pass exceeded {deps.fast_cap_s:.0f} s"
             if isinstance(exc, TimeoutError)
             else f"fast pass failed ({type(exc).__name__})"
         )
-        await _fail(store, log, ev.FAST_FAILED, error)
+        await _fail(log, ev.FAST_FAILED, error)
     except Exception as exc:
-        await _fail(store, log, ev.FAST_FAILED, f"unexpected {type(exc).__name__}")
+        await _fail(log, ev.FAST_FAILED, f"unexpected {type(exc).__name__}")
         raise
 
 
 async def _run_fast(
-    job: Job, store: Store, deps: ResearchDeps, guard: LeakGuard, log: EventLog
+    job: tables.Job, deps: ResearchDeps, guard: LeakGuard, log: EventLog
 ) -> None:
-    payload = ResearchFastPayload.model_validate(job.payload)
+    payload = ResearchFastJob.model_validate(job.payload)
     case_id = payload.case_id
-    await store.update_job(job.job_id, "running")
     await log.emit(ev.FAST_STARTED, "Started reading the letter")
 
-    output = await _read_letter(payload, store, deps, log)
+    output = await _read_letter(payload, deps, log)
     guard.add(sv.value for sv in output.sensitive_values)
     r1 = output.r1
 
+    # The case row comes first: refs and R1 hang off it. A re-read of the same
+    # case (a better photo, or a needs_user_input reply) reuses the row.
+    if await reads.get_case(case_id) is None:
+        await writes.create_case(case_id, payload.user_id, payload.document_ids)
+        await log.emit(ev.CASE_CREATED, "Opened a case for the letter")
     for sv in output.sensitive_values:
-        ref = await store.insert_case_ref(case_id, sv.field, sv.value)
-        if ref != sv.ref:
-            raise ValueError(f"store returned {ref} for {sv.ref}")
-
-    if r1.status != "needs_better_image":
-        case = CaseRecord(
-            case_id=case_id,
-            user_id=payload.user_id,
-            document_ids=payload.document_ids,
-            r1=r1,
-            signals=output.signals,
-            call_purpose=output.call_purpose,
-        )
-        guard.check("cases row", case.model_dump(mode="json"))
-        await store.insert_case(case)
+        if sv.ref != f"<ref:{sv.field}>":
+            raise ValueError(f"ref {sv.ref} does not match field {sv.field}")
+        await writes.put_ref(case_id, sv.field, sv.value)
+    guard.check("cases row", r1.model_dump(mode="json"))
+    await writes.save_fast_result(case_id, r1)
 
     if r1.proposed_facts:
         await _queue(
-            store,
             guard,
-            "memory_write",
-            {
-                "job": "memory_write",
-                "user_id": payload.user_id,
-                "source": "from_document",
-                "source_ref": payload.document_ids[0],
-                "proposed_facts": [
-                    f.model_dump(mode="json") for f in r1.proposed_facts
-                ],
-            },
+            MemoryWriteJob(
+                user_id=payload.user_id,
+                source=FactSource.FROM_DOCUMENT,
+                source_ref=payload.document_ids[0],
+                proposed_facts=r1.proposed_facts,
+            ),
+            payload.user_id,
             case_id,
         )
     if r1.status == "ok":
-        deep = ResearchDeepPayload(
-            case_id=case_id,
-            user_id=payload.user_id,
-            document_ids=payload.document_ids,
-        )
         await _queue(
-            store, guard, "research_deep", deep.model_dump(mode="json"), case_id
+            guard,
+            ResearchDeepJob(
+                case_id=case_id,
+                user_id=payload.user_id,
+                document_ids=payload.document_ids,
+                signals=output.signals,
+                call_purpose=output.call_purpose,
+            ),
+            payload.user_id,
+            case_id,
         )
 
-    await _finish(store, guard, job.job_id, r1.model_dump(mode="json"))
+    await _finish(guard, job.id, r1)
     await log.emit(
         ev.FAST_DONE,
         f"Finished reading the letter: {r1.status}",
@@ -168,17 +160,22 @@ async def _run_fast(
 
 
 async def _read_letter(
-    payload: ResearchFastPayload, store: Store, deps: ResearchDeps, log: EventLog
+    payload: ResearchFastJob, deps: ResearchDeps, log: EventLog
 ) -> FastPassOutput:
     """Convert every page in order and run the fast pass with the slow/cap rule."""
     blocks: list[ContentBlock] = []
     try:
         for document_id in payload.document_ids:
-            document = await store.get_document(document_id)
+            document = await reads.get_document(document_id)
+            if document is None:
+                raise ValueError(f"document {document_id} not found")
             for page in document.pages:
-                blocks.extend(await deps.to_blocks_fn(page.data, page.content_type))
+                media = await reads.get_media(page["media_id"])
+                if media is None:
+                    raise ValueError(f"media {page['media_id']} not found")
+                blocks.extend(await deps.to_blocks_fn(media.data, media.content_type))
     except UnsupportedMedia as exc:
-        r1 = R1(
+        r1 = FastResult(
             case_id=payload.case_id, status="needs_better_image", image_issue=str(exc)
         )
         return FastPassOutput(r1=r1, signals=LegitimacySignals())
@@ -200,31 +197,39 @@ async def _read_letter(
     return task.result()
 
 
-async def handle_research_deep(job: Job, store: Store, deps: ResearchDeps) -> None:
+async def handle_research_deep(job: tables.Job, deps: ResearchDeps) -> None:
     """Run a `research_deep` job end to end (-> R2 + brief).
 
-    Reads the case's signals, runs the deep pass, writes `verifications` and
-    `case_briefs`, logs `research.deep_*` and `verification.*` events, and
-    sets the job result to R2.
+    Takes the signals from its payload, runs the deep pass, writes
+    `verifications` and `case_briefs`, logs `research.deep_*` and
+    `verification.*` events, and sets the job result to R2.
     """
     # Sensitive values stay in the fast job's memory; the deep pass never sees them.
     guard = LeakGuard()
-    log = EventLog(store, guard, case_id=job.case_id, job_id=job.job_id)
+    log = EventLog(guard, user_id=job.user_id, case_id=job.case_id, job_id=job.id)
     try:
-        await _run_deep(job, store, deps, guard, log)
+        await _run_deep(job, deps, guard, log)
     except Exception as exc:
-        await _fail(store, log, ev.DEEP_FAILED, f"unexpected {type(exc).__name__}")
+        await _fail(log, ev.DEEP_FAILED, f"unexpected {type(exc).__name__}")
         raise
 
 
 async def _run_deep(
-    job: Job, store: Store, deps: ResearchDeps, guard: LeakGuard, log: EventLog
+    job: tables.Job, deps: ResearchDeps, guard: LeakGuard, log: EventLog
 ) -> None:
-    payload = ResearchDeepPayload.model_validate(job.payload)
-    await store.update_job(job.job_id, "running")
+    payload = ResearchDeepJob.model_validate(job.payload)
     await log.emit(ev.DEEP_STARTED, "Started checking the letter is legitimate")
-    case = await store.get_case(payload.case_id)
-    county = payload.answers.get("county") or case.signals.county
+    row = await reads.get_case(payload.case_id)
+    if row is None or row.fast_result is None:
+        raise ValueError(f"case {payload.case_id} has no fast result")
+    case = CaseRecord(
+        case_id=payload.case_id,
+        user_id=payload.user_id,
+        document_ids=payload.document_ids,
+        r1=FastResult.model_validate(row.fast_result),
+        signals=payload.signals,
+        call_purpose=payload.call_purpose,
+    )
 
     async def research_log(
         event_type: str, summary_en: str, data: dict[str, Any]
@@ -235,7 +240,8 @@ async def _run_deep(
 
     try:
         findings = await asyncio.wait_for(
-            _call_deep_pass(deps, case, county, research_log), deps.deep_timeout_s
+            _call_deep_pass(deps, case, case.signals.county, research_log),
+            deps.deep_timeout_s,
         )
     except (TimeoutError, httpx.HTTPError, APIError) as exc:
         reason = (
@@ -246,11 +252,17 @@ async def _run_deep(
         logger.warning(
             "deep pass failed case_id=%s job_id=%s error=%s",
             payload.case_id,
-            job.job_id,
+            job.id,
             type(exc).__name__,
         )
         findings = DeepFindings(
-            verification=Verification(status="unknown", evidence=[reason])
+            verification=Verification(
+                status="unknown",
+                official_phone=None,
+                letter_phone_matches=None,
+                evidence=[reason],
+                red_flags=[],
+            )
         )
         await log.emit(
             ev.DEEP_FAILED,
@@ -261,16 +273,24 @@ async def _run_deep(
     verification = findings.verification
     if verification.status not in ev.VERIFICATION_EVENT:
         raise ValueError(f"deep pass returned status {verification.status!r}")
+    # The dashboard shows the first evidence entry as the official source.
+    source_url = findings.trust_chain[-1] if findings.trust_chain else None
+    if verification.status == "verified" and source_url:
+        evidence = [source_url, *(e for e in verification.evidence if e != source_url)]
+        verification = verification.model_copy(update={"evidence": evidence})
     guard.check("verifications row", verification.model_dump(mode="json"))
-    ver_id = await store.insert_verification(payload.case_id, verification)
+    ver_row = await writes.save_verification(payload.case_id, verification)
 
-    brief: CaseBrief | None = None
+    brief_id: str | None = None
+    call_goal_en = findings.call_goal_en
     if verification.status == "verified":
         brief = build_brief(case, findings)
         guard.check("case_briefs row", brief.model_dump(mode="json"))
-        await store.insert_case_brief(brief)
+        await writes.save_brief(payload.case_id, brief)
+        brief_id = brief.brief_id
+        call_goal_en = brief.call_goal_en
 
-    r2 = R2(
+    r2 = DeepResult(
         case_id=payload.case_id,
         verification=verification,
         official_phone_purpose=findings.official_phone_purpose,
@@ -279,48 +299,55 @@ async def _run_deep(
             verification.status == "verified"
             and verification.official_phone is not None
         ),
-        brief_id=brief.brief_id if brief else None,
-        call_goal_en=brief.call_goal_en if brief else findings.call_goal_en,
+        brief_id=brief_id,
+        call_goal_en=call_goal_en,
     )
-    await _finish(store, guard, job.job_id, r2.model_dump(mode="json"))
+    await _finish(guard, job.id, r2)
+    data: dict[str, Any] = {
+        "ver_id": ver_row.id,
+        "red_flag_count": len(verification.red_flags),
+    }
+    if verification.status == "verified" and source_url:
+        data["source"] = registered_domain(source_url)
     await log.emit(
         ev.VERIFICATION_EVENT[verification.status],
         f"Letter verification: {verification.status}",
-        {"ver_id": ver_id, "red_flag_count": len(verification.red_flags)},
+        data,
     )
     await log.emit(
         ev.DEEP_DONE,
         "Finished checking the letter",
-        {"ver_id": ver_id, "call_recommended": r2.call_recommended},
+        {"ver_id": ver_row.id, "call_recommended": r2.call_recommended},
     )
 
 
-async def handle_research_question(job: Job, store: Store, deps: ResearchDeps) -> None:
+async def handle_research_question(job: tables.Job, deps: ResearchDeps) -> None:
     """Run a `research_question` job: answer one process question from official pages.
 
     Never talks to the user; the orchestrator reads the job result (QuestionAnswer)
     and relays it. Logs `research.question_*` events without the question text.
     """
     guard = LeakGuard()
-    log = EventLog(store, guard, case_id=job.case_id, job_id=job.job_id)
+    log = EventLog(guard, user_id=job.user_id, case_id=job.case_id, job_id=job.id)
     try:
-        await _run_question(job, store, deps, guard, log)
+        await _run_question(job, deps, guard, log)
     except Exception as exc:
-        await _fail(store, log, ev.QUESTION_FAILED, f"unexpected {type(exc).__name__}")
+        await _fail(log, ev.QUESTION_FAILED, f"unexpected {type(exc).__name__}")
         raise
 
 
 async def _run_question(
-    job: Job, store: Store, deps: ResearchDeps, guard: LeakGuard, log: EventLog
+    job: tables.Job, deps: ResearchDeps, guard: LeakGuard, log: EventLog
 ) -> None:
-    payload = ResearchQuestionPayload.model_validate(job.payload)
-    await store.update_job(job.job_id, "running")
+    payload = ResearchQuestionJob.model_validate(job.payload)
     await log.emit(ev.QUESTION_STARTED, "Started researching a question")
     sensitive: list[str] = []
     letter: str | None = None
     if payload.case_id:
-        sensitive = list((await store.get_case_refs(payload.case_id)).values())
-        letter = letter_context((await store.get_case(payload.case_id)).r1)
+        sensitive = [ref.value for ref in await reads.list_case_refs(payload.case_id)]
+        case = await reads.get_case(payload.case_id)
+        if case is not None and case.fast_result is not None:
+            letter = letter_context(FastResult.model_validate(case.fast_result))
     guard.add(sensitive)
 
     async def research_log(
@@ -352,7 +379,7 @@ async def _run_question(
         logger.warning(
             "question pass failed case_id=%s job_id=%s error=%s",
             payload.case_id,
-            job.job_id,
+            job.id,
             type(exc).__name__,
         )
         answer = QuestionAnswer(status="not_confirmed", reason_en=reason)
@@ -362,7 +389,7 @@ async def _run_question(
             {"error": type(exc).__name__},
         )
 
-    await _finish(store, guard, job.job_id, answer.model_dump(mode="json"))
+    await _finish(guard, job.id, answer)
     await log.emit(
         ev.QUESTION_DONE,
         f"Finished researching a question: {answer.status}",
@@ -379,7 +406,7 @@ async def _call_deep_pass(
         "http": deps.http,
         "log": log_fn,
     }
-    # Track B may add a doc_type kwarg; pass it only when the function takes it.
+    # Fakes may not take doc_type or seed; pass them only when the function does.
     params = inspect.signature(deps.deep_pass_fn).parameters
     any_kwargs = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
     if "doc_type" in params or any_kwargs:
@@ -390,27 +417,21 @@ async def _call_deep_pass(
 
 
 async def _queue(
-    store: Store,
-    guard: LeakGuard,
-    job_type: JobType,
-    payload: dict[str, Any],
-    case_id: str,
+    guard: LeakGuard, payload: JobPayload, user_id: str, case_id: str
 ) -> None:
-    guard.check(f"{job_type} payload", payload)
-    await store.create_job(job_type, payload, case_id=case_id)
+    guard.check(f"{payload.job} payload", payload.model_dump(mode="json"))
+    await db_jobs.enqueue(payload, Component.RESEARCH_AGENT, user_id, case_id)
 
 
-async def _finish(
-    store: Store, guard: LeakGuard, job_id: str, result: dict[str, Any]
-) -> None:
-    guard.check("job result", result)
-    await store.update_job(job_id, "done", result=result)
+async def _finish(guard: LeakGuard, job_id: str, result: BaseModel) -> None:
+    guard.check("job result", result.model_dump(mode="json"))
+    await db_jobs.finish(job_id, result)
 
 
-async def _fail(store: Store, log: EventLog, event_type: str, error: str) -> None:
+async def _fail(log: EventLog, event_type: str, error: str) -> None:
     """Mark the job failed and log it. `error` is our own text, never exception content."""
     logger.warning(
         "%s case_id=%s job_id=%s error=%s", event_type, log.case_id, log.job_id, error
     )
-    await store.update_job(log.job_id, "failed", error=error)
+    await db_jobs.fail(log.job_id, error)
     await log.emit(event_type, f"Job failed: {error}", {"error": error})

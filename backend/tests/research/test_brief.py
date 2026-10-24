@@ -1,14 +1,16 @@
 from datetime import date
 
-from app.research.brief import USER_ANSWERS, build_brief
-from app.research.fake import fake_deep_findings, fake_fast_pass_output
-from app.research.models import (
+from app.contracts import (
     REQUIRED_MUST_NOT_DO,
     Appointment,
     ChecklistItem,
     KeyFact,
 )
-from app.research.sim.store import CaseRecord
+from app.research.brief import USER_ANSWERS, build_brief
+from app.research.fake import fake_deep_findings, fake_fast_pass_output
+from app.research.models import (
+    CaseRecord,
+)
 
 
 def case(**r1_updates: object) -> CaseRecord:

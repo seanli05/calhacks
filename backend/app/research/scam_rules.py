@@ -5,9 +5,11 @@ Each flag is a plain-English sentence the orchestrator can relay as-is.
 
 import re
 
+from app.contracts import (
+    LegitimacySignals,
+)
 from app.research.fetch_tool import is_gov, registered_domain
 from app.research.hints import Hint
-from app.research.models import LegitimacySignals
 
 # (pattern, what the letter asks for). Matched on payment text and signature.
 _PAYMENT_RULES: tuple[tuple[str, str], ...] = (

@@ -18,6 +18,9 @@ import httpx
 from anthropic import AsyncAnthropic
 from pydantic import BaseModel, ValidationError
 
+from app.contracts import (
+    LegitimacySignals,
+)
 from app.research import checks
 from app.research.deep_prompts import DEEP_SYSTEM, FETCH_PAGE_TOOL, SUBMIT_FINDINGS_TOOL
 from app.research.deep_verify import (  # noqa: F401 (question.py imports _same_url here)
@@ -48,7 +51,9 @@ from app.research.hints import (
     purpose_key,
     where_to_look,
 )
-from app.research.models import DeepFindings, LegitimacySignals
+from app.research.models import (
+    DeepFindings,
+)
 from app.research.scam_rules import scam_red_flags
 from app.research.verify_cache import CachedVerification, VerifyCache
 

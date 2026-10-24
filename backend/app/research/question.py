@@ -17,6 +17,12 @@ import httpx
 from anthropic import AsyncAnthropic
 from pydantic import BaseModel, ValidationError
 
+from app.contracts import (
+    FastResult,
+    QuestionAnswer,
+    QuestionSource,
+    ResearchQuestionStatus,
+)
 from app.research.deep_pass import FALLBACK_BETA, LogFn, _log, _same_url
 from app.research.deep_prompts import FETCH_PAGE_TOOL
 from app.research.fetch_tool import (
@@ -28,7 +34,6 @@ from app.research.fetch_tool import (
     system_resolver,
 )
 from app.research.hints import BLOCKED_DOMAINS, ID_SHAPED_PATTERNS
-from app.research.models import R1, QuestionAnswer, QuestionSource, QuestionStatus
 from app.research.question_prompts import QUESTION_SYSTEM, SUBMIT_ANSWER_TOOL
 
 MAX_ITERATIONS = 8
@@ -64,7 +69,7 @@ RETRY_CITED = (
 
 
 class _Submission(BaseModel):
-    status: QuestionStatus
+    status: ResearchQuestionStatus
     answer_en: str | None = None
     sources: list[QuestionSource] = []
 
@@ -90,7 +95,7 @@ def _norm(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip().lower()
 
 
-def letter_context(r1: R1) -> str:
+def letter_context(r1: FastResult) -> str:
     """What the question model may know about the user's letter: R1's plain
     fields only. R1 never holds sensitive values (they travel as refs)."""
     lines = [

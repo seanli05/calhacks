@@ -1,25 +1,37 @@
 from datetime import date
 
 import pytest
-from app.research.fake import fake_case_brief, fake_fast_pass_output, fake_r2
-from app.research.models import (
-    R1,
-    R2,
+from app.contracts import (
     REQUIRED_MUST_NOT_DO,
     CaseBrief,
-    DeepFindings,
-    FastPassOutput,
+    DeepResult,
+    FastResult,
     KeyFact,
     LegitimacySignals,
     LetterPhone,
     ProposedFact,
-    ResearchDeepPayload,
-    ResearchFastPayload,
-    SensitiveValue,
+    ResearchDeepJob,
+    ResearchFastJob,
     SignalResult,
     Verification,
 )
+from app.research.fake import fake_case_brief, fake_fast_pass_output, fake_r2
+from app.research.models import (
+    DeepFindings,
+    FastPassOutput,
+    SensitiveValue,
+)
 from pydantic import BaseModel, ValidationError
+
+
+def verification(status: str, phone: str | None = None) -> Verification:
+    return Verification(
+        status=status,
+        official_phone=phone,
+        letter_phone_matches=None,
+        evidence=[],
+        red_flags=[],
+    )
 
 
 def round_trip(model: BaseModel) -> None:
@@ -40,17 +52,18 @@ def round_trip(model: BaseModel) -> None:
             verification=fake_r2().verification,
             trust_chain=["https://www.example.gov/"],
         ),
-        ResearchFastPayload(
+        ResearchFastJob(
             case_id="case_1",
             user_id="user_1",
             document_ids=["doc_1"],
             user_language="es",
         ),
-        ResearchDeepPayload(
+        ResearchDeepJob(
             case_id="case_1",
             user_id="user_1",
             document_ids=["doc_1"],
-            answers={"county": "X"},
+            signals=fake_fast_pass_output().signals,
+            call_purpose="Confirm the form was received",
         ),
     ],
     ids=lambda m: type(m).__name__,
@@ -66,39 +79,34 @@ def test_dates_serialize_as_iso() -> None:
 
 
 def test_r1_needs_better_image_requires_issue() -> None:
-    R1(
+    FastResult(
         case_id="case_1",
         status="needs_better_image",
         image_issue="Too blurry; hold the phone steady",
     )
     with pytest.raises(ValidationError):
-        R1(case_id="case_1", status="needs_better_image")
+        FastResult(case_id="case_1", status="needs_better_image")
 
 
 def test_r1_needs_user_input_requires_question() -> None:
-    R1(
+    FastResult(
         case_id="case_1",
         status="needs_user_input",
         question_en="Which county do you live in?",
     )
     with pytest.raises(ValidationError):
-        R1(case_id="case_1", status="needs_user_input")
+        FastResult(case_id="case_1", status="needs_user_input")
 
 
 def test_r1_ok_requires_content() -> None:
     with pytest.raises(ValidationError):
-        R1(case_id="case_1", status="ok")
-
-
-def test_r1_rejects_unprefixed_case_id() -> None:
-    with pytest.raises(ValidationError):
-        R1(case_id="123", status="needs_better_image", image_issue="x")
+        FastResult(case_id="case_1", status="ok")
 
 
 def test_r1_rejects_unknown_fields() -> None:
     data = fake_fast_pass_output().r1.model_dump(mode="json") | {"surprise": 1}
     with pytest.raises(ValidationError):
-        R1.model_validate(data)
+        FastResult.model_validate(data)
 
 
 def test_key_fact_needs_exactly_one_of_value_or_ref() -> None:
@@ -138,7 +146,7 @@ def test_phones_must_be_e164(number: str) -> None:
     with pytest.raises(ValidationError):
         LetterPhone(number=number, quote=number)
     with pytest.raises(ValidationError):
-        Verification(status="verified", official_phone=number)
+        verification("verified", number)
 
 
 def test_signal_state_values() -> None:
@@ -150,27 +158,27 @@ def test_signal_state_values() -> None:
 
 def test_verification_status_values() -> None:
     for status in ("pending", "verified", "suspicious", "unknown"):
-        Verification(status=status)
+        verification(status)
     with pytest.raises(ValidationError):
-        Verification(status="legit")
+        verification("legit")
 
 
 def test_r2_call_requires_verified_official_phone() -> None:
     with pytest.raises(ValidationError):
-        R2(
+        DeepResult(
             case_id="case_1",
-            verification=Verification(status="unknown"),
+            verification=verification("unknown"),
             call_recommended=True,
         )
     with pytest.raises(ValidationError):
-        R2(
+        DeepResult(
             case_id="case_1",
-            verification=Verification(status="verified"),
+            verification=verification("verified"),
             call_recommended=True,
         )
-    R2(
+    DeepResult(
         case_id="case_1",
-        verification=Verification(status="unknown"),
+        verification=verification("unknown"),
         call_recommended=False,
     )
 
@@ -232,11 +240,7 @@ def test_fakes_are_consistent() -> None:
 
 def test_payloads_validate() -> None:
     with pytest.raises(ValidationError):
-        ResearchFastPayload(
-            case_id="case_1", user_id="user_1", document_ids=[], user_language="es"
-        )
-    with pytest.raises(ValidationError):
-        ResearchFastPayload(
+        ResearchFastJob(
             case_id="case_1",
             user_id="user_1",
             document_ids=["doc_1"],

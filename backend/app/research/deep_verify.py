@@ -15,6 +15,12 @@ from urllib.parse import urlsplit
 from bs4 import BeautifulSoup
 from pydantic import BaseModel
 
+from app.contracts import (
+    AlternativeContact,
+    LegitimacySignals,
+    SignalResult,
+    Verification,
+)
 from app.research import checks
 from app.research.fetch_tool import (
     FetchedPage,
@@ -24,11 +30,7 @@ from app.research.fetch_tool import (
 )
 from app.research.hints import SECONDARY_LINE_WORDS, Hint, Registry
 from app.research.models import (
-    AlternativeContact,
     DeepFindings,
-    LegitimacySignals,
-    SignalResult,
-    Verification,
 )
 
 

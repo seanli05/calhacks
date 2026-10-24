@@ -13,8 +13,13 @@ from urllib.parse import urlparse
 from anthropic import APIError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from app.contracts import (
+    FastResultStatus,
+)
 from app.research.fast_pass import FastPassError
-from app.research.models import FastPassOutput, R1Status
+from app.research.models import (
+    FastPassOutput,
+)
 from app.research.preprocess import ContentBlock, UnsupportedMedia, to_content_blocks
 
 PAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
@@ -35,7 +40,7 @@ class Expected(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    status: R1Status
+    status: FastResultStatus
     doc_type_prefix: str | None = None
     issuer_contains: list[str] | None = Field(
         default=None, description="Passes if the issuer contains any of these"

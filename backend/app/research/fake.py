@@ -2,22 +2,24 @@
 
 from datetime import date
 
-from app.research.models import (
-    R1,
-    R2,
+from app.contracts import (
     AlternativeContact,
     CaseBrief,
     ChecklistItem,
-    DeepFindings,
-    FastPassOutput,
+    DeepResult,
+    FastResult,
     KeyDate,
     KeyFact,
     LegitimacySignals,
     ProposedFact,
     RepQuestion,
-    SensitiveValue,
     SignalResult,
     Verification,
+)
+from app.research.models import (
+    DeepFindings,
+    FastPassOutput,
+    SensitiveValue,
 )
 
 FAKE_OFFICIAL_PHONE = "+15555550100"
@@ -25,7 +27,7 @@ FAKE_URL = "https://www.example.gov/contact"
 
 
 def fake_fast_pass_output(case_id: str = "case_fake") -> FastPassOutput:
-    r1 = R1(
+    r1 = FastResult(
         case_id=case_id,
         status="ok",
         doc_type="generic_agency_notice",
@@ -77,14 +79,15 @@ def fake_fast_pass_output(case_id: str = "case_fake") -> FastPassOutput:
     )
 
 
-def fake_r2(case_id: str = "case_fake", brief_id: str = "brief_fake") -> R2:
-    return R2(
+def fake_r2(case_id: str = "case_fake", brief_id: str = "brief_fake") -> DeepResult:
+    return DeepResult(
         case_id=case_id,
         verification=Verification(
             status="verified",
             official_phone=FAKE_OFFICIAL_PHONE,
             letter_phone_matches=None,
             evidence=[FAKE_URL],
+            red_flags=[],
             signals=[
                 SignalResult(signal="urls", state="match", evidence=[FAKE_URL]),
                 SignalResult(signal="form_ids", state="match", evidence=[FAKE_URL]),

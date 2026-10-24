@@ -6,14 +6,16 @@ No model call. Explains, never advises (C33); carries no asylum-claim details
 
 import uuid
 
-from app.research.models import (
+from app.contracts import (
     REQUIRED_MUST_NOT_DO,
     CaseBrief,
-    DeepFindings,
     KeyFact,
     RepQuestion,
 )
-from app.research.sim.store import CaseRecord
+from app.research.models import (
+    CaseRecord,
+    DeepFindings,
+)
 
 USER_ANSWERS = "the user, in their own voice, once bridged"
 

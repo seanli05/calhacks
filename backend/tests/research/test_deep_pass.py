@@ -8,9 +8,11 @@ from typing import Any
 
 import httpx
 import pytest
+from app.contracts import (
+    LegitimacySignals,
+)
 from app.research.deep_pass import run_deep_pass
 from app.research.fetch_tool import replay_resolver, replay_transport, save_fixture
-from app.research.models import LegitimacySignals
 from app.research.verify_cache import VerifyCache, seed_entry
 
 SIGNALS_DIR = Path(__file__).resolve().parents[1] / "fixtures/research/signals"

@@ -10,14 +10,14 @@ Owner: person 1. Ask before changing the schema, the contracts, or another write
 
 | Piece | Where | Status |
 |---|---|---|
-| Contracts (every Plan.md payload) | `backend/app/contracts/` | Done. `CaseBrief` is still a placeholder `dict` (persons 3 and 4 define it) |
+| Contracts (every Plan.md payload) | `backend/app/contracts/` | Done |
 | Tables (all 16) | `backend/app/db/tables.py` | Done; created on app startup |
 | Helpers (reads, writes, jobs, events, messages, deletes) | `backend/app/db/` | Done; tested against Postgres |
 | Reset and demo seed | `python -m app.db.reset` | Done (`--after-call` adds a finished call) |
 | WhatsApp pipe, relay, ask_user, call-status messages | `backend/app/relay/`, `orchestrator/` | On `main`; writes `users`, `media`, `documents`, `messages`, `questions`, events. Status: [whatsapp-pipe.md](whatsapp-pipe.md) |
 | Orchestrator's Claude turn, translation, memory writer | their packages | Not on `main` yet |
 | Phone agent | `backend/app/phone/` | State machine and menu decider on `main`; the call runner (dial, hold, bridge, report) not yet |
-| Research agent | branch `research_agent`, top-level `research/` | Has its own models; not yet on the shared contracts (see [Open issues](#open-issues)). `app/dev/fake_research.py` stands in for it |
+| Research agent | `backend/app/research/` | Done; on the shared contracts. Its worker starts with the app (`RESEARCH_WORKER`). `app/dev/fake_research.py` still stands in when the worker is off |
 | Dashboard and its API | `dashboard/`, `backend/app/api/` | Done. What components must write to show up: [dashboard-AGENTS.md](dashboard-AGENTS.md) |
 
 ## Setup
@@ -75,7 +75,7 @@ Need a read that doesn't exist? Add a small one to `app.db.reads` (one query, ex
 | P1 | `AskUserRequest`; reply `AskUserReply` | `questions` |
 | P3 | `CallReport` | `jobs.result` and `calls.report` |
 | C14 | `Event`, `EventType`, `USER_MESSAGING_EVENTS` | `events` |
-| — | `CaseBrief` (`dict` for now) | `case_briefs.brief` |
+| — | `CaseBrief` | `case_briefs.brief` |
 
 Enums and string types (`LanguageCode`, `PhoneE164`, `RefPlaceholder`, ID aliases) are in `app.contracts.common`.
 
@@ -228,13 +228,5 @@ Rules 1, 3, and 6 (only the orchestrator talks free-form, never impersonate the 
 
 Open as of this writing; ask person 1 for the latest.
 
-- **Research models vs contracts.** `research/models.py` (branch `research_agent`) differs from `app.contracts`:
-  - It adds a `needs_user_input` status and `key_dates`.
-  - `Sensitivity` is `high` where the contracts use `sensitive`.
-  - `KeyFact` uses `value`/`page` instead of `citation`.
-  - It stores `signals`/`call_purpose` on the case, which has no column.
-  
-  These need reconciling (contracts or models) before research writes to the DB.
-- **`CaseBrief`** is a placeholder `dict`. The seed uses the shape of `CaseBrief` in `research/models.py` (branch `research_agent`) as a working version: `call_goal_en`, `expected_menu_path`, `questions_to_ask`, `must_not_do`, `facts` (refs), `handoff_note`, `likely_rep_questions`, `contingencies`. Build against it; persons 3 and 4 still need to confirm it.
 - **Demo seed** uses a fake WhatsApp number, so the real demo phone won't match the seeded user yet, and `TWILIO_MOCK_AGENCY_NUMBER` as the verified "official" number (unset means nothing to dial).
 - **Declined sensitive facts:** C15 says the memory writer deletes a fact the user says no to. There's no memory-writer delete helper yet. Ask person 1 before deleting through `app.db.deletes` (that path logs a user-facing `fact.deleted` event).

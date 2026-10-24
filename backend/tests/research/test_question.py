@@ -6,15 +6,15 @@ from typing import Any
 
 import httpx
 import pytest
+from app.contracts import QuestionAnswer, QuestionSource, ResearchQuestionJob
+from app.db import tables
 from app.research.fake import fake_fast_pass_output
 from app.research.fetch_tool import replay_resolver
 from app.research.jobs import handle_research_question
-from app.research.models import QuestionAnswer, QuestionSource
 from app.research.question import answer_question, scrub_question
-from app.research.sim.memory import InMemoryStore
-from app.research.sim.run import fake_deps
-from app.research.sim.store import CaseRecord
 from pydantic import ValidationError
+
+from research.fakes import FakeResearchDB, fake_deps
 
 GOV = "https://www.uscis.gov/interview"
 NOT_GOV = "https://immigration-help.example.com/interview"
@@ -181,30 +181,33 @@ def test_answer_contract_needs_sources_and_only_for_answered() -> None:
         QuestionAnswer(status="not_confirmed", answer_en="Yes.")
 
 
-async def queue_question(
-    store: InMemoryStore, question: str = "Can I bring an interpreter?"
-) -> str:
-    return await store.create_job(
-        "research_question",
-        {"job": "research_question", "user_id": "user_1", "question_en": question},
+def queue_question(
+    store: FakeResearchDB,
+    question: str = "Can I bring an interpreter?",
+    case_id: str | None = None,
+) -> tables.Job:
+    payload = ResearchQuestionJob(
+        user_id="user_1", case_id=case_id, question_en=question
     )
+    return store.add_claimed_job(payload, case_id)
 
 
-async def test_handler_writes_result_and_keeps_question_out_of_events() -> None:
-    store = InMemoryStore()
-    job_id = await queue_question(store, "Secret question text?")
-    await handle_research_question(store.jobs[job_id], store, fake_deps())
+async def test_handler_writes_result_and_keeps_question_out_of_events(
+    store: FakeResearchDB,
+) -> None:
+    job = queue_question(store, "Secret question text?")
+    await handle_research_question(job, fake_deps())
 
-    job = store.jobs[job_id]
     assert job.status == "done"
     assert QuestionAnswer.model_validate(job.result).status == "answered"
-    types = [e.type for e in store.events]
+    types = store.event_types()
     assert types[0] == "research.question_started"
     assert types[-1] == "research.question_done"
+    assert all(e.user_id == "user_1" for e in store.events)
     assert all("Secret question" not in e.model_dump_json() for e in store.events)
 
 
-async def test_handler_timeout_is_not_confirmed() -> None:
+async def test_handler_timeout_is_not_confirmed(store: FakeResearchDB) -> None:
     async def slow(*_: Any, **__: Any) -> QuestionAnswer:
         await asyncio.sleep(1)
         raise AssertionError("should have timed out")
@@ -212,13 +215,12 @@ async def test_handler_timeout_is_not_confirmed() -> None:
     deps = fake_deps()
     deps.question_fn = slow
     deps.question_timeout_s = 0.01
-    store = InMemoryStore()
-    job_id = await queue_question(store)
-    await handle_research_question(store.jobs[job_id], store, deps)
+    job = queue_question(store)
+    await handle_research_question(job, deps)
 
-    result = QuestionAnswer.model_validate(store.jobs[job_id].result)
+    result = QuestionAnswer.model_validate(job.result)
     assert result.status == "not_confirmed"
-    assert "research.question_failed" in [e.type for e in store.events]
+    assert "research.question_failed" in store.event_types()
 
 
 def cited(url: str, cited_text: str) -> SimpleNamespace:
@@ -273,19 +275,9 @@ async def test_text_with_non_gov_citation_or_long_uncited_claim_is_not_answered(
     assert unsupported.status == "not_confirmed"
 
 
-async def test_sim_report_summarizes_a_question_job() -> None:
-    from app.research.sim.run import job_summary
-
-    store = InMemoryStore()
-    job_id = await queue_question(store)
-    await handle_research_question(store.jobs[job_id], store, fake_deps())
-
-    assert job_summary(store.jobs[job_id]) == "answer status=answered sources=1"
-
-
-async def test_question_about_a_letter_gets_its_context_without_sensitive_values() -> (
-    None
-):
+async def test_question_about_a_letter_gets_its_context_without_sensitive_values(
+    store: FakeResearchDB,
+) -> None:
     seen: dict[str, Any] = {}
 
     async def capture(question_en: str, **kwargs: Any) -> QuestionAnswer:
@@ -293,29 +285,14 @@ async def test_question_about_a_letter_gets_its_context_without_sensitive_values
         return QuestionAnswer(status="not_confirmed", reason_en="x")
 
     out = fake_fast_pass_output("case_1")
-    store = InMemoryStore()
-    store.cases["case_1"] = CaseRecord(
-        case_id="case_1",
-        user_id="user_1",
-        document_ids=["doc_1"],
-        r1=out.r1,
-        signals=out.signals,
-    )
+    await store.create_case("case_1", "user_1", ["doc_1"])
+    await store.save_fast_result("case_1", out.r1)
     for sv in out.sensitive_values:
-        await store.insert_case_ref("case_1", sv.field, sv.value)
-    job_id = await store.create_job(
-        "research_question",
-        {
-            "job": "research_question",
-            "user_id": "user_1",
-            "case_id": "case_1",
-            "question_en": "Can my kids come?",
-        },
-        "case_1",
-    )
+        await store.put_ref("case_1", sv.field, sv.value)
+    job = queue_question(store, "Can my kids come?", case_id="case_1")
     deps = fake_deps()
     deps.question_fn = capture
-    await handle_research_question(store.jobs[job_id], store, deps)
+    await handle_research_question(job, deps)
 
     assert f"Document type: {out.r1.doc_type}" in seen["letter"]
     for sv in out.sensitive_values:

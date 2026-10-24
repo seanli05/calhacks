@@ -9,15 +9,16 @@ import time
 from pathlib import Path
 
 from anthropic import AsyncAnthropic
-from pydantic import ValidationError
 
 from app.research.eval_harness import report
 from app.research.eval_harness import run_eval as run_eval_fixtures
 from app.research.fake import fake_fast_pass_output
 from app.research.fast_pass import FastPassError, run_fast_pass
-from app.research.models import FastPassOutput
+from app.research.models import (
+    FastPassOutput,
+)
 from app.research.preprocess import ContentBlock, UnsupportedMedia, to_content_blocks
-from app.research.sim.settings import ResearchSettings
+from app.settings import Settings, get_settings
 
 LETTER_FIXTURES = (
     Path(__file__).resolve().parents[2] / "tests/fixtures/research/letters"
@@ -25,25 +26,19 @@ LETTER_FIXTURES = (
 
 FAST_TIMEOUT_S = 45.0
 CLI_CASE_ID = "case_cli"
-NO_KEY_MESSAGE = (
-    "No API key: set ANTHROPIC_API_KEY, MODEL_DEFAULT and MODEL_DEEP in .env "
-    "(see .env.example)."
-)
+NO_KEY_MESSAGE = "No API key: set ANTHROPIC_API_KEY in .env (see .env.example)."
 
 
-def _load_settings() -> ResearchSettings | None:
+def _load_settings() -> Settings | None:
     """Settings with a non-empty API key, or None."""
-    try:
-        settings = ResearchSettings()
-    except ValidationError:
-        return None
-    if not settings.anthropic_api_key.get_secret_value().strip():
+    settings = get_settings()
+    if not settings.anthropic_api_key.strip():
         return None
     return settings
 
 
-def _client(settings: ResearchSettings) -> AsyncAnthropic:
-    return AsyncAnthropic(api_key=settings.anthropic_api_key.get_secret_value())
+def _client(settings: Settings) -> AsyncAnthropic:
+    return AsyncAnthropic(api_key=settings.anthropic_api_key)
 
 
 async def _read_pages(pages: list[Path]) -> list[ContentBlock]:
@@ -133,8 +128,6 @@ async def run_deep(
     import time
 
     import httpx
-    from anthropic import AsyncAnthropic
-    from pydantic import ValidationError
 
     from app.research import deep_pass
     from app.research.fetch_tool import (
@@ -145,7 +138,6 @@ async def run_deep(
         system_resolver,
     )
     from app.research.models import LegitimacySignals
-    from app.research.sim.settings import ResearchSettings
     from app.research.verify_cache import SEED_CACHE_DIR, VerifyCache
 
     raw = json.loads(signals_path.read_text())
@@ -168,11 +160,8 @@ async def run_deep(
                     signals, record, http=http, resolve=replay_resolver, log=log
                 )
         else:
-            try:
-                settings = ResearchSettings()
-            except ValidationError:
-                settings = None
-            if settings is None or not settings.anthropic_api_key.get_secret_value():
+            settings = _load_settings()
+            if settings is None:
                 print(
                     "No ANTHROPIC_API_KEY: running code checks only; discovery loop skipped."
                 )
@@ -183,9 +172,7 @@ async def run_deep(
                 transport = RecordingTransport() if mode == "record" else None
                 async with (
                     httpx.AsyncClient(transport=transport) as http,
-                    AsyncAnthropic(
-                        api_key=settings.anthropic_api_key.get_secret_value()
-                    ) as client,
+                    _client(settings) as client,
                 ):
                     findings = await deep_pass.run_deep_pass(
                         signals,

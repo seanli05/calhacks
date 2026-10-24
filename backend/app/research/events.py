@@ -10,26 +10,30 @@ import re
 from collections.abc import Iterable
 from typing import Any
 
-from app.research.sim.store import Store
+from app.contracts import Component, Event, EventType
+from app.db import events as db_events
+from app.db.ids import new_id
+from app.db.tables import utcnow
 
-SOURCE = "research_agent"
+SOURCE = Component.RESEARCH_AGENT
 
-FAST_STARTED = "research.fast_started"
-FAST_SLOW = "research.fast_slow"
-FAST_DONE = "research.fast_done"
-FAST_FAILED = "research.fast_failed"
-DEEP_STARTED = "research.deep_started"
-DEEP_DONE = "research.deep_done"
-DEEP_FAILED = "research.deep_failed"
-QUESTION_STARTED = "research.question_started"
-QUESTION_DONE = "research.question_done"
-QUESTION_FAILED = "research.question_failed"
-SEARCH = "research.search"
-FETCH = "research.fetch"
-CHECK = "research.check"
-VERIFIED = "verification.verified"
-SUSPICIOUS = "verification.suspicious"
-UNKNOWN = "verification.unknown"
+CASE_CREATED = EventType.CASE_CREATED
+FAST_STARTED = EventType("research.fast_started")
+FAST_SLOW = EventType("research.fast_slow")
+FAST_DONE = EventType("research.fast_done")
+FAST_FAILED = EventType("research.fast_failed")
+DEEP_STARTED = EventType("research.deep_started")
+DEEP_DONE = EventType("research.deep_done")
+DEEP_FAILED = EventType("research.deep_failed")
+QUESTION_STARTED = EventType("research.question_started")
+QUESTION_DONE = EventType("research.question_done")
+QUESTION_FAILED = EventType("research.question_failed")
+SEARCH = EventType("research.search")
+FETCH = EventType("research.fetch")
+CHECK = EventType("research.check")
+VERIFIED = EventType.VERIFICATION_VERIFIED
+SUSPICIOUS = EventType.VERIFICATION_SUSPICIOUS
+UNKNOWN = EventType.VERIFICATION_UNKNOWN
 
 RESEARCH_LOG_TYPES = frozenset({SEARCH, FETCH, CHECK})
 VERIFICATION_EVENT = {
@@ -76,10 +80,10 @@ class EventLog:
     """Writes research events for one job, checking each against the guard."""
 
     def __init__(
-        self, store: Store, guard: LeakGuard, *, case_id: str | None, job_id: str
+        self, guard: LeakGuard, *, user_id: str, case_id: str | None, job_id: str
     ) -> None:
-        self.store = store
         self.guard = guard
+        self.user_id = user_id
         self.case_id = case_id
         self.job_id = job_id
 
@@ -89,11 +93,17 @@ class EventLog:
         self.guard.check(
             f"event {event_type}", {"summary_en": summary_en, "data": data}
         )
-        return await self.store.add_event(
-            event_type,
-            SOURCE,
-            summary_en,
-            case_id=self.case_id,
-            job_id=self.job_id,
-            data=data,
+        event = await db_events.append_event(
+            Event(
+                event_id=new_id("event"),
+                created_at=utcnow(),
+                type=EventType(event_type),
+                source=SOURCE,
+                user_id=self.user_id,
+                case_id=self.case_id,
+                job_id=self.job_id,
+                summary_en=summary_en,
+                data=data or {},
+            )
         )
+        return event.event_id

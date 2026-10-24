@@ -299,7 +299,7 @@ def test_asylum_claim_facts_are_dropped() -> None:
 
 def test_proposed_fact_sensitivity_and_source() -> None:
     facts = {p.fact: p for p in build(canned()).r1.proposed_facts}
-    assert facts["Has an asylum interview scheduled"].sensitivity == "high"
+    assert facts["Has an asylum interview scheduled"].sensitivity == "sensitive"
     assert facts["Has dependents"].sensitivity == "normal"
     assert all(p.source == "from_document" for p in facts.values())
 

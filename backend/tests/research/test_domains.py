@@ -6,6 +6,9 @@ from pathlib import Path
 
 import httpx
 import pytest
+from app.contracts import (
+    LegitimacySignals,
+)
 from app.research import checks
 from app.research.deep_pass import RunRecord, replay_deep_pass
 from app.research.deep_verify import Discovery, Submission, org_domain, verify
@@ -20,7 +23,9 @@ from app.research.fetch_tool import (
     save_fixture,
 )
 from app.research.hints import HINTS, Hint, Registry, hint_key, where_to_look
-from app.research.models import DeepFindings, LegitimacySignals
+from app.research.models import (
+    DeepFindings,
+)
 from app.research.scam_rules import scam_red_flags
 from tests.research.test_deep_pass import (
     FakeClient,

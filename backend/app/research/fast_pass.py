@@ -16,20 +16,22 @@ from anthropic import AsyncAnthropic, transform_schema
 from anthropic.types import MessageParam, TextBlockParam
 from pydantic import ValidationError
 
-from app.research.checks import deadline_sane
-from app.research.extraction import Extraction
-from app.research.models import (
-    R1,
+from app.contracts import (
     Appointment,
     ChecklistItem,
-    FastPassOutput,
+    FastResult,
     KeyDate,
     KeyFact,
     LegitimacySignals,
     LetterPhone,
     ProposedFact,
-    SensitiveValue,
     Urgency,
+)
+from app.research.checks import deadline_sane
+from app.research.extraction import Extraction
+from app.research.models import (
+    FastPassOutput,
+    SensitiveValue,
 )
 from app.research.preprocess import ContentBlock
 from app.research.prompts import FAST_PASS_SYSTEM
@@ -218,14 +220,14 @@ def build_output(
 ) -> FastPassOutput:
     """Turn the model's extraction into R1 + signals + sensitive values, applying the safety rules."""
     if not ex.readable:
-        r1 = R1(
+        r1 = FastResult(
             case_id=case_id,
             status="needs_better_image",
             image_issue=ex.image_issue or DEFAULT_IMAGE_TIP,
         )
         return FastPassOutput(r1=r1, signals=LegitimacySignals())
     if ex.pages_from_different_letters:
-        r1 = R1(
+        r1 = FastResult(
             case_id=case_id,
             status="needs_user_input",
             question_en=DIFFERENT_LETTERS_QUESTION,
@@ -306,7 +308,7 @@ def build_output(
         ProposedFact(
             fact=pf.fact,
             source="from_document",
-            sensitivity="high"
+            sensitivity="sensitive"
             if pf.sensitive or pf.category in SENSITIVE_CATEGORIES
             else "normal",
         )
@@ -321,7 +323,7 @@ def build_output(
     if hedges:
         explanation = " ".join([explanation, *hedges])
 
-    r1 = R1(
+    r1 = FastResult(
         case_id=case_id,
         status="ok",
         doc_type=_slug(ex.doc_type or "") or "other_letter",
@@ -366,8 +368,8 @@ def build_output(
 
 
 def scrub_output(
-    r1: R1, signals: LegitimacySignals, sensitive: list[SensitiveValue]
-) -> tuple[R1, LegitimacySignals]:
+    r1: FastResult, signals: LegitimacySignals, sensitive: list[SensitiveValue]
+) -> tuple[FastResult, LegitimacySignals]:
     """Take every sensitive value out of R1 and the signals, so a letter with personal data still processes.
 
     Prose fields get the value replaced by a plain description ("your address").

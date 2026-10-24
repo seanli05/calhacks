@@ -8,7 +8,9 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from app.research.models import LegitimacySignals
+from app.contracts import (
+    LegitimacySignals,
+)
 
 # Sites that republish agency numbers. Their numbers can be stale or planted, so
 # the fetch tool refuses them and web search never returns them.

@@ -115,6 +115,28 @@ The call runner (`phone/runner.py`) runs a whole call on fakes. To watch one aga
 
 To play the line yourself, run the playground from `backend/`: `python -m app.phone.playground`. Each line you paste is what the agency says; the real runner answers, and each step shows the 1c reading, the state change, the 1b action, what went out, and latency. Add `--fake` to run without Claude (you type the menu decision). `/help` lists the commands; `/save <name>` records a session, and `python -m app.phone.playground --replay app/phone/playground/scripts/<name>.json` replays it with a pass/fail table (add `--fake` to replay the recorded answers for free). In a new worktree, copy the main checkout's `.env` first, or export `ANTHROPIC_API_KEY`.
 
+### The research agent
+
+Research runs inside the backend: a worker started with the app claims `research_fast`, `research_deep` and `research_question` jobs from Postgres. It starts when `RESEARCH_WORKER=true` (the default) and `ANTHROPIC_API_KEY` is set; set `RESEARCH_WORKER=false` to run the backend without it. Don't call `POST /dev/fake-research` while the worker runs: both claim the same jobs.
+
+`DEMO_DIAL_NUMBER` (in `.env.example`, the mock agency line) makes `official_dial_number` return that number instead of the verified one, still only for a verified case (Plan.md C40). Leave it set for every rehearsal and the demo.
+
+Dev tools, from `backend/` (`--help` on each):
+
+```bash
+python -m app.research.cli fast --fake tests/fixtures/research/letters/i797c_asylum_interview/page_1.png   # canned R1, no key
+python -m app.research.cli fast tests/fixtures/research/letters/i797c_asylum_interview/page_1.png          # real fast pass
+python -m app.research.cli deep --signals tests/fixtures/research/signals/uscis_interview.json --replay    # recorded web, no network
+python -m app.research.cli eval                                                                             # score the fast pass on the fixture letters
+python -m app.research.cli ask "Can I bring an interpreter to my asylum interview?"
+```
+
+The live end-to-end test runs the demo letter through the worker, a real database, the model and the web, then checks the dashboard API. It needs `ANTHROPIC_API_KEY` and a Neon branch of your own in `TEST_DATABASE_URL` (it drops every table there), takes a few minutes and costs a few cents:
+
+```bash
+RESEARCH_E2E=1 pytest backend/tests/research/test_e2e_live.py
+```
+
 ### Deploying for the demo
 
 Everything runs on one laptop (the one recording the video). Only the backend is public, through ngrok, so Twilio can reach it. The dashboard stays on `localhost`.

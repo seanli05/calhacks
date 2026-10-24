@@ -43,7 +43,7 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | `relay/` | WhatsApp webhook, Twilio send/download, templates (`send_template`); ask_user relay | 2 | Webhook, sending, templates, ask_user (`relay.ask_user.ask_user(request)`, P1) done |
 | `orchestrator/`, `translation/`, `memory/` | WhatsApp agent, translation, memory writer | 2 | Pipe (language pick, photo grouping), call-status messages (C36, `orchestrator/call_status.py`), letter → `research_fast` with a job watcher (`orchestrator/letters.py`, `job_watch.py`), and the Claude turn with five tools plus translation at the edges (`orchestrator/turn.py`, `translation/translate.py`) done; reacting to results, consent and calls, glossary grounding, memory not started. Interfaces and decisions: [docs/whatsapp-pipe.md](../docs/whatsapp-pipe.md) |
 | `dev/` | Dev-only stand-ins: `POST /dev/fake-call` (a scripted call without the phone agent), `POST /dev/fake-research` (finishes research jobs from the contract fixtures). Off unless `DEV_ENDPOINTS=true`; local requests only | 2 | Done |
-| `research/`, `glossary/` | Letter reading, verification, case brief; glossary | 3 | Work is on branch `research_agent` (top-level `research/`, own models); integration plan in [docs/research-integration.md](../docs/research-integration.md) |
+| `research/`, `glossary/` | Letter reading, verification, case brief; glossary | 3 | Research done: fast pass (R1, refs), deep pass (verification, alternative contacts, brief), `research_question`, on `app.contracts` and `app.db`. `worker.py` claims its jobs and starts with the app (`RESEARCH_WORKER`); `jobs.py` holds the handlers; `cli.py` runs each pass alone (README → The research agent). Tests and a DB fake in `tests/research/`, letter and web fixtures in `tests/fixtures/research/`. Glossary not started |
 | `phone/` | Call state machine, hold/human detection, bridge, call report | 4 | State machine (`state.py`), menu decider (`menu.py`), phase classifier (`phase.py`), ports and fakes (`ports.py`, `fakes.py`), and the call runner (`runner.py` + `runner_*.py`, `executor.py`, a stand-in `report.py`) done, with a text-tree simulator (`simulate.py`, `sim_trees.py`) and an interactive playground (`playground/`, where you play the line); see [docs/specs/phone-ports.md](../docs/specs/phone-ports.md). Real audio (Twilio + Pipecat), the bridge, the LLM call report, and the job worker next |
 
 Tests live in `backend/tests/`. Contract fixtures in `backend/tests/fixtures/contracts/` double as fake inputs for any component.
@@ -80,6 +80,4 @@ ruff format . && ruff check --fix . && pytest         # before every push
 ## Open issues
 
 Tracked in [data-layer-guide.md → Open issues](../docs/data-layer-guide.md#open-issues):
-- the provisional `CaseBrief` shape;
-- the research models that don't match the contracts yet;
 - the fake WhatsApp number in the seed.

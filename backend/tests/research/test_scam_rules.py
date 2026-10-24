@@ -1,8 +1,10 @@
 """Scam red flags: deterministic, offline."""
 
 import pytest
+from app.contracts import (
+    LegitimacySignals,
+)
 from app.research.hints import where_to_look
-from app.research.models import LegitimacySignals
 from app.research.scam_rules import scam_red_flags
 
 USCIS = where_to_look("uscis_i797c")

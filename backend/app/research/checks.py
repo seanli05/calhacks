@@ -9,8 +9,11 @@ from urllib.parse import urlsplit
 import phonenumbers
 from bs4 import BeautifulSoup
 
+from app.contracts import (
+    SignalResult,
+    VerificationStatus,
+)
 from app.research.fetch_tool import FetchedPage, is_gov, registered_domain
-from app.research.models import SignalResult, VerificationStatus
 
 DomainTrust = Literal["anchor", "linked_from_anchor", "untrusted"]
 
