@@ -99,7 +99,7 @@ Work on the branch `chris/research-contracts` from `main`. Set the status row to
 - `common.py`:
   - `FastResultStatus` gains `needs_user_input`.
   - `JobType` gains `research_question`.
-  - New `KeyDateType`, `SignalState` and `QuestionStatus` enums.
+  - New `KeyDateType`, `SignalState` and `ResearchQuestionStatus` enums. (Research's `QuestionStatus` is renamed, because `QuestionStatus` already tracks ask_user questions.)
 - `results.py`:
   - `FastResult` gains `question_en` and `key_dates` (new `KeyDate`), and their `R1` status validator.
   - `KeyFact` becomes theirs: exactly one of `value` or `ref`, plus `quote` and `page`; no `citation`.
@@ -122,7 +122,7 @@ Work on the branch `chris/research-contracts` from `main`. Set the status row to
 
 **1b. Data layer (`backend/app/db/`).**
 - `writes.research.create_case` is idempotent: it returns the existing row when the case ID already exists.
-- `writes.research.save_brief(case_id, brief, handoff_note, brief_id=None)` uses the given `brief_id` when there is one. The brief's own `brief_id` and the row's ID must match.
+- `writes.research.save_brief(case_id, brief, handoff_note=None)`: given a `CaseBrief`, the row's ID is the brief's own `brief_id` and the handoff note comes from the brief. A plain dict (dev tools, tests) still works, and gets a new ID.
 - `progress.py`: a new `CaseStage.NEEDS_ANSWER`, which applies when the latest R1 is `needs_user_input` and no newer fast job is running. Add it to the stage table in `docs/data-layer-guide.md`.
 - `settings.py`: `demo_dial_number: str = ""` (with an E.164 check when set), and `research_worker: bool = True`. Add both to `.env.example`, with `DEMO_DIAL_NUMBER` defaulting to the mock agency line.
 - `reads.official_dial_number`: keep every existing check. When `demo_dial_number` is set, return it instead of the verified number, and add a comment pointing to C40.
@@ -189,6 +189,7 @@ git mv fixtures backend/tests/fixtures/research
 - Delete from `research/models.py` everything that step 1 moved into `app.contracts`, and import those from `app.contracts`.
 - Keep the models internal to research there: `SensitiveValue`, `FastPassOutput`, `DeepFindings` and the other pass outputs.
 - Rename sensitivity `high` to `sensitive` everywhere.
+- Import `ResearchQuestionStatus` where research had `QuestionStatus`, and `ResearchQuestionJob` where it had `ResearchQuestionPayload`. Use `ResearchFastJob` and `ResearchDeepJob` for its `ResearchFastPayload` and `ResearchDeepPayload`, and `FastResult` and `DeepResult` for `R1` and `R2`.
 - Delete `ResearchDeepPayload.answers` and its fallback in `jobs.py` (row 12).
 - When the fast pass queues the deep pass, put `signals` and `call_purpose` in the `ResearchDeepJob`. The deep pass reads them from the payload, not from a case record.
 
@@ -203,7 +204,7 @@ git mv fixtures backend/tests/fixtures/research
 | `get_case` | Not needed: the deep pass reads `signals` and `call_purpose` from its job. R1 is in `reads.get_case(case_id).fast_result` if needed |
 | `insert_case_ref` | `writes.research.put_ref(case_id, field, value)` returns nothing; the placeholder is `<ref:field>` |
 | `insert_verification` | `writes.research.save_verification(case_id, verification)` |
-| `insert_case_brief` | `writes.research.save_brief(case_id, brief.model_dump(mode="json"), handoff_note, brief_id=brief.brief_id)` |
+| `insert_case_brief` | `writes.research.save_brief(case_id, brief)` with the `CaseBrief` model. The row's ID is `brief.brief_id`, so R2's `brief_id` is that same value |
 | `create_job` | `jobs.enqueue(<contract model>, Component.RESEARCH_AGENT, user_id, case_id)` |
 | `update_job` | `jobs.claim_next` sets `running`; finish with `jobs.finish(job.id, result_model)` or `jobs.fail(job.id, reason)` |
 | `add_event` | `events.append_event(Event(event_id=new_id("event"), created_at=utcnow(), type=EventType..., source=Component.RESEARCH_AGENT, user_id=..., case_id=..., job_id=..., summary_en=..., data=...))` |

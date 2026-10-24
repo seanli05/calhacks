@@ -143,16 +143,16 @@ if job:
 ### Research agent
 
 1. Claim `research_fast`. `reads.get_document` gives the pages (`[{"media_id", "added_at"}]`); `reads.get_media(media_id).data` gives the bytes.
-2. `writes.research.create_case(case_id, user_id, document_ids)`. The `case_id` comes from the payload; the orchestrator minted it.
+2. `writes.research.create_case(case_id, user_id, document_ids)`. The `case_id` comes from the payload; the orchestrator minted it. It's idempotent, so a second fast pass for the same case (C39) reuses the row.
 3. For each sensitive value: `put_ref(case_id, "receipt_number", value)`. Use only `<ref:receipt_number>` in R1.
 4. `save_fast_result(case_id, fast_result)` (also sets `doc_type` and `deadline`), `jobs.finish(job.id, fast_result)`, then enqueue `ResearchDeepJob`.
-5. Deep pass: `save_verification(case_id, verification)` (adds a row; the latest one counts), then `save_brief(case_id, brief_dict, handoff_note)` gives the `brief_id` for R2, then `jobs.finish(job.id, deep_result)`.
+5. Deep pass: `save_verification(case_id, verification)` (adds a row; the latest one counts), then `save_brief(case_id, brief)` with a `CaseBrief` (its own `brief_id` becomes the row's ID, so R2 can name it), then `jobs.finish(job.id, deep_result)`.
 6. Glossary misses: enqueue `GlossaryLookupJob` (stretch).
 
 ### Phone agent
 
 1. Claim `call`; `payload_of(job)` gives a `CallJob`.
-2. **Number to dial: only `reads.official_dial_number(case_id)`** (rule 2). It raises `UnverifiedNumber` unless the case's latest verification is `verified` and has a phone. Never dial anything else, and don't catch the error to fall back.
+2. **Number to dial: only `reads.official_dial_number(case_id)`** (rule 2). It raises `UnverifiedNumber` unless the case's latest verification is `verified` and has a phone. While `DEMO_DIAL_NUMBER` is set it returns that number instead, after the same checks (Plan.md C40). Never dial anything else, and don't catch the error to fall back.
 3. The user's number to ring: `reads.get_user(user_id).whatsapp_number` (C6, C29).
 4. The brief: `reads.get_brief(brief_id).brief`. Resolve refs only if needed, with `reads.resolve_ref(case_id, "<ref:…>")`; the agent never speaks identifiers (C35).
 5. `writes.phone.create_call(case_id, job.id, brief_id, consent_message_id)`, then `set_call_state(call_id, CallState.MENU, twilio_call_sid=…)` as the call moves. `ENDED` sets `ended_at`.
@@ -186,6 +186,7 @@ Reads plus `app.db.deletes`: `delete_fact`, `delete_document` (and its images), 
 | `received` | Case exists, nothing started |
 | `explaining` | Latest `research_fast` job is queued or running |
 | `needs_better_image` | R1 came back `needs_better_image` |
+| `needs_answer` | R1 came back `needs_user_input` (C39): waiting for the user's answer |
 | `checking` | Deep pass queued or running, verification pending, or R1 ok with no verdict yet |
 | `suspicious` / `unknown` | Latest verification says so |
 | `awaiting_consent` | Verified, no call yet |

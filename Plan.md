@@ -73,6 +73,9 @@ We're building a WhatsApp-based agent that helps immigrant families deal with im
 | C35 | The phone agent never types or says the A-Number, receipt number, or date of birth, in the phone menu or to the representative. The mock line's menu doesn't ask for them. If a real menu requires one, the agent takes the path that doesn't need it (e.g., "speak to a representative") or asks the user via ask_user which path to take; the user gives identifiers in their own voice once bridged. **Needs team decision:** whether entering the receipt number in a menu counts as answering a verification question (rule 3). | USCIS menus ask for these numbers, and they function as identity checks. Rule 3 forbids the agent answering for the user; this picks the strict reading until the team decides. |
 | C36 | The phone agent logs every call event unfiltered; the orchestrator decides which reach the user (P2), by fixed rules in code, sent as relay templates. It owns the "On hold" limit (one per 10 minutes per call); `call.human_detected` is always sent at once. Person 2 agreed (Oct 23). | Keeps the phone agent transparent and puts all user-facing policy in one place. Rules instead of a model call, because the user has only 30 s to answer once a human picks up. |
 | C37 | The phone agent answers phone menus by speaking (TTS on the live stream), not with DTMF. For a menu step that only accepts the keypad, it updates the call through the REST API with `<Play digits>` and then a new `<Connect><Stream>`, batching digits so it reconnects as rarely as possible and carrying call state across the new stream. It never sends identifiers this way **[C35]**. | Twilio Media Streams can't send DTMF. In a spike call, Pipecat's in-band tones weren't registered as key presses; speaking and the REST update both worked, each in about 5 s ([spikes/dtmf/README.md](spikes/dtmf/README.md)). Speaking keeps one unbroken stream, which hold detection and the bridge depend on; the REST update drops the stream on every use. |
+| C38 | A `research_question` job answers the user's factual questions about their letter or process from official sources only. The orchestrator queues it with the question in English (and the `case_id` when it's about a case; research then reads only that case's R1 and refs). The result is `answered` with quotes from the official pages, or a decline: `not_confirmed`, `declined_legal_advice`, `declined_asylum_claim` (C33, C34), or `out_of_scope`. The orchestrator relays it. | Users ask questions the letter doesn't answer. Answering from the model's memory risks wrong immigration information; grounding every answer in a quoted official page keeps it checkable. |
+| C39 | R1 may be `needs_user_input` with `question_en`, when the pages look like different letters. The orchestrator asks the question, then queues `research_fast` again for the same case with the reply as `user_note_en`. The case stage is `needs_answer` meanwhile. | Photos sent within seconds become one letter, so two letters can land in one document. Only research can see that, and guessing would explain the wrong letter. |
+| C40 | Demo exception to rule 2: while `DEMO_DIAL_NUMBER` is set, `official_dial_number` returns it (the mock agency line) instead of the verified official number. Every other check still applies: an unverified case gets no number. Research still saves the real official number, so verification and the dashboard stay truthful. Clear it before calling real agencies. | Research finds the real USCIS number, so without this a rehearsal would call USCIS. Keeping the swap inside the one helper keeps a single path to any dialed number. |
 
 ## MVP and stretch goals
 
@@ -207,6 +210,7 @@ All handoffs go through Postgres: a `jobs` row (type, status, payload, result) p
 | `call` | Orchestrator, after consent | Phone agent | P3 |
 | `memory_write` | Orchestrator (after each reply), research agent (with R1/R2), phone agent (with P3) | Memory writer | Facts saved, superseded, or held for consent |
 | `glossary_lookup` (stretch **[C28]**) | Research agent | Glossary worker | Glossary entry |
+| `research_question` **[C38]** | Orchestrator, for a user's factual question | Research agent | Answer with official sources, or a decline |
 
 **Statuses:** `queued` → `running` → `done` or `failed`. The handler moves the status and writes `result` (or an error). The orchestrator reacts when `research_fast`, `research_deep`, and `call` jobs for its cases finish.
 
@@ -224,9 +228,9 @@ Trigger: user sends a photo or PDF. Relay acknowledges immediately. Each documen
 
 Trigger: parsing done. Orchestrator translates and sends the explanation and checklist, ending with "I'm checking that this letter is legitimate." Proposed facts go to the memory writer; the deep pass starts automatically.
 
-If `status` is `needs_better_image`, the other fields are empty and the orchestrator asks for a new photo using `image_issue` as the tip. **[C9]**
+If `status` is `needs_better_image`, the other fields are empty and the orchestrator asks for a new photo using `image_issue` as the tip. **[C9]** If it's `needs_user_input`, `question_en` holds a question for the user and the deep pass waits for their answer. **[C39]**
 
-`appointment` is `null` for notices with no appointment. `checklist_en` items have a `kind` of `who_must_come`, `bring`, or `deadline`. `deadline` is the earliest date the user must act. **[C31]** Receipt number, A-Number, and interview location are always refs. **[C34]**
+`appointment` is `null` for notices with no appointment; its `time` and `location_ref` are `null` when the letter doesn't give them. `key_dates` lists every date the letter prints (`notice_date`, `received_date`, `deadline`, `appointment`, `other`), since many notices have an appointment but no deadline. `checklist_en` items have a `kind` of `who_must_come`, `bring`, or `deadline`. `deadline` is the earliest date the user must act. **[C31]** Receipt number, A-Number, and interview location are always refs. **[C34]** A key fact holds either a `ref` (sensitive) or a plain `value` with the letter's `quote` (public, like the form ID), plus its `page`. Proposed facts carry a `sensitivity` (`normal` or `sensitive`).
 
 ```json
 { "case_id": "case_123", "status": "ok", "image_issue": null,
@@ -240,8 +244,10 @@ If `status` is `needs_better_image`, the other fields are empty and the orchestr
     { "kind": "bring", "item": "ID for you and each dependent (name, date of birth, place of birth, nationality)", "citation": "p1 §II" },
     { "kind": "bring", "item": "Original and one copy of relationship documents (marriage or birth certificates)", "citation": "p1 §II" },
     { "kind": "deadline", "item": "If your attorney will join remotely, their election form is due 10 days before the interview", "citation": "p1 §I" } ],
-  "key_facts": [{ "field": "receipt_number", "ref": "<ref:receipt_number>", "citation": "p1" },
-                { "field": "a_number", "ref": "<ref:a_number>", "citation": "p1" }],
+  "key_dates": [{ "type": "appointment", "raw": "November 18, 2026 at 8:30 AM", "iso": "2026-11-18" }],
+  "key_facts": [{ "field": "form_id", "value": "I-797C", "quote": "I-797C, Notice of Action", "page": 1 },
+                { "field": "receipt_number", "ref": "<ref:receipt_number>", "page": 1 },
+                { "field": "a_number", "ref": "<ref:a_number>", "page": 1 }],
   "explanation_en": "This is a notice from USCIS scheduling your asylum interview...",
   "urgency": "high", "verification": "pending",
   "proposed_facts": [{ "fact": "Has an asylum interview scheduled", "source": "from_document" }] }
@@ -256,11 +262,12 @@ Trigger: verification and brief done.
   "verification": { "status": "verified", "official_phone": "+18003755283",
                     "letter_phone_matches": null,
                     "evidence": ["https://www.uscis.gov/contactcenter"], "red_flags": [] },
+  "official_phone_purpose": "USCIS Contact Center", "alternative_contacts": [],
   "call_recommended": true, "brief_id": "brief_77",
   "call_goal_en": "Confirm the interview is still scheduled; ask what to do if the interpreter can't come" }
 ```
 
-Verification `status` is one of `pending`, `verified`, `suspicious`, `unknown`. **[C18]**
+Verification `status` is one of `pending`, `verified`, `suspicious`, `unknown`. **[C18]** `verification.signals` records how each signal from the letter compared with the official source (`match`, `not_found`, `conflict`, `uncertain`). `brief_id` is `null` when there's no call to brief, such as a suspicious letter, and `call_recommended` requires a verified official phone. `alternative_contacts` lists verified places to turn when the sender can't be called.
 
 `letter_phone_matches` is `null` when the letter prints no phone number, as on the I-797C. Checks for USCIS notices: form number and edition date, every URL on `uscis.gov`, receipt number format. Red flags: demands for payment, gift cards, or wire transfers; threats of arrest or deportation; non-`.gov` links; "notario" offers. The official number is always looked up on `uscis.gov` at run time, never taken from the letter or hard-coded. **[C32]**
 
@@ -268,7 +275,7 @@ Verification `status` is one of `pending`, `verified`, `suspicious`, `unknown`. 
 - **Suspicious** → warn the user; never offer a call to the letter's number.
 - **Unknown** → explain and ask the user how to proceed.
 
-The case brief (`brief_77`) stays in Postgres: JSON fields (doc type, issuer, deadline, appointment, call goal, expected menu path, questions to ask, must_not_do, glossary terms, `<ref:...>` facts) plus a handoff note, likely representative questions with where the answers live, contingencies, and open uncertainties. `must_not_do` always includes: never give the A-Number, receipt number, or date of birth **[C35]**; never discuss the asylum claim **[C34]**.
+The case brief (`brief_77`, the `CaseBrief` contract) stays in Postgres: JSON fields (doc type, issuer, deadline, appointment, call goal, expected menu path, questions to ask, must_not_do, glossary terms, `<ref:...>` facts) plus a handoff note, likely representative questions with where the answers live, contingencies, and open uncertainties. `must_not_do` always includes: never give the A-Number, receipt number, or date of birth **[C35]**; never discuss the asylum claim **[C34]**.
 
 ### H2. Orchestrator → Phone
 

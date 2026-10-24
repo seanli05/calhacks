@@ -30,7 +30,7 @@ ruff format . && ruff check --fix . && pytest
 Every change must keep these true. If one would be broken, stop and raise it with the team.
 
 1. **Only the orchestrator talks to the user free-form.** Other components send messages only through the relay's templates.
-2. **Never dial an unverified number.** The number dialed always comes from the verified official number, never from the letter or from model output.
+2. **Never dial an unverified number.** The number dialed always comes from the verified official number, never from the letter or from model output. The one exception is the demo override `DEMO_DIAL_NUMBER` (Plan.md C40), which swaps in the mock agency line inside `official_dial_number` and only for a verified case.
 3. **Never impersonate the user.** The agent never answers identity or verification questions on the user's behalf.
 4. **No call without explicit, recorded consent.**
 5. **Each table has exactly one writer.** Read what you like through helpers; write only to the tables your component owns.
