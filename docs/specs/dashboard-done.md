@@ -2,7 +2,7 @@
 
 Owner: person 1 · Tracks: task C ([task-c-dashboard.md](task-c-dashboard.md) → Done when) · Design changes are out of scope here
 
-Every page and every API route is built and on `main`. This is the non-design work left before task C is officially done. Tick items off here as they land.
+Every page and every API route is built and on `main`. This is the non-design work left before task C is officially done. Tick items off here as they land. How the rest plays out and what to ask of the team: [dashboard-closeout.md](dashboard-closeout.md). What teammates must write for the dashboard to show it: [docs/dashboard-AGENTS.md](../dashboard-AGENTS.md).
 
 ## Must do
 
@@ -12,7 +12,7 @@ Every page and every API route is built and on `main`. This is the non-design wo
   - `ngrok http 8000`, with a reserved ngrok domain if the account has one, so webhook URLs survive restarts;
   - `PUBLIC_BASE_URL`, and pointing the WhatsApp sandbox and the voice webhooks at it;
   - the dashboard on the recording laptop: `NEXT_PUBLIC_DATA=live npm run build && npm start`. It doesn't need to be public.
-- [ ] **4. Tell the team which event `data` the feed needs.** Feed lines are only specific when the emitter includes certain `data` fields; otherwise they fall back to a generic line. The table is at the top of [`backend/app/api/feed_templates.py`](../../backend/app/api/feed_templates.py). Persons 2 (consent, memory) and 4 (`call.*`) need it.
+- [ ] **4. Tell the team which event `data` the feed needs.** Written up in [docs/dashboard-AGENTS.md](../dashboard-AGENTS.md); send it to the team. Feed lines are only specific when the emitter includes certain `data` fields; otherwise they fall back to a generic line. The table is at the top of [`backend/app/api/feed_templates.py`](../../backend/app/api/feed_templates.py). Persons 2 (consent, memory) and 4 (`call.*`) need it.
 - [ ] **5. Reset the shared database with the new seed:** `cd backend && python -m app.db.reset --yes` (no `--after-call`, so the case starts at `awaiting_consent`). Again right before the rehearsal and before recording.
 - [ ] **6. End-to-end rehearsal with the real components**, once the phone agent is on `main`. One real call with the case view on screen at 1920×1080. Check that:
   - the tracker and headline move through calling → on hold → person answered → connected → call ended as the real events arrive;
