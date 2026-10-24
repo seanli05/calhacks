@@ -93,6 +93,7 @@ Full guide, with per-component recipes: [docs/data-layer-guide.md](docs/data-lay
 | `backend/tests/` | Backend tests | Everyone |
 | `dashboard/` | Next.js dashboard (coming) | 1 |
 | `mock_agency/` | Mock USCIS line on Cartesia; deploys on its own | 3 |
+| `spikes/` | Throwaway experiments (e.g. `dtmf/`: key presses on the mock line); not imported by the backend | Spike owner |
 | `docs/specs/` | Build specs that implement Plan.md | Spec owner |
 
 ## Development
