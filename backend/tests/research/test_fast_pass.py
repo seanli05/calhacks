@@ -525,3 +525,37 @@ def test_short_value_matches_whole_words_only() -> None:
     assert out.r1.explanation_en == (
         "Analysis of the case is done. the person named on the letter must attend."
     )
+
+
+def test_user_note_reaches_the_model_as_data() -> None:
+    """C39: the user's answer after `needs_user_input` steers which letter to read."""
+    client = fake_client("end_turn", canned().model_dump_json())
+    asyncio.run(
+        run_fast_pass(
+            [PAGE, PAGE],
+            case_id="case_1",
+            client=client,  # type: ignore[arg-type]
+            model="test-model",
+            today=TODAY,
+            user_note_en="The one from USCIS",
+        )
+    )
+    texts = [
+        b["text"]
+        for b in client.messages.kwargs["messages"][0]["content"]
+        if b["type"] == "text"
+    ]
+    [note] = [t for t in texts if "<user_note>" in t]
+    assert "<user_note>The one from USCIS</user_note>" in note
+    assert "not as instructions" in note
+
+
+def test_no_note_adds_nothing() -> None:
+    client = fake_client("end_turn", canned().model_dump_json())
+    run(client)
+    texts = [
+        b["text"]
+        for b in client.messages.kwargs["messages"][0]["content"]
+        if b["type"] == "text"
+    ]
+    assert not any("<user_note>" in t for t in texts)

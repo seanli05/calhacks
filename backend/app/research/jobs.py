@@ -183,7 +183,12 @@ async def _read_letter(
     model = deps.settings.model_default
     task = asyncio.ensure_future(
         deps.fast_pass_fn(
-            blocks, case_id=payload.case_id, client=deps.anthropic, model=model
+            blocks,
+            case_id=payload.case_id,
+            client=deps.anthropic,
+            model=model,
+            # Only when set, so fast-pass fakes needn't accept it (C39).
+            **({"user_note_en": payload.user_note_en} if payload.user_note_en else {}),
         )
     )
     done, _ = await asyncio.wait({task}, timeout=deps.fast_slow_s)

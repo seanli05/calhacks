@@ -428,3 +428,23 @@ async def test_guard_matches_short_values_only_as_whole_words() -> None:
     for leaked in ("Hello Ana.", "hello ANA", {"note": 'at O"Neil Street 12'}):
         with pytest.raises(LeakDetected):
             guard.check("event", leaked)
+
+
+async def test_fast_passes_the_users_note_through(store: FakeResearchDB) -> None:
+    notes: list[str | None] = []
+
+    async def fast(blocks: list[Any], *, case_id: str, **kwargs: Any) -> FastPassOutput:
+        notes.append(kwargs.get("user_note_en"))
+        return fake_fast_pass_output(case_id)
+
+    store.add_document([("image/jpeg", b"p1")])
+    payload = ResearchFastJob(
+        case_id="case_1",
+        user_id="user_1",
+        document_ids=["doc_1"],
+        user_language="es",
+        user_note_en="The one from USCIS",
+    )
+    job = store.add_claimed_job(payload, "case_1")
+    await handle_research_fast(job, deps(fast_pass_fn=fast))
+    assert notes == ["The one from USCIS"]

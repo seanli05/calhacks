@@ -34,7 +34,7 @@ from app.research.models import (
     SensitiveValue,
 )
 from app.research.preprocess import ContentBlock
-from app.research.prompts import FAST_PASS_SYSTEM
+from app.research.prompts import FAST_PASS_SYSTEM, USER_NOTE_PROMPT
 
 log = logging.getLogger(__name__)
 
@@ -128,6 +128,7 @@ async def run_fast_pass(
     model: str,
     profile_county: str | None = None,
     today: date | None = None,
+    user_note_en: str | None = None,
 ) -> FastPassOutput:
     """Extract the letter with structured outputs (no citations; quotes live in the schema).
 
@@ -137,7 +138,12 @@ async def run_fast_pass(
     """
     today = today or date.today()
     extraction = await extract(
-        blocks, case_id=case_id, client=client, model=model, today=today
+        blocks,
+        case_id=case_id,
+        client=client,
+        model=model,
+        today=today,
+        user_note_en=user_note_en,
     )
     return build_output(
         extraction, case_id=case_id, profile_county=profile_county, today=today
@@ -151,6 +157,7 @@ async def extract(
     client: AsyncAnthropic,
     model: str,
     today: date,
+    user_note_en: str | None = None,
 ) -> Extraction:
     """One structured-output call over all pages. Raises FastPassError on refusal or truncation."""
     if not blocks:
@@ -162,6 +169,12 @@ async def extract(
             label += f" (a PDF: number its pages {page}, {page + 1}, ... in order)"
         content.append(TextBlockParam(type="text", text=label))
         content.append(block)
+    if user_note_en and user_note_en.strip():
+        content.append(
+            TextBlockParam(
+                type="text", text=USER_NOTE_PROMPT.format(note=user_note_en.strip())
+            )
+        )
     content.append(
         TextBlockParam(
             type="text",
