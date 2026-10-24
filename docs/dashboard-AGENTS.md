@@ -51,7 +51,7 @@ The source of truth is the table at the top of [`backend/app/api/feed_templates.
 
 **Memory** (`/u/{id}/memory` page) reads `facts` with `reads.list_facts`: `fact` (English), `category`, `status`, `sensitivity`, `source`. Pending immigration facts show as "waiting for your OK". The profile card shows every key of `upsert_profile`'s dict as label and value, so keep keys short and values plain. Emit `memory.fact_*` with `fact_id` for each change. Deletes are the dashboard's job (`app.db.deletes`); don't write them.
 
-**Translation:** today `app/api/common.py: localize(en, lang)` uses a hard-coded Spanish table for the seed's strings (`app/api/stand_in_es.py`). When `translation/` exists, the dashboard needs **a fast, sync lookup** (the API polls every 1–3 s), not an LLM call per request. Agree the interface with person 1 before building: likely translate at write time and cache by `(text_en, lang)`, with the API reading the cache. Person 1 then swaps `localize` and deletes the stand-in.
+**Translation:** the dashboard API calls `get_translator().from_english(text_en, lang)` from `translation/translate.py`, in the background, once per string and language, and caches the result in memory (`app/api/translations.py`). A new string shows in English for one poll, then translated. Keep that function's signature, and its rule of keeping `<ref:…>` placeholders and dates as they are; tell person 1 before changing either. The seed's strings still come from the fixed table `app/api/stand_in_es.py`, so demo screens read the same every run.
 
 **Already right on `main`:** `/dev/fake-call` emits the call events with the fields above. ask_user logs its events with `choice` and `default_option`.
 

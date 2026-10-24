@@ -1,7 +1,7 @@
-"""TEMPORARY stand-in for the translation module: Spanish for the exact English
-strings the demo seed writes (app/db/reset.py, app/db/seed_story.py), so Spanish
-screens aren't half English. `common.localize` is the only caller. Delete this file
-(and that one lookup) once `app.translation` exists.
+"""Fixed Spanish for the exact English strings the demo seed writes
+(app/db/reset.py, app/db/seed_story.py). `common.localize` checks it before the
+translation cache, so the seeded screens are Spanish on the first poll and read the
+same in every recording. Other text goes through `translations.py`.
 """
 
 SPANISH: dict[str, str] = {

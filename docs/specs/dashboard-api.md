@@ -14,7 +14,7 @@ Conventions:
 - Response bodies are Pydantic models defined in `api/`, never table rows. Never put media bytes or `data` blobs in JSON.
 - Times are ISO 8601 UTC; dates are `YYYY-MM-DD`.
 - `NotFound` from the DB helpers becomes 404.
-- **`?lang=xx`** on every route that returns user-facing text. Default: the user's language, else `en`. That text comes back as `Localized` (`{"text": …, "en": …}`): `text` in the requested language, `en` the English it came from. With no translation available, `text` equals `en`.
+- **`?lang=xx`** on every route that returns user-facing text. Default: the user's language, else `en`. That text comes back as `Localized` (`{"text": …, "en": …}`): `text` in the requested language, `en` the English it came from. With no translation available, `text` equals `en`. The seed's strings come from a fixed Spanish table (`stand_in_es.py`); any other free text is translated in the background by `translation/`'s translator, once per string and language, and cached in memory (`translations.py`), so it reads in English until a later poll. Without `ANTHROPIC_API_KEY` it stays English.
 - **Masking.** Identifiers (receipt number, A-Number) are masked server-side as `"•••• " + last 4 characters` (`ZLA2690012345` → `•••• 2345`). Full values never reach the browser. The date of birth is never sent. The interview location is not an identifier and is sent in full (`Appointment.location`), resolved through `reads.resolve_ref`.
 
 ## Routes
@@ -50,7 +50,7 @@ Server-side, so the dashboard stays simple (C23, C27).
 
 - **`api/feed_templates.py`:** a template per language for each event type shown on the demo screen, filled from the event's `data`. At minimum `case.created`, `research.fast_done`, `verification.*`, `consent.*`, every `call.*` type, `memory.fact_*`, the four delete types. Spanish and English first.
 - **Missing `data` fields never break the feed.** Each type has a variant with no variables. For example, `call.menu_choice` renders "We chose option {option} in the menu" when `data.option` exists and "We chose an option in the menu" when it doesn't. Other components emit these events, so don't assume their `data`.
-- **Other types:** `summary_en`, translated through the translation module (`backend/app/translation/`) once it exists and cached in memory. Until then, `text` = `summary_en`.
+- **Other types:** `summary_en`, translated the same way (English until the translation lands).
 - **References (C27):** an event whose `data` has `fact_id` or `document_id` shows that row's text, looked up at render time. Once the row is gone, set `deleted_at` (the time of the matching `fact.deleted` / `document.deleted` event) and render the text without the content. Event rows never contain the content itself.
 - Write down which `data` fields each template expects in a table at the top of `feed_templates.py`, and report it to Chris so the team can emit them.
 

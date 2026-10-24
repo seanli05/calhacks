@@ -51,6 +51,17 @@ _READS = (
 )
 
 
+@pytest.fixture(autouse=True)
+def no_dashboard_translation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The dashboard API translates free text in the background with the real
+    translator whenever a key is set; tests must never call it. Tests of the cache
+    patch in a fake."""
+    from app.api import translations
+
+    monkeypatch.setattr(translations, "get_translator", lambda: None)
+    translations.clear()
+
+
 @pytest.fixture
 def db(monkeypatch: pytest.MonkeyPatch) -> FakeDB:
     fake = FakeDB()
