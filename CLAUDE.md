@@ -104,6 +104,7 @@ Every change must keep these true. If one would be broken, stop and raise it wit
 
 ## Notes for Claude
 
+- Start with [backend/AGENTS.md](backend/AGENTS.md): a map of the code, the docs, and what's built so far.
 - Read the relevant part of the spec and the existing code before writing new code, and match the conventions already in use.
 - Stay inside the area the current task is about. Ask before editing shared contracts, the DB schema, or another person's component.
 - Never weaken a non-negotiable rule to make something work, even temporarily.
