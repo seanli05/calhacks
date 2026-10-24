@@ -260,3 +260,43 @@ export interface Suggestion {
 
 /** POST /api/users/{user_id}/delete-everything */
 export type DeleteCounts = Record<string, number>;
+
+/**
+ * The bridged call as it happens, both legs, in the viewer's language. Mock only
+ * for now (fixtures): the backend stream needs the phone agent to save each line
+ * as it's heard, not only at wrap-up.
+ */
+export type LiveCallEvent =
+  /** A finished turn was heard; its translation streams next as `delta`s. */
+  | { type: "line"; id: string; at: string; speaker: Speaker; en: string }
+  /** The next piece of the line's translation, appended to what came before. */
+  | { type: "delta"; id: string; text: string }
+  | { type: "done"; id: string }
+  | { type: "tip"; tip: LiveTip }
+  /** The user said what a tip suggested. */
+  | { type: "tip_used"; id: string };
+
+/**
+ * Something the user could say next. `ask` gives English to read out loud;
+ * `yourself` marks a question only the user may answer (rule 3), so it never
+ * carries an answer.
+ */
+export interface LiveTip {
+  id: string;
+  kind: "ask" | "yourself";
+  /** The line that prompted it. */
+  line_id: string;
+  /** English to read out loud; null for `yourself`. */
+  say_en: string | null;
+  meaning: Localized;
+}
+
+export type TrustLevel = "official" | "community" | "machine";
+
+/** GET /api/glossary?lang=xx: the translation book for one language. */
+export interface GlossaryEntry {
+  term: string;
+  translation: string;
+  trust_level: TrustLevel;
+  source_url: string | null;
+}

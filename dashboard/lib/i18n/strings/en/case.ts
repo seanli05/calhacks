@@ -89,6 +89,20 @@ export const caseView = {
   transcript: "Transcript",
   transcriptNote: "The call was in English. We don't keep the audio.",
   speakers: { agent: "[App]", agency: "Agency", user: "You" },
+  live: {
+    title: "Live translation",
+    waiting: "Listening. What you and the officer say shows up here in your language.",
+    tipsTitle: "What you can say",
+    ask: "You could ask",
+    yourself: "Answer this yourself",
+    used: "You said it",
+    book: "Translation book",
+    search: "Search a word: interpreter, cita…",
+    searchLabel: "Search the translation book",
+    fromCall: "Words from this call",
+    none: "No word like that in the book yet",
+    trust: { official: "Official", community: "Community", machine: "Machine" },
+  },
   close: "Close",
 };
 

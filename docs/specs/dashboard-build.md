@@ -15,6 +15,8 @@ npm run build          # type-checks every page; must pass before merging
 
 Pages run on **live data** by default. With `NEXT_PUBLIC_DATA=fixtures` they use fake data from `lib/api/fixtures.ts` instead, with no backend needed. A **Fixtures** bar at the bottom steps the demo call through its states (◀ ▶ or the arrow keys): waiting for consent → dialing → menu → on hold → person answered → connected → call ended. Deletes work in fixtures too.
 
+At **connected** the case view switches to the live call: both sides stream in word by word in the viewer's language (`LiveTranscript`), tips for what to say sit above the assistant (`LiveTips`), and the translation book is searchable under the transcript (`GlossaryBook`). Only fixtures play it for now (`lib/api/fixtures-live.ts`); in live mode `api.liveCall` and `api.glossary` are empty until the backend has a stream and a glossary route. The stream needs the phone agent to save each transcript line during the bridge, not only at wrap-up.
+
 With the backend running, `npm run dev` calls the real API through the `/api` rewrite (`BACKEND_URL`, default `http://localhost:8000`; see `.env.example`).
 
 Useful URLs on fixtures: `/u/user_demo000000000001` (My cases), `/u/user_demo000000000001/cases/case_demo000000000001` (case view), `/u/user_demo000000000001/memory`.

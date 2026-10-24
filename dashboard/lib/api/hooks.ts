@@ -8,7 +8,7 @@ import { useLang } from "@/lib/i18n";
 
 import { api, DATA_MODE } from "./client";
 import { subscribe } from "./fixtures";
-import type { FeedItem } from "./types";
+import type { FeedItem, LiveTip, Speaker } from "./types";
 
 /**
  * Runs `task` now, then again `intervalMs` after each run settles. Never overlaps,
@@ -130,4 +130,54 @@ export function useNow(intervalMs = 1000): number {
     return () => clearInterval(timer);
   }, [intervalMs]);
   return now;
+}
+
+export interface LiveLine {
+  id: string;
+  at: string;
+  speaker: Speaker;
+  en: string;
+  /** The translation so far. */
+  text: string;
+  done: boolean;
+}
+
+export interface LiveCall {
+  lines: LiveLine[];
+  tips: (LiveTip & { used: boolean })[];
+}
+
+/**
+ * The bridged call as it streams in, while `active`. Starts over when the call or
+ * the language changes, since every line is translated for one language.
+ */
+export function useLiveCall(callId: string | null, active: boolean): LiveCall {
+  const { lang } = useLang();
+  const [live, setLive] = useState<LiveCall>({ lines: [], tips: [] });
+
+  useEffect(() => {
+    setLive({ lines: [], tips: [] });
+    if (!callId || !active) return;
+    return api.liveCall(callId, lang, (event) =>
+      setLive((prev) => {
+        switch (event.type) {
+          case "line":
+            return { ...prev, lines: [...prev.lines, { ...event, text: "", done: false }] };
+          case "delta":
+            return {
+              ...prev,
+              lines: prev.lines.map((l) => (l.id === event.id ? { ...l, text: l.text + event.text } : l)),
+            };
+          case "done":
+            return { ...prev, lines: prev.lines.map((l) => (l.id === event.id ? { ...l, done: true } : l)) };
+          case "tip":
+            return { ...prev, tips: [...prev.tips, { ...event.tip, used: false }] };
+          case "tip_used":
+            return { ...prev, tips: prev.tips.map((t) => (t.id === event.id ? { ...t, used: true } : t)) };
+        }
+      }),
+    );
+  }, [callId, active, lang]);
+
+  return live;
 }

@@ -5,12 +5,15 @@
  */
 
 import * as fx from "./fixtures";
+import * as fxLive from "./fixtures-live";
 import type {
   CaseDetail,
   CaseSummary,
   DeleteCounts,
   DemoInfo,
   FeedItem,
+  GlossaryEntry,
+  LiveCallEvent,
   Memory,
   Message,
   PublicConfig,
@@ -63,6 +66,10 @@ const live = {
     request<void>(`/api/transcripts/${transcriptId}`, { method: "DELETE" }),
   deleteEverything: (userId: string) =>
     request<DeleteCounts>(`/api/users/${userId}/delete-everything`, { method: "POST" }),
+  // Fixtures only until the backend has these routes; live mode shows them empty.
+  glossary: (_lang: string): Promise<GlossaryEntry[]> => Promise.resolve([]),
+  /** Streams the bridged call into `emit`; returns stop. */
+  liveCall: (_callId: string, _lang: string, _emit: (event: LiveCallEvent) => void): (() => void) => () => {},
 };
 
 const fixtures: typeof live = {
@@ -80,6 +87,8 @@ const fixtures: typeof live = {
   deleteDocument: (documentId) => fake(() => fx.deleteDocument(documentId)),
   deleteTranscript: (transcriptId) => fake(() => fx.deleteTranscript(transcriptId)),
   deleteEverything: (userId) => fake(() => fx.deleteEverything(userId)),
+  glossary: (lang) => fake(() => fxLive.glossary(lang)),
+  liveCall: fxLive.liveCall,
 };
 
 export const api = DATA_MODE === "live" ? live : fixtures;
