@@ -1,0 +1,184 @@
+{
+  "about": "A menu whose only choices commit the applicant: the agent asks the family, the menu reprompts, the safe default goes out",
+  "steps": [
+    {
+      "expect": {
+        "state": "menu",
+        "kind": [
+          "wait"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "menu": {
+          "output": {
+            "action": {
+              "reason_en": "Greeting with no options yet; wait for the menu.",
+              "fallback": false,
+              "kind": "wait"
+            }
+          }
+        },
+        "phase": {
+          "output": {
+            "phase": "menu",
+            "confidence": 0.6,
+            "reason_en": "Automated-sounding greeting with no name or question; likely a menu opener"
+          }
+        }
+      },
+      "do": "heard",
+      "text": "You've reached the scheduling line for asylum office interviews.",
+      "after_s": 10.0
+    },
+    {
+      "expect": {
+        "state": "menu",
+        "kind": [
+          "ask_user"
+        ],
+        "options": [
+          "1",
+          "2"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "menu",
+            "confidence": 0.95,
+            "reason_en": "Lists keypad options to cancel or reschedule an interview"
+          }
+        },
+        "menu": {
+          "output": {
+            "action": {
+              "reason_en": "Menu offers only cancel or reschedule, both of which commit the applicant, so the applicant must choose.",
+              "fallback": false,
+              "kind": "ask_user",
+              "question_en": "The USCIS asylum office line says your interview is scheduled. The only options are to cancel it or move it to the next available date. Which should I choose? Neither one will be taken without your answer.",
+              "options": [
+                {
+                  "label_en": "Cancel the interview",
+                  "digits": "1"
+                },
+                {
+                  "label_en": "Move it to next available date",
+                  "digits": "2"
+                }
+              ],
+              "default_option": 2
+            }
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Our records show an upcoming interview. To cancel your interview, press one. To move it to the next available date, press two.",
+      "after_s": 10.0
+    },
+    {
+      "expect": {
+        "state": "menu",
+        "kind": [
+          "none"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "menu",
+            "confidence": 0.92,
+            "reason_en": "Keypad options and a reprompt after no response; automated menu continues."
+          }
+        }
+      },
+      "do": "heard",
+      "text": "I'm sorry, I didn't get a response. To cancel your interview, press one. To move it to the next available date, press two.",
+      "after_s": 10.0
+    },
+    {
+      "expect": {
+        "state": "menu",
+        "kind": [
+          "press"
+        ],
+        "digits": [
+          "1",
+          "2"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "menu",
+            "confidence": 0.95,
+            "reason_en": "Repeated keypad options and reprompt, automated scheduling line, no person"
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Sorry, I still didn't get that. To cancel your interview, press one. To move it to the next available date, press two.",
+      "after_s": 8.0
+    },
+    {
+      "expect": {
+        "state": "menu",
+        "kind": [
+          "press"
+        ],
+        "digits": [
+          "0",
+          "3"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "menu",
+            "confidence": 0.95,
+            "reason_en": "Lists keypad options and reprompts; automated menu tree continues."
+          }
+        },
+        "menu": {
+          "output": {
+            "action": {
+              "reason_en": "Pressing 0 for an agent to confirm the interview and ask about the interpreter; the earlier press of 2 chose a rescheduling option without asking the applicant first.",
+              "fallback": false,
+              "kind": "press",
+              "digits": "0",
+              "option_label_en": "speak with an agent"
+            }
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Returning to the main menu. For questions about a case you've already filed, press three. To speak with an agent, press zero.",
+      "after_s": 10.0
+    },
+    {
+      "expect": {
+        "state": "hold",
+        "kind": [
+          "none"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "hold",
+            "confidence": 0.9,
+            "reason_en": "Queue announcement: please hold, calls answered in order received, no question."
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Please hold while we find someone to help you. Calls are answered in the order received.",
+      "after_s": 10.0
+    }
+  ]
+}

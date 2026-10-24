@@ -1,0 +1,250 @@
+{
+  "about": "Speech menu with a language choice and an open question, a long hold, then a person; the applicant joins",
+  "steps": [
+    {
+      "expect": {
+        "state": "menu",
+        "kind": [
+          "wait"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "menu": {
+          "output": {
+            "action": {
+              "reason_en": "Recorded greeting with no actionable menu yet; waiting for options.",
+              "fallback": false,
+              "kind": "wait"
+            }
+          }
+        },
+        "phase": {
+          "output": {
+            "phase": "menu",
+            "confidence": 0.8,
+            "reason_en": "Recorded greeting and recording notice before an expected menu; no person"
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Thank you for calling the national immigration information line. Your call may be recorded.",
+      "after_s": 10.0
+    },
+    {
+      "expect": {
+        "state": "menu",
+        "kind": [
+          "press"
+        ],
+        "digits": [
+          "1"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "menu",
+            "confidence": 0.97,
+            "reason_en": "Bilingual keypad options offered; automated menu expects input"
+          }
+        },
+        "menu": {
+          "output": {
+            "action": {
+              "reason_en": "Language choice offered; selecting English as the hint requires.",
+              "fallback": false,
+              "kind": "press",
+              "digits": "1",
+              "option_label_en": "English"
+            }
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Para continuar en español, oprima ocho. To continue in English, press one.",
+      "after_s": 10.0
+    },
+    {
+      "expect": {
+        "state": "menu",
+        "kind": [
+          "press"
+        ],
+        "digits": [
+          "5"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "menu",
+            "confidence": 0.95,
+            "reason_en": "Keypad options listed; automated menu expecting button presses"
+          }
+        },
+        "menu": {
+          "output": {
+            "action": {
+              "reason_en": "Interview-related option is available; pressing 5 for interview or appointment notices.",
+              "fallback": false,
+              "kind": "press",
+              "digits": "5",
+              "option_label_en": "interview, biometrics, or other appointment"
+            }
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Please listen carefully, as our options have changed. To ask about the status of an application, press two. For an interview, biometrics, or other appointment, press five. For all other questions, press zero.",
+      "after_s": 10.0
+    },
+    {
+      "expect": {
+        "state": "menu",
+        "kind": [
+          "say"
+        ],
+        "say_matches": "interview|appointment",
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "menu",
+            "confidence": 0.93,
+            "reason_en": "Automated voice asks for spoken options; prior keypad menu continues"
+          }
+        },
+        "menu": {
+          "output": {
+            "action": {
+              "reason_en": "Menu asks a spoken question; state the goal plainly and ask for a representative.",
+              "fallback": false,
+              "kind": "say",
+              "text": "I'd like to speak with a representative about an upcoming interview appointment."
+            }
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Briefly tell me what you're calling about. You can say things like 'replace a card' or 'speak with someone'.",
+      "after_s": 10.0
+    },
+    {
+      "expect": {
+        "state": "hold",
+        "kind": [
+          "none"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "hold",
+            "confidence": 0.85,
+            "reason_en": "Transfer announcement followed by hold and wait-time message; no person speaking yet"
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Thanks. I'm transferring you to an officer. Please continue to hold; wait times are longer than usual.",
+      "after_s": 8.0
+    },
+    {
+      "expect": {
+        "state": "hold",
+        "kind": [
+          "none"
+        ],
+        "fallback": false
+      },
+      "model": {},
+      "do": "sound",
+      "sound": "music",
+      "seconds": 180.0
+    },
+    {
+      "expect": {
+        "state": "hold",
+        "kind": [
+          "none"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "hold",
+            "confidence": 0.92,
+            "reason_en": "Generic patience and stay-on-line notice; queue recording, no question asked"
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Thank you for your patience. Your call is important to us, so please stay on the line.",
+      "after_s": 240.0
+    },
+    {
+      "expect": {
+        "state": "bridging",
+        "kind": [
+          "none"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "human",
+            "confidence": 0.93,
+            "reason_en": "Officer introduces self by name and asks caller's name directly"
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Good afternoon, this is Officer Reyes with the contact center. Can I get your name, please?",
+      "after_s": 90.0
+    },
+    {
+      "expect": {
+        "state": "bridging",
+        "kind": [
+          "none"
+        ],
+        "fallback": false
+      },
+      "model": {},
+      "do": "heard",
+      "text": "Hello? Is anyone there?",
+      "after_s": 6.0
+    },
+    {
+      "expect": {
+        "state": "connected",
+        "kind": [
+          "none"
+        ],
+        "fallback": false
+      },
+      "model": {},
+      "do": "line",
+      "event": "user_answered"
+    },
+    {
+      "expect": {
+        "state": "ended",
+        "kind": [
+          "none"
+        ],
+        "fallback": false
+      },
+      "model": {},
+      "do": "line",
+      "event": "agency_hung_up"
+    }
+  ]
+}

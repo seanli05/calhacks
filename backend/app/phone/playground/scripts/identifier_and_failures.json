@@ -1,0 +1,219 @@
+{
+  "about": "A prompt for the receipt number, two failed decisions in a row, and a doubtful reading on hold before a real person",
+  "steps": [
+    {
+      "expect": {
+        "state": "menu",
+        "kind": [
+          "wait"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "menu",
+            "confidence": 0.93,
+            "reason_en": "Greeting with language-option prompt; automated keypad menu expecting input"
+          }
+        },
+        "menu": {
+          "output": {
+            "action": {
+              "reason_en": "Greeting with a language prompt; English is the default, so wait for the English menu.",
+              "fallback": false,
+              "kind": "wait"
+            }
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Welcome to the federal benefits help line. Si necesita ayuda en español, oprima nueve.",
+      "after_s": 10.0
+    },
+    {
+      "expect": {
+        "state": "menu",
+        "kind": [
+          "press"
+        ],
+        "digits": [
+          "*"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "menu",
+            "confidence": 0.95,
+            "reason_en": "Keypad options and input prompt for receipt number; automated menu"
+          }
+        },
+        "menu": {
+          "output": {
+            "action": {
+              "reason_en": "Menu offers a star key for callers without a receipt number; pressing it avoids giving any identifier.",
+              "fallback": false,
+              "kind": "press",
+              "digits": "*",
+              "option_label_en": "I don't have a receipt number"
+            }
+          }
+        }
+      },
+      "do": "heard",
+      "text": "To get started, enter your thirteen-character receipt number followed by the pound key. If you don't have a receipt number, press star.",
+      "after_s": 10.0
+    },
+    {
+      "model": {},
+      "do": "fail",
+      "kind": "menu"
+    },
+    {
+      "expect": {
+        "state": "menu",
+        "kind": [
+          "wait"
+        ],
+        "fallback": true
+      },
+      "model": {
+        "menu": {
+          "error": "failed on purpose (/fail)"
+        },
+        "phase": {
+          "output": {
+            "phase": "menu",
+            "confidence": 0.97,
+            "reason_en": "Lists keypad options and expects a keypress; automated menu continues"
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Main menu. For an upcoming interview or appointment, press four. For anything else, press seven.",
+      "after_s": 10.0
+    },
+    {
+      "model": {},
+      "do": "fail",
+      "kind": "menu"
+    },
+    {
+      "expect": {
+        "state": "menu",
+        "kind": [
+          "say"
+        ],
+        "say_matches": "representative",
+        "fallback": true
+      },
+      "model": {
+        "menu": {
+          "error": "failed on purpose (/fail)"
+        },
+        "phase": {
+          "output": {
+            "phase": "menu",
+            "confidence": 0.95,
+            "reason_en": "Reprompt of keypad options; no person, same menu repeated"
+          }
+        }
+      },
+      "do": "heard",
+      "text": "I didn't get your selection. For an upcoming interview or appointment, press four. For anything else, press seven.",
+      "after_s": 12.0
+    },
+    {
+      "expect": {
+        "state": "hold",
+        "kind": [
+          "none"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "menu": {
+          "output": {
+            "action": {
+              "reason_en": "Line says to hold for a representative; waiting for a person to answer.",
+              "fallback": false,
+              "kind": "wait"
+            }
+          }
+        },
+        "phase": {
+          "output": {
+            "phase": "hold",
+            "confidence": 0.8,
+            "reason_en": "Automated transfer notice followed by a please-hold instruction; no person speaking"
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Okay, let me get you to someone who can help. Please hold.",
+      "after_s": 10.0
+    },
+    {
+      "model": {},
+      "do": "phase",
+      "phase": "human",
+      "confidence": 0.65
+    },
+    {
+      "expect": {
+        "state": "hold",
+        "kind": [
+          "none"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "human",
+            "confidence": 0.65,
+            "reason_en": "Forced in the playground"
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Thank you for holding.",
+      "after_s": 120.0
+    },
+    {
+      "expect": {
+        "state": "bridging",
+        "kind": [
+          "none"
+        ],
+        "fallback": false
+      },
+      "model": {
+        "phase": {
+          "output": {
+            "phase": "human",
+            "confidence": 0.95,
+            "reason_en": "Live agent introduces themself by name and asks how to help"
+          }
+        }
+      },
+      "do": "heard",
+      "text": "Hi, you're speaking with Sam at the help desk. How can I help you today?",
+      "after_s": 60.0
+    },
+    {
+      "expect": {
+        "state": "ended",
+        "kind": [
+          "none"
+        ],
+        "fallback": false
+      },
+      "model": {},
+      "do": "line",
+      "event": "user_unreachable"
+    }
+  ]
+}

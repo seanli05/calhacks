@@ -28,7 +28,7 @@ eval's own cases):
   says it's `hold`; the model sometimes goes by who is speaking.
 - `reason_en` sometimes names the rep despite the prompt. Agency staff, not user
   data, but `_scrub` only drops quotes and number runs.
-- `CLASSIFY_TIMEOUT_S` and the `_RULES` thresholds come from three eval runs.
+- `CLASSIFY_TIMEOUT_S` and the `RULES` thresholds come from three eval runs.
 """
 
 import asyncio
@@ -178,20 +178,20 @@ class Cues:
 
 
 @dataclass(frozen=True)
-class _Rule:
+class Rule:
     trigger: Trigger
     min_confidence: float
 
 
-_RULES: dict[tuple[CallState, Phase], _Rule] = {
-    (CallState.MENU, Phase.HOLD): _Rule(Trigger.HOLD_STARTED, 0.6),
+RULES: dict[tuple[CallState, Phase], Rule] = {
+    (CallState.MENU, Phase.HOLD): Rule(Trigger.HOLD_STARTED, 0.6),
     # Stricter than from hold: virtual assistants with names live in menus.
-    (CallState.MENU, Phase.HUMAN): _Rule(Trigger.HUMAN_DETECTED, 0.8),
-    (CallState.HOLD, Phase.HUMAN): _Rule(Trigger.HUMAN_DETECTED, 0.7),
-    (CallState.HOLD, Phase.MENU): _Rule(Trigger.MENU_RETURNED, 0.6),
+    (CallState.MENU, Phase.HUMAN): Rule(Trigger.HUMAN_DETECTED, 0.8),
+    (CallState.HOLD, Phase.HUMAN): Rule(Trigger.HUMAN_DETECTED, 0.7),
+    (CallState.HOLD, Phase.MENU): Rule(Trigger.MENU_RETURNED, 0.6),
     # Strictest: a wrong one walks away from a live person. Claude reads a rep's
     # "let me transfer you, please hold" at about 0.75-0.8.
-    (CallState.HUMAN_DETECTED, Phase.HOLD): _Rule(Trigger.FALSE_HUMAN, 0.75),
+    (CallState.HUMAN_DETECTED, Phase.HOLD): Rule(Trigger.FALSE_HUMAN, 0.75),
 }
 """Asymmetric on purpose: each threshold follows what a wrong move costs."""
 
@@ -199,7 +199,7 @@ _RULES: dict[tuple[CallState, Phase], _Rule] = {
 def to_trigger(state: CallState, reading: PhaseReading) -> Trigger | None:
     """The 1a trigger this reading fires in this state, or None to stay put.
     Only ever returns triggers `state.TRANSITIONS` allows from `state`."""
-    rule = _RULES.get((state, reading.phase))
+    rule = RULES.get((state, reading.phase))
     if rule is None or reading.confidence < rule.min_confidence:
         return None
     return rule.trigger
