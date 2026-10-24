@@ -370,6 +370,16 @@ async def test_reference_read_out_digit_by_digit_is_kept() -> None:
     assert report.reference_number == "R-55821"
 
 
+async def test_reference_with_oh_for_zero_is_kept() -> None:
+    lines = [
+        *OPENING,
+        (640, "agency", "Confirmation is C as in cat, seven, oh, four two."),
+    ]
+    llm = FakeReportLlm(_draft(outcome="partial", reference_number="C7042"))
+    report = await LlmReportBuilder(llm)(_input(lines))
+    assert report.reference_number == "C7042"
+
+
 @pytest.mark.parametrize(
     "error",
     [LlmError("timed out after 45.0s"), RuntimeError("a bug"), _validation_error()],

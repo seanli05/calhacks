@@ -55,6 +55,7 @@ _HEAD_CHARS = 8_000
 
 _RECEIPT = re.compile(r"\b[a-z]{3}[\s-]*\d(?:[\s-]*\d){9}\b", re.IGNORECASE)
 _A_NUMBER = re.compile(r"\ba[\s-]*\d(?:[\s-]*\d){7,8}\b", re.IGNORECASE)
+_OH = re.compile(r"\boh\b", re.IGNORECASE)
 _MIN_REF_DIGITS = 4
 """Fewer spoken digits could match by chance anywhere in a long transcript."""
 
@@ -224,8 +225,8 @@ class LlmReportBuilder:
         if flat and flat in _alnum(heard):
             return value
         # Read out digit by digit ("R five five eight two one"): match the digits.
-        digits = spoken_digits(value)
-        if len(digits) >= _MIN_REF_DIGITS and digits in spoken_digits(heard):
+        digits = _ref_digits(value)
+        if len(digits) >= _MIN_REF_DIGITS and digits in _ref_digits(heard):
             return value
         return None
 
@@ -329,6 +330,12 @@ def _deadlines(values: Sequence[str], call_date: dt.date | None) -> list[dt.date
             continue
         dates.add(date)
     return sorted(dates)
+
+
+def _ref_digits(text: str) -> str:
+    """Digits as read aloud, where "oh" is zero. Only for matching a reference: the
+    guard can't count "oh", since "oh, okay" would add digits to its stream."""
+    return spoken_digits(_OH.sub("0", text))
 
 
 def _alnum(text: str) -> str:
