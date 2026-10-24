@@ -18,7 +18,7 @@ Each step updates its row when it starts and when it finishes, and pushes that c
 
 | Step | Owner | State | Commit on `main` | Notes |
 |---|---|---|---|---|
-| 1. Contracts, data layer, dashboard, Plan.md | person 1's session | in progress | | Branch `chris/research-contracts` |
+| 1. Contracts, data layer, dashboard, Plan.md | person 1's session | in progress: code done, gate blocked | | Branch `chris/research-contracts` (pushed). ruff, the non-DB tests (508) and `npm run build` pass. **Blocked:** the DB tests and the seed check need the `research-int-p1` Neon branch, which person 1 creates (see "Before anyone starts"). Step 2 can start 2b–2e against this branch's contracts now. Small fixes in other packages: `orchestrator/letter_result.py` (date-only appointment; `needs_user_input` sends nothing yet), `orchestrator/tools.py` (only ref'd facts are "identifiers"), `relay/templates.py` (new `letter.appointment_date`), `dev/fake_research.py` (skips value facts and missing locations) |
 | 2. Move and wire the research agent | person 3's session | in progress | | Preparing 2b–2e on `research/integrate`; waiting for step 1. No `research-int-p3` URL yet (needed for the gate and the end-to-end check) |
 | 3. Hand-offs sent | person 1 | not started | | |
 
