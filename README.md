@@ -115,7 +115,7 @@ Reply templates live in `relay/templates.py` (`en` and `es`). Status, interfaces
 
 ### The phone agent without a phone
 
-The call runner (`phone/runner.py`) runs a whole call on fakes. To watch one against a text phone tree with real Claude, run from `backend/` with `ANTHROPIC_API_KEY` set: `python -m app.phone.simulate --list`, then `python -m app.phone.simulate --tree speech_federal` (add `--interactive` to answer ask_user at the console). Ports, fakes, and the runner's policies: [docs/specs/phone-ports.md](docs/specs/phone-ports.md).
+The call runner (`phone/runner.py`) runs a whole call on fakes. To watch one against a text phone tree with real Claude, run from `backend/` with `ANTHROPIC_API_KEY` set: `python -m app.phone.simulate --list`, then `python -m app.phone.simulate --tree speech_federal` (add `--interactive` to answer ask_user at the console). To check the call report against real Claude, run `python -m app.phone.report_eval` (same key, costs a little). Ports, fakes, and the runner's policies: [docs/specs/phone-ports.md](docs/specs/phone-ports.md).
 
 To play the line yourself, run the playground from `backend/`: `python -m app.phone.playground`. Each line you paste is what the agency says; the real runner answers, and each step shows the 1c reading, the state change, the 1b action, what went out, and latency. Add `--fake` to run without Claude (you type the menu decision). `/help` lists the commands; `/save <name>` records a session, and `python -m app.phone.playground --replay app/phone/playground/scripts/<name>.json` replays it with a pass/fail table (add `--fake` to replay the recorded answers for free). In a new worktree, copy the main checkout's `.env` first, or export `ANTHROPIC_API_KEY`.
 
