@@ -80,7 +80,11 @@ async def test_seeded_case_end_to_end(api: httpx.AsyncClient) -> None:
     assert (await api.delete(f"/api/facts/{fact_id}")).status_code == 404
     feed = (await api.get(f"/api/users/{user_id}/feed")).json()
     deleted = [item for item in feed if item["deleted_at"]]
-    assert [item["text"]["text"] for item in deleted] == ["Guardamos un dato sobre ti"]
+    # The first fact is the immigration one, held for consent (C15, C25).
+    assert memory["facts"][0]["status"] == "pending_consent"
+    assert [item["text"]["text"] for item in deleted] == [
+        "Te preguntaremos antes de guardar un dato"
+    ]
 
 
 async def test_after_call_seed_has_report_and_transcript(
