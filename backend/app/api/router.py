@@ -2,9 +2,10 @@
 
 from fastapi import APIRouter
 
-from app.api import cases, feed, users
+from app.api import cases, feed, memory, users
 
 router = APIRouter(prefix="/api")
 router.include_router(users.router)
 router.include_router(cases.router)
 router.include_router(feed.router)
+router.include_router(memory.router)
