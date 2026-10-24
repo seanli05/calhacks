@@ -1,0 +1,88 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 26, 20, 0.35);
+  z-index: 50;
+}
+
+.sheet {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(560px, 100%);
+  z-index: 51;
+  background: var(--card);
+  border-left: 1px solid var(--line);
+  box-shadow: -20px 0 60px rgba(15, 26, 20, 0.12);
+  padding: calc(22px + env(safe-area-inset-top, 0px)) max(22px, env(safe-area-inset-right, 0px))
+    calc(22px + env(safe-area-inset-bottom, 0px)) 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  animation: slide 260ms ease both;
+}
+
+@keyframes slide {
+  from {
+    transform: translateX(40px);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.head h2 {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--faint);
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.who {
+  font-family: var(--font-code);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+  padding-top: 2px;
+}
+
+.agent .who {
+  color: var(--forest-2);
+  font-weight: 500;
+}
+
+.user .who {
+  color: var(--amber);
+}
+

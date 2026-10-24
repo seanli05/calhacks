@@ -1,0 +1,27 @@
+.page {
+  aspect-ratio: 8.5 / 11;
+  max-width: 100%;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  padding: 8px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.page i {
+  display: block;
+  height: 3px;
+  background: #d9ddd5;
+}
+
+.page i.hl {
+  background: var(--lime);
+}
+
+.photo {
+  display: block;
+  aspect-ratio: 8.5 / 11;
+  object-fit: cover;
+  border: 1px solid var(--line-strong);
+}
