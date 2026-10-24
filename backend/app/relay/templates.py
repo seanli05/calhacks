@@ -112,6 +112,205 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "went on with it."
         ),
     },
+    # R1 (Goal 6.1). The explanation and checklist are translated free text; these
+    # lines carry what must never be garbled, with dates formatted in code.
+    "letter.appointment": {
+        "es": "📅 Su entrevista: {date}, a las {time}. La dirección está en su carta.",
+        "en": "📅 Your interview: {date}, at {time}. The address is on your letter.",
+    },
+    "letter.deadline": {
+        "es": "📅 Fecha límite: {date}.",
+        "en": "📅 Deadline: {date}.",
+    },
+    "letter.checking": {
+        "es": (
+            "Ahora estoy verificando que la carta sea auténtica. "
+            "Le escribo en unos minutos."
+        ),
+        "en": (
+            "I'm now checking that this letter is legitimate. "
+            "I'll write again in a few minutes."
+        ),
+    },
+    "letter.explain_failed": {
+        "es": (
+            "Leí su carta, pero no pude escribirle la explicación ahora. "
+            "Escríbame «¿qué dice mi carta?» y se la explico."
+        ),
+        "en": (
+            "I read your letter, but I couldn't write up the explanation just now. "
+            'Write me "what does my letter say?" and I\'ll explain it.'
+        ),
+    },
+    # Plan.md → Failure rules: unreadable photo (C9).
+    "letter.retake": {
+        "es": (
+            "No pude leer bien la foto. ¿Me puede enviar otra? Ponga la carta sobre "
+            "una mesa con buena luz, con toda la página dentro de la foto y sin sombras."
+        ),
+        "en": (
+            "I couldn't read the photo well. Could you send another one? Put the "
+            "letter on a table in good light, with the whole page in the photo and "
+            "no shadows."
+        ),
+    },
+    "letter.retake_tip": {
+        "es": "No pude leer bien la foto. {tip} ¿Me puede enviar otra?",
+        "en": "I couldn't read the photo well. {tip} Could you send another one?",
+    },
+    # R2 (Goal 6.2).
+    "verification.verified": {
+        "es": "Revisé su carta con la información oficial de uscis.gov: es auténtica. ✅",
+        "en": "I checked your letter against official information on uscis.gov: it's genuine. ✅",
+    },
+    "verification.verified_no_call": {
+        "es": (
+            "Revisé su carta con la información oficial de uscis.gov: es auténtica. ✅ "
+            "Por ahora no hace falta llamar a USCIS. Escríbame si tiene preguntas."
+        ),
+        "en": (
+            "I checked your letter against official information on uscis.gov: it's "
+            "genuine. ✅ There's no need to call USCIS for now. Write to me if you "
+            "have questions."
+        ),
+    },
+    # Plan.md → Failure rules: a letter that looks like a scam. Never offers a call.
+    "verification.suspicious": {
+        "es": (
+            "⚠️ Cuidado: esta carta tiene señales de fraude:\n{red_flags}\n"
+            "No llame a los números de la carta, no pague nada y no dé sus datos. "
+            "Escríbame si tiene preguntas."
+        ),
+        "en": (
+            "⚠️ Careful: this letter has signs of a scam:\n{red_flags}\n"
+            "Don't call the numbers on the letter, don't pay anything, and don't give "
+            "out your details. Write to me if you have questions."
+        ),
+    },
+    "verification.suspicious_generic": {
+        "es": (
+            "⚠️ Cuidado: esta carta tiene señales de fraude. No llame a los números "
+            "de la carta, no pague nada y no dé sus datos. Escríbame si tiene preguntas."
+        ),
+        "en": (
+            "⚠️ Careful: this letter has signs of a scam. Don't call the numbers on "
+            "the letter, don't pay anything, and don't give out your details. Write "
+            "to me if you have questions."
+        ),
+    },
+    # Plan.md → Failure rules: verification unknown. No call offer; explain and ask.
+    "verification.unknown": {
+        "es": (
+            "No pude confirmar si esta carta es auténtica, así que todavía no le "
+            "ofrezco llamar a USCIS. Puedo explicarle lo que dice la carta, o usted "
+            "puede revisar su caso en uscis.gov. ¿Qué prefiere?"
+        ),
+        "en": (
+            "I couldn't confirm whether this letter is genuine, so I'm not offering "
+            "to call USCIS yet. I can explain what the letter says, or you can check "
+            "your case on uscis.gov. What would you like to do?"
+        ),
+    },
+    # Consent (Goal 6.3, C21). A YES covers one call; every call asks again.
+    "consent.request": {
+        "es": (
+            "¿Quiere que llame a USCIS por usted?\nPara qué: {goal}\n"
+            "Yo espero en la línea. Cuando conteste una persona, le llamo a este "
+            "número para que hable usted. No daré sus números de caso ni su fecha de "
+            "nacimiento. Le pido permiso para cada llamada.\n"
+            "1 Sí, llame\n2 No, gracias"
+        ),
+        "en": (
+            "Would you like me to call USCIS for you?\nWhat for: {goal}\n"
+            "I'll wait on the line. When a person answers, I'll call you at this "
+            "number so you can talk to them. I won't give out your case numbers or "
+            "your date of birth. I ask your permission for every call.\n"
+            "1 Yes, call\n2 No, thanks"
+        ),
+    },
+    "consent.request_generic": {
+        "es": (
+            "¿Quiere que llame a USCIS por usted sobre esta carta?\n"
+            "Yo espero en la línea. Cuando conteste una persona, le llamo a este "
+            "número para que hable usted. No daré sus números de caso ni su fecha de "
+            "nacimiento. Le pido permiso para cada llamada.\n"
+            "1 Sí, llame\n2 No, gracias"
+        ),
+        "en": (
+            "Would you like me to call USCIS for you about this letter?\n"
+            "I'll wait on the line. When a person answers, I'll call you at this "
+            "number so you can talk to them. I won't give out your case numbers or "
+            "your date of birth. I ask your permission for every call.\n"
+            "1 Yes, call\n2 No, thanks"
+        ),
+    },
+    "consent.reprompt": {
+        "es": "Por favor responda 1 si quiere que llame a USCIS, o 2 si no.",
+        "en": "Please reply 1 if you'd like me to call USCIS, or 2 if not.",
+    },
+    "consent.given": {
+        "es": "Gracias. Preparo la llamada y le aviso cuando esté marcando.",
+        "en": "Thank you. I'm setting up the call and will let you know when I'm dialing.",
+    },
+    "consent.declined": {
+        "es": "De acuerdo, no voy a llamar. Si cambia de opinión, escríbame.",
+        "en": "All right, I won't call. If you change your mind, write to me.",
+    },
+    "consent.unavailable": {
+        "es": (
+            "Lo siento, no puedo hacer esa llamada ahora. Escríbame si quiere que "
+            "lo intente más tarde."
+        ),
+        "en": "Sorry, I can't make that call right now. Write to me if you'd like me to try later.",
+    },
+    # Post-call summary (Goal 6.4). The next steps are translated free text.
+    "summary.reference": {
+        "es": "Número de referencia de la llamada: {reference}",
+        "en": "Reference number for the call: {reference}",
+    },
+    "summary.deadlines": {
+        "es": "📅 Fechas importantes: {dates}",
+        "en": "📅 Important dates: {dates}",
+    },
+    "summary.unavailable": {
+        "es": (
+            "La llamada con USCIS terminó. No pude escribirle el resumen ahora; "
+            "escríbame y se lo explico."
+        ),
+        "en": (
+            "The call with USCIS is over. I couldn't write up the summary just now; "
+            "write to me and I'll explain it."
+        ),
+    },
+    # Plan.md → Failure rules: hold exceeded max. A retry asks for consent again (C21).
+    "summary.call_failed": {
+        "es": (
+            "No pude completar la llamada con USCIS: la espera fue demasiado larga "
+            "o la llamada se cortó."
+        ),
+        "en": (
+            "I couldn't complete the call with USCIS: the wait was too long or the "
+            "call dropped."
+        ),
+    },
+    "summary.unreachable_followup": {
+        "es": (
+            "Si quiere, puedo llamar otra vez a USCIS y avisarle cuando conteste "
+            "una persona."
+        ),
+        "en": "If you'd like, I can call USCIS again and let you know when a person answers.",
+    },
+    # C22: suggest closing; the user decides (the turn's close_case tool).
+    "summary.suggest_close": {
+        "es": (
+            "Parece que esta carta ya está resuelta. Si ya no necesita ayuda con "
+            "ella, escríbame «cerrar» y la cierro."
+        ),
+        "en": (
+            "It looks like this letter is taken care of. If you don't need more help "
+            'with it, write "close" and I\'ll close it.'
+        ),
+    },
     # Call status (P2). The orchestrator picks which call events become these (C36).
     # Exactly the four in USER_MESSAGING_EVENTS; after the call, the user gets the
     # post-call summary instead of a "call ended" message.

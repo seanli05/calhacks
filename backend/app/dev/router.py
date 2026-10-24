@@ -1,6 +1,7 @@
 """Dev endpoints: `POST /dev/fake-call` starts the fake phone agent for one user (see
 fake_call.py); `POST /dev/fake-research` starts the fake research agent (see
-fake_research.py).
+fake_research.py); `POST /dev/fake-phone` starts the fake phone worker, which takes
+the call jobs the orchestrator queues after a YES (see fake_phone.py).
 
 Off unless DEV_ENDPOINTS=true, and even then only from the machine running the
 server: ngrok makes this app public, and ngrok always adds X-Forwarded-For.
@@ -14,6 +15,7 @@ from pydantic import BaseModel, Field
 from app.contracts.common import PhoneE164
 from app.db import reads
 from app.dev.fake_call import run_fake_call
+from app.dev.fake_phone import get_fake_phone
 from app.dev.fake_research import get_fake_research
 from app.orchestrator.call_status import get_call_status
 from app.relay.ask_user import get_ask_user
@@ -40,9 +42,9 @@ class FakeCallRequest(BaseModel):
     """The user's WhatsApp number in E.164, e.g. +15105550123."""
 
 
-class FakeResearchRequest(BaseModel):
+class FakeWorkerRequest(BaseModel):
     minutes: float = Field(default=30, gt=0, le=240)
-    """How long to keep claiming research jobs."""
+    """How long to keep claiming jobs."""
 
 
 @router.post("/fake-call", status_code=202)
@@ -60,7 +62,14 @@ async def fake_call(
 
 
 @router.post("/fake-research", status_code=202)
-async def fake_research(body: FakeResearchRequest | None = None) -> dict[str, str]:
-    body = body or FakeResearchRequest()
+async def fake_research(body: FakeWorkerRequest | None = None) -> dict[str, str]:
+    body = body or FakeWorkerRequest()
     started = get_fake_research().start(body.minutes * 60)
+    return {"status": "started" if started else "already running"}
+
+
+@router.post("/fake-phone", status_code=202)
+async def fake_phone(body: FakeWorkerRequest | None = None) -> dict[str, str]:
+    body = body or FakeWorkerRequest()
+    started = get_fake_phone().start(body.minutes * 60)
     return {"status": "started" if started else "already running"}

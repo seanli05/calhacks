@@ -19,8 +19,10 @@ from app.contracts import (
     MessageDirection,
     MessageSender,
     QuestionStatus,
+    VerificationStatus,
 )
 from app.db import tables
+from app.db.errors import UnverifiedNumber
 from app.db.progress import CaseStage, compute_stage
 from app.db.tables import utcnow
 from app.relay.inbound import InboundMedia, InboundMessage
@@ -48,6 +50,7 @@ class FakeDB:
         self.events: list[Event] = []
         self.jobs: dict[str, tables.Job] = {}
         self.verifications: dict[str, tables.Verification] = {}
+        self.briefs: dict[str, tables.CaseBrief] = {}
         self.profiles: dict[str, tables.Profile] = {}
         self.facts: list[tables.Fact] = []
 
@@ -271,6 +274,44 @@ class FakeDB:
     async def latest_verification(self, case_id: str) -> tables.Verification | None:
         return self.verifications.get(case_id)
 
+    async def official_dial_number(self, case_id: str) -> str:
+        """Refuses like the real helper (rule 2)."""
+        verification = self.verifications.get(case_id)
+        if verification is None or verification.status != VerificationStatus.VERIFIED:
+            raise UnverifiedNumber(f"case {case_id} is not verified")
+        if not verification.official_phone:
+            raise UnverifiedNumber(f"case {case_id} has no official phone")
+        return verification.official_phone
+
+    async def latest_brief(self, case_id: str) -> tables.CaseBrief | None:
+        return self.briefs.get(case_id)
+
+    async def list_calls(self, case_id: str) -> list[tables.Call]:
+        return [c for c in self.calls.values() if c.case_id == case_id]
+
+    def add_verified_case(
+        self,
+        user: tables.User,
+        status: VerificationStatus = VerificationStatus.VERIFIED,
+        official_phone: str | None = "+15105550199",
+    ) -> tables.Case:
+        """A case research has finished: R1 saved, a verdict, and a brief."""
+        case = tables.Case(
+            user_id=user.id,
+            doc_type="uscis_i797c_asylum_interview",
+            fast_result={"status": "ok", "issuer": "USCIS"},
+        )
+        self.cases.append(case)
+        self.verifications[case.id] = tables.Verification(
+            case_id=case.id, status=status, official_phone=official_phone
+        )
+        self.briefs[case.id] = tables.CaseBrief(
+            case_id=case.id,
+            brief={"call_goal_en": "Confirm the interview is still on"},
+            handoff_note="test brief",
+        )
+        return case
+
     async def get_profile(self, user_id: str) -> tables.Profile | None:
         return self.profiles.get(user_id)
 
@@ -304,6 +345,21 @@ class FakeWhatsApp:
         if media.url in self.broken_urls:
             raise MediaDownloadError(f"Media download failed for {message_sid}")
         return DownloadedMedia(content_type=media.content_type, data=b"jpeg")
+
+
+class FakeTranslator:
+    """Marks what it translated, so a test can tell translated text from English."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.fail = fail
+        self.calls: list[str] = []
+
+    async def from_english(self, text_en: str, language: str) -> str | None:
+        self.calls.append(text_en)
+        return None if self.fail else f"[{language}] {text_en}"
+
+    async def to_english(self, text: str, language: str) -> str | None:
+        return None if self.fail else f"[en] {text}"
 
 
 def _copy(question: tables.Question) -> tables.Question:

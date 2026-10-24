@@ -7,13 +7,19 @@ dates-survive check (5.4) come later.
 """
 
 import logging
+from functools import lru_cache
 
 import anthropic
 from anthropic import AsyncAnthropic
 from pydantic import BaseModel
 
 from app.contracts.common import LanguageCode
-from app.translation.prompts import FROM_ENGLISH_SYSTEM, TO_ENGLISH_SYSTEM
+from app.settings import get_settings
+from app.translation.prompts import (
+    FROM_ENGLISH_SYSTEM,
+    LABELS_FROM_ENGLISH_SYSTEM,
+    TO_ENGLISH_SYSTEM,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +38,10 @@ _DEFAULT_REGISTER = "Write warm, simple, polite language. Short sentences."
 
 class _Translated(BaseModel):
     text: str
+
+
+class _Labels(BaseModel):
+    labels: list[str]
 
 
 class Translator:
@@ -62,6 +72,49 @@ class Translator:
         )
         return await self._translate(text_en, system, language)
 
+    async def labels_from_english(
+        self, labels_en: list[str], language: LanguageCode
+    ) -> list[str] | None:
+        """Short labels (phone menu options) in `language`, in the same order, or
+        None if the call fails or the count doesn't match."""
+        if language == "en":
+            return labels_en
+        system = LABELS_FROM_ENGLISH_SYSTEM.format(
+            language=_name(language),
+            register=REGISTERS.get(language, _DEFAULT_REGISTER),
+        )
+        try:
+            response = await self._client.messages.parse(
+                model=self._model,
+                max_tokens=1024,
+                system=system,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": _Labels(labels=labels_en).model_dump_json(),
+                    }
+                ],
+                output_config={"effort": "low"},
+                output_format=_Labels,
+                timeout=self._timeout_s,
+            )
+        except anthropic.APIError as exc:
+            logger.warning(
+                "Label translation failed language=%s: %s",
+                language,
+                type(exc).__name__,
+            )
+            return None
+        translated = response.parsed_output
+        if (
+            translated is None
+            or len(translated.labels) != len(labels_en)
+            or not all(label.strip() for label in translated.labels)
+        ):
+            logger.warning("Label translation came back unusable language=%s", language)
+            return None
+        return translated.labels
+
     async def _translate(
         self, text: str, system: str, language: LanguageCode
     ) -> str | None:
@@ -89,3 +142,26 @@ class Translator:
 
 def _name(language: LanguageCode) -> str:
     return LANGUAGE_NAMES.get(language, f"the language with ISO 639-1 code {language}")
+
+
+@lru_cache
+def get_translator() -> Translator | None:
+    """The shared translator, or None without an Anthropic key."""
+    settings = get_settings()
+    if not settings.anthropic_api_key:
+        return None
+    return Translator(
+        AsyncAnthropic(api_key=settings.anthropic_api_key), settings.model_fast
+    )
+
+
+async def localize(
+    translator: Translator | None, text_en: str, language: LanguageCode
+) -> str | None:
+    """`text_en` in `language`, or None when it can't be translated (no translator,
+    or the call failed). Callers fall back to a template, never to English."""
+    if language == "en":
+        return text_en
+    if translator is None:
+        return None
+    return await translator.from_english(text_en, language)

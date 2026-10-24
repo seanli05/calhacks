@@ -2,7 +2,8 @@
 
 Order per message: user row → media saved → inbound logged → routed. Routing order:
 a reply to an ask_user question (the call is waiting), then the language pick, photo
-grouping, a "same letter or new?" answer, or an orchestrator turn.
+grouping, a "same letter or new?" answer, an answer to a consent request, or an
+orchestrator turn.
 
 One number's messages are routed one at a time, under a per-number lock. An
 orchestrator turn (slow: a Claude call) runs after that lock is released, under a
@@ -21,10 +22,12 @@ from anthropic import AsyncAnthropic
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.contracts import MessageDirection, MessageSender
-from app.contracts.common import LanguageCode, MediaId, UserId
+from app.contracts.common import LanguageCode, MediaId, MessageId, UserId
 from app.db import tables
 from app.db.messages import append_message
 from app.db.writes import orchestrator as writes
+from app.orchestrator.call_status import get_call_status
+from app.orchestrator.consent import ConsentGate
 from app.orchestrator.job_watch import get_job_watcher
 from app.orchestrator.language import (
     LanguageStep,
@@ -32,18 +35,20 @@ from app.orchestrator.language import (
     last_language_prompt,
     prompt_for,
 )
+from app.orchestrator.letter_result import LetterResults
 from app.orchestrator.letters import Letters
 from app.orchestrator.photos import PHOTO_QUIET_WINDOW_S, PendingPages, PhotoBatcher
 from app.orchestrator.turn import OrchestratorTurn
+from app.orchestrator.verdicts import Verdicts
 from app.relay.ask_user import AskUser, get_ask_user
 from app.relay.inbound import InboundMedia, InboundMessage
 from app.relay.media import MediaDownloadError
 from app.relay.outbound import send_template, send_text
-from app.relay.replies import parse_choice
+from app.relay.replies import parse_choice, parse_yes_no
 from app.relay.whatsapp import WhatsApp, WhatsAppSendError, get_whatsapp
 from app.settings import get_settings
 from app.translation.detect import detect_language
-from app.translation.translate import Translator
+from app.translation.translate import Translator, get_translator
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +61,12 @@ class TurnRunner(Protocol):
     """The orchestrator's reply to free text (`OrchestratorTurn.run`)."""
 
     async def __call__(
-        self, user: tables.User, *, same_or_new_pending: bool = False
+        self,
+        user: tables.User,
+        message_id: MessageId,
+        *,
+        same_or_new_pending: bool = False,
+        consent_pending: bool = False,
     ) -> None: ...
 
 
@@ -75,15 +85,18 @@ class InboundPipe:
         *,
         to_english: ToEnglish | None = None,
         turn: TurnRunner | None = None,
+        consent: ConsentGate | None = None,
     ) -> None:
         """Without `to_english`, non-English messages are logged with no `body_en`;
-        without `turn`, free text is echoed (no Anthropic key)."""
+        without `turn`, free text is echoed (no Anthropic key); without `consent`,
+        nothing is routed to a consent request."""
         self._whatsapp = whatsapp
         self._detect = detect
         self._ask_user = ask_user
         self.letters = letters
         self._to_english = to_english
         self._turn = turn
+        self._consent = consent
         self.photos = PhotoBatcher(self._letter_ready, quiet_window_s)
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self._turn_locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
@@ -123,7 +136,7 @@ class InboundPipe:
         elif message.text:
             question = await self._ask_user.question_for_reply(user.id)
 
-        await append_message(
+        inbound = await append_message(
             user.id,
             MessageDirection.IN,
             MessageSender.USER,
@@ -147,9 +160,11 @@ class InboundPipe:
         elif pages:
             await self._letter_pages(user, pages)
         elif (pending := self.photos.pending(user.id)) is not None:
-            return await self._same_or_new_answer(user, message, pending)
+            return await self._same_or_new_answer(user, message, inbound, pending)
+        elif self._consent is not None and self._consent.pending(user.id) is not None:
+            return await self._consent_answer(user, message, inbound)
         else:
-            return partial(self._orchestrator_turn, user, message)
+            return partial(self._orchestrator_turn, user, message, inbound.id)
         return None
 
     async def _english(
@@ -160,8 +175,9 @@ class InboundPipe:
         answers_question: tables.Question | None,
     ) -> str | None:
         """The English for the log (rule 6). Skipped for a reply to an open ask_user
-        question, which is a number and must not wait on a model call."""
-        if language == "en":
+        question, which must not wait on a model call; a bare number is the same in
+        English."""
+        if language == "en" or parse_choice(message.text, 99) is not None:
             return message.body
         if not message.text or answers_question is not None or self._to_english is None:
             return None
@@ -242,7 +258,11 @@ class InboundPipe:
         await send_template(self._whatsapp, user, "letter.received")
 
     async def _same_or_new_answer(
-        self, user: tables.User, message: InboundMessage, pending: PendingPages
+        self,
+        user: tables.User,
+        message: InboundMessage,
+        inbound: tables.Message,
+        pending: PendingPages,
     ) -> Turn | None:
         """A "1" or "2" settles it; other text goes to the orchestrator turn, which
         answers and reminds the user to pick (or re-asks, without a turn)."""
@@ -250,7 +270,11 @@ class InboundPipe:
         if choice is None:
             if self._turn is not None and message.text:
                 return partial(
-                    self._orchestrator_turn, user, message, same_or_new_pending=True
+                    self._orchestrator_turn,
+                    user,
+                    message,
+                    inbound.id,
+                    same_or_new_pending=True,
                 )
             await send_template(self._whatsapp, user, "letter.same_or_new")
             return None
@@ -270,6 +294,28 @@ class InboundPipe:
             await send_template(self._whatsapp, user, "letter.received")
         return None
 
+    async def _consent_answer(
+        self, user: tables.User, message: InboundMessage, inbound: tables.Message
+    ) -> Turn | None:
+        """A 1/yes or 2/no answers the consent request in code (rule 4: the model
+        never starts a call); other text goes to the turn, which reminds the user."""
+        assert self._consent is not None
+        choice = parse_yes_no(message.text) if message.text else None
+        if choice is not None:
+            await self._consent.answer(user, inbound, choice)
+            return None
+        if self._turn is not None and message.text:
+            return partial(
+                self._orchestrator_turn,
+                user,
+                message,
+                inbound.id,
+                consent_pending=True,
+            )
+        if message.text:
+            await send_template(self._whatsapp, user, "consent.reprompt")
+        return None
+
     async def _letter_ready(self, user_id: UserId, media_ids: list[MediaId]) -> None:
         document = await writes.create_document(user_id, media_ids)
         logger.info(
@@ -284,11 +330,18 @@ class InboundPipe:
         self,
         user: tables.User,
         message: InboundMessage,
+        message_id: MessageId,
         *,
         same_or_new_pending: bool = False,
+        consent_pending: bool = False,
     ) -> None:
         if self._turn is not None:
-            await self._turn(user, same_or_new_pending=same_or_new_pending)
+            await self._turn(
+                user,
+                message_id,
+                same_or_new_pending=same_or_new_pending,
+                consent_pending=consent_pending,
+            )
         elif message.text:
             # No Anthropic key: echo, so the pipe can still be tried on a phone.
             await send_text(self._whatsapp, user, f"Echo: {message.text}")
@@ -302,16 +355,20 @@ async def _no_detection(text: str) -> None:
 def get_pipe() -> InboundPipe:
     settings = get_settings()
     whatsapp = get_whatsapp()
-    letters = Letters(whatsapp, get_job_watcher())
-    if not settings.anthropic_api_key:
+    translator = get_translator()
+    consent, letters = _results_path(whatsapp, translator)
+    if translator is None:
         logger.warning(
             "ANTHROPIC_API_KEY not set: first contact always gets the menu, nothing "
             "is translated, and free text is echoed"
         )
-        return InboundPipe(whatsapp, _no_detection, get_ask_user(), letters)
+        return InboundPipe(
+            whatsapp, _no_detection, get_ask_user(), letters, consent=consent
+        )
     client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-    translator = Translator(client, settings.model_fast)
-    turn = OrchestratorTurn(client, settings.model_default, whatsapp, translator)
+    turn = OrchestratorTurn(
+        client, settings.model_default, whatsapp, translator, consent
+    )
     return InboundPipe(
         whatsapp,
         partial(detect_language, client, settings.model_fast),
@@ -319,4 +376,16 @@ def get_pipe() -> InboundPipe:
         letters,
         to_english=translator.to_english,
         turn=turn.run,
+        consent=consent,
     )
+
+
+def _results_path(
+    whatsapp: WhatsApp, translator: Translator | None
+) -> tuple[ConsentGate, Letters]:
+    """Letter → explanation → verdict → consent → call → summary."""
+    job_watcher = get_job_watcher()
+    consent = ConsentGate(whatsapp, translator, job_watcher, get_call_status())
+    verdicts = Verdicts(whatsapp, translator, consent)
+    results = LetterResults(whatsapp, translator, verdicts)
+    return consent, Letters(whatsapp, job_watcher, results)
