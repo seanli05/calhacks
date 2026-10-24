@@ -1,6 +1,6 @@
-import { Placeholder } from "@/components/Placeholder";
+import { CasesPage } from "@/components/cases/CasesPage";
 
-export default async function CasesPage({ params }: { params: Promise<{ userId: string }> }) {
+export default async function MyCasesPage({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = await params;
-  return <Placeholder userId={userId} title="My cases" />;
+  return <CasesPage userId={userId} />;
 }

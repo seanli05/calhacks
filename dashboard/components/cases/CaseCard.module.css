@@ -1,0 +1,166 @@
+.card {
+  --c-fg: var(--ink);
+  --c-muted: var(--muted);
+  --c-faint: var(--faint);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: start;
+  padding: 20px 26px;
+  color: var(--c-fg);
+  text-decoration: none;
+  transition:
+    background-color 600ms ease,
+    color 600ms ease,
+    border-color 200ms ease;
+}
+
+.card:hover {
+  border-color: var(--forest-2);
+}
+
+/* A person answered: the card turns forest, like the case view's hero. */
+.moment {
+  --c-fg: #fff;
+  --c-muted: #cfe3d8;
+  --c-faint: #9dbbac;
+  background: var(--forest);
+  border-color: var(--forest);
+}
+
+.moment .pill {
+  background: var(--lime);
+}
+
+.bad {
+  background: var(--coral-soft);
+}
+
+.warn {
+  background: var(--amber-soft);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.top h2 {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.received {
+  font-size: var(--fs-sm);
+  color: var(--c-faint);
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  font-size: var(--fs-md);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: blink 1.6s ease-in-out infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.timer {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.t {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.tl {
+  font-size: var(--fs-sm);
+  color: var(--c-faint);
+}
+
+.appt {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+  font-size: var(--fs-lg);
+  color: var(--c-muted);
+}
+
+.appt b {
+  color: var(--c-fg);
+  font-weight: 600;
+}
+
+.k {
+  font-size: var(--fs-xs);
+  color: var(--c-faint);
+}
+
+.loc {
+  display: block;
+  font-size: var(--fs-md);
+}
+
+.open {
+  align-self: center;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--forest-2);
+  white-space: nowrap;
+}
+
+.moment .open {
+  color: var(--lime);
+}
+
+@media (max-width: 640px) {
+  .card {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+  }
+
+  .card > :first-child {
+    display: none;
+  }
+
+  .open {
+    justify-self: start;
+  }
+
+  .timer {
+    margin-left: 0;
+  }
+}
