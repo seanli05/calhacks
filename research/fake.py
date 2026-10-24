@@ -8,6 +8,7 @@ from research.models import (
     AlternativeContact,
     CaseBrief,
     ChecklistItem,
+    DeepFindings,
     FastPassOutput,
     KeyDate,
     KeyFact,
@@ -97,6 +98,18 @@ def fake_r2(case_id: str = "case_fake", brief_id: str = "brief_fake") -> R2:
         call_recommended=True,
         brief_id=brief_id,
         call_goal_en="Confirm the form was received",
+    )
+
+
+def fake_deep_findings() -> DeepFindings:
+    """Verified findings that agree with `fake_r2`."""
+    r2 = fake_r2()
+    return DeepFindings(
+        verification=r2.verification,
+        official_phone_purpose=r2.official_phone_purpose,
+        alternative_contacts=r2.alternative_contacts,
+        trust_chain=[FAKE_URL],
+        call_goal_en=r2.call_goal_en,
     )
 
 

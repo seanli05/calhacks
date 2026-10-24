@@ -2,6 +2,7 @@
 """In-memory Store for solo runs and tests."""
 
 import uuid
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -22,6 +23,22 @@ class InMemoryStore:
         self.case_refs: dict[tuple[str, str], str] = {}
         self.jobs: dict[str, Job] = {}
         self.events: list[Event] = []
+
+    async def insert_document(self, document: Document) -> None:
+        """Orchestrator-side write; the simulator plays the orchestrator."""
+        self.documents[document.document_id] = document
+
+    def next_queued(self, job_types: Iterable[str]) -> Job | None:
+        """Oldest queued job of the given types. Stands in for the real job runner's claim."""
+        wanted = set(job_types)
+        return next(
+            (
+                j
+                for j in self.jobs.values()
+                if j.status == "queued" and j.type in wanted
+            ),
+            None,
+        )
 
     async def get_document(self, document_id: str) -> Document:
         return self.documents[document_id]
