@@ -55,7 +55,6 @@ dashboard/
 - **Rules from CLAUDE.md that touch the UI.** The dashboard never sends WhatsApp messages: it only opens `wa.me` links with text prefilled (rule 1). It only deletes through the delete routes, never writes anything else (rule 5). Sensitive refs arrive masked; never unmask or log them.
 - **Dependencies.** Already installed and pinned: `next`, `react`, `qrcode.react` (for the landing QR). Don't add others without asking person 1.
 - **Shared files.** Don't edit `lib/api/types.ts`, `globals.css`, `lib/i18n/index.tsx` or the shared components without telling person 1. If you need a new shared token or component, ask. Each page agent owns only its own route, its `components/<page>/` folder, and its two strings files.
-- **Placeholder.** `components/Placeholder.tsx` stands in for unbuilt pages. Replace it in your page; whoever replaces the last one deletes the file.
 
 ## Git
 
