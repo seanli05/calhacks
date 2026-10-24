@@ -1,7 +1,7 @@
 /**
- * The one place pages get data from. `NEXT_PUBLIC_DATA=live` calls the FastAPI
- * routes through the `/api` rewrite; anything else serves `fixtures.ts`, so every
- * page runs without the backend.
+ * The one place pages get data from. By default it calls the FastAPI routes
+ * through the `/api` rewrite; `NEXT_PUBLIC_DATA=fixtures` serves `fixtures.ts`
+ * instead, so a page can be built without the backend.
  */
 
 import * as fx from "./fixtures";
@@ -20,7 +20,7 @@ import type {
 } from "./types";
 
 export const DATA_MODE: "live" | "fixtures" =
-  process.env.NEXT_PUBLIC_DATA === "live" ? "live" : "fixtures";
+  process.env.NEXT_PUBLIC_DATA === "fixtures" ? "fixtures" : "live";
 
 export class ApiError extends Error {
   constructor(

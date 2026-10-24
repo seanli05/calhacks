@@ -91,7 +91,7 @@ The **call panel** at the top of the case view is driven by the `calls` row and 
 
 ```bash
 uvicorn app.main:app --app-dir backend --port 8000               # repo root
-cd dashboard && npm install && NEXT_PUBLIC_DATA=live npm run dev  # http://localhost:3000
+cd dashboard && npm install && npm run dev  # http://localhost:3000, live data by default
 ```
 
 - `curl localhost:8000/api/demo` gives the user and the open case. The pages are `/u/<user>/cases/<case>`, `/u/<user>/cases` and `/u/<user>/memory`.

@@ -62,8 +62,8 @@ Run the dashboard (Node 20, from the repo root):
 
 ```bash
 cd dashboard && npm install
-npm run dev     # http://localhost:3000, on fake data (fixtures) by default
-NEXT_PUBLIC_DATA=live npm run dev   # against the backend on :8000
+npm run dev     # http://localhost:3000, against the backend on :8000
+NEXT_PUBLIC_DATA=fixtures npm run dev   # on fake data, no backend needed
 ```
 
 ### Using the database
@@ -145,7 +145,7 @@ For screenshots, serve the test branch on the side (headless Edge is used; `--br
 
 ```bash
 DATABASE_URL_UNPOOLED=<TEST_DATABASE_URL> RESEARCH_WORKER=false uvicorn app.main:app --app-dir backend --port 8001
-cd dashboard && BACKEND_URL=http://localhost:8001 NEXT_PUBLIC_DATA=live npx next dev -p 3001
+cd dashboard && BACKEND_URL=http://localhost:8001 npx next dev -p 3001
 cd backend && python -m app.dev.rehearsal --out ../rehearsal
 ```
 
@@ -174,10 +174,10 @@ Everything runs on one laptop (the one recording the video). Only the backend is
 
    ```bash
    cd dashboard && npm install
-   NEXT_PUBLIC_DATA=live npm run build && npm start   # http://localhost:3000
+   npm run build && npm start   # http://localhost:3000, on live data
    ```
 
-   `NEXT_PUBLIC_DATA` is baked in at build time, so rebuild after changing it. Open `http://localhost:3000`, follow the demo link to the case page, and record at 1920×1080.
+   Live data is the default; `NEXT_PUBLIC_DATA` is baked in at build time, so rebuild after changing it. Open `http://localhost:3000`, follow the demo link to the case page, and record at 1920×1080.
 
 Checks before recording: `http://localhost:8000/health` and `https://<your-name>.ngrok-free.app/health` both answer, a WhatsApp message to the sandbox shows up in the ngrok inspector (http://127.0.0.1:4040), and your phone joined the sandbox within the last 3 days.
 
