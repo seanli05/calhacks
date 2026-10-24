@@ -74,6 +74,7 @@ Every change must keep these true. If one would be broken, stop and raise it wit
 - The backend is async end to end. Don't call blocking I/O (sync HTTP, `time.sleep`, sync DB drivers) inside the event loop.
 - Anything user-facing must be fast. Slow work runs in the background, and the user gets a status message while they wait.
 - Put explicit timeouts on every external call and on every wait for the user.
+- The backend runs as one process: some state lives in memory (e.g. photo batching in the WhatsApp pipe). Never run it with `--workers`, and run the dev server with `--reload-dir backend` so changes in `.venv` don't restart it.
 
 ### Errors and observability
 - Follow the spec's failure rules exactly; don't improvise new behavior in the moment.

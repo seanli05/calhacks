@@ -44,7 +44,7 @@ You'll need:
 Run the backend (from the repo root, with the venv active):
 
 ```bash
-uvicorn app.main:app --app-dir backend --reload   # http://localhost:8000/health
+uvicorn app.main:app --app-dir backend --reload --reload-dir backend   # http://localhost:8000/health
 ```
 
 Startup creates any missing tables. To rebuild the database and seed the demo case (one Spanish-speaking user, the I-797C case from `mock_agency`, verified), run the command below. **This wipes the shared database for everyone**, so check with the team first:
@@ -73,11 +73,27 @@ Full guide, with per-component recipes: [docs/data-layer-guide.md](docs/data-lay
 
 1. Install ngrok (version 3.20 or newer; run `ngrok update` if needed) and add your token: `ngrok config add-authtoken <token>`.
 2. Run `ngrok http 8000` and copy the `https://...` URL.
-3. In `.env`, set `PUBLIC_BASE_URL` to that URL (no trailing slash) and fill in `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`. Restart the server; `--reload` doesn't pick up `.env` changes.
-4. In the Twilio console, go to **Messaging → Try it out → Send a WhatsApp message → Sandbox settings** and set **When a message comes in** to `POST <PUBLIC_BASE_URL>/whatsapp`. New accounts land on a "Try out WhatsApp" page with no webhook setting; switch to the legacy Console (account menu) to get the sandbox page with the **Sandbox settings** tab.
-5. From your phone, send the join code shown on that page to the sandbox number shown there.
+3. In `.env`, set `PUBLIC_BASE_URL` to that URL (no trailing slash, no `/whatsapp`) and fill in `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`. Use the team's one funded Twilio account (ask person 2): a trial account with a negative balance rejected every reply. Restart the server; `--reload` doesn't pick up `.env` changes.
+4. In that account's console, go to **Messaging → Try it out → Send a WhatsApp message → Sandbox settings** and set **When a message comes in** to the full URL `https://<your-ngrok-domain>/whatsapp`, method **POST**, then Save and reload the page to check it stuck. New accounts land on a "Try out WhatsApp" page with no webhook setting; switch to the legacy Console (account menu) to get the sandbox page with the **Sandbox settings** tab.
+5. From your phone, send that account's join code (`join <two-words>`) to the sandbox number shown there.
 
-`/whatsapp` checks Twilio's request signature against `PUBLIC_BASE_URL` and the auth token, so both must match the account whose sandbox points at you. If you get Twilio's default "Configure your WhatsApp Sandbox's Inbound URL" reply, the webhook URL isn't saved. For now the bot echoes text and replies to photos with their type and size.
+`/whatsapp` checks Twilio's request signature against `PUBLIC_BASE_URL` and the auth token, so both must match the account whose sandbox points at you.
+
+**Gotchas (each cost us time on Oct 23):**
+- The sandbox number (+1 415 523 8886) is shared by every Twilio account. Your message goes to whichever sandbox your phone joined most recently, so join with the code of the account in your `.env`.
+- A sandbox has one webhook URL, so only one laptop receives at a time. Agree who it points at.
+- If the URL is missing `https://`, Twilio silently doesn't call it: Twilio's logs show the message as received, with no error, and nothing reaches ngrok. If the method is GET, ngrok shows `GET /whatsapp` with a 405.
+- Twilio's default "Configure your WhatsApp Sandbox's Inbound URL" reply means no URL is saved.
+- Expect 5–9 s from send to webhook on the sandbox (photos are the slow end); that delay is Twilio's, not ours.
+- To debug, check in order: the ngrok inspector (http://127.0.0.1:4040), then Twilio **Monitor → Logs** (Messaging and Errors), then the uvicorn log. Failed replies there show Twilio's error code.
+
+The webhook returns empty TwiML at once and handles the message in a background task (`orchestrator/pipe.py`); every reply goes out through the Twilio REST API (`relay/whatsapp.py`) and is logged to `messages`. The pipe needs `DATABASE_URL`; without `ANTHROPIC_API_KEY`, language detection is skipped and first contact always gets the language menu. What a new number sees:
+
+- **Language pick:** a text first message gets a one-tap confirm in the detected language; a photo-only one gets the bilingual menu.
+- **Photos:** photos sent within 6 s of each other become one letter (`documents` row). Once a case exists, a new photo gets "same letter or new?".
+- **Other text:** echoed back until the orchestrator's Claude turn lands (Goal 4).
+
+Reply templates live in `relay/templates.py` (`en` and `es`). Status and open concerns for the WhatsApp side: [docs/whatsapp-pipe.md](docs/whatsapp-pipe.md).
 
 ## Repo layout
 
@@ -95,6 +111,7 @@ Full guide, with per-component recipes: [docs/data-layer-guide.md](docs/data-lay
 | `mock_agency/` | Mock USCIS line on Cartesia; deploys on its own | 3 |
 | `spikes/` | Throwaway experiments (e.g. `dtmf/`: key presses on the mock line); not imported by the backend | Spike owner |
 | `docs/specs/` | Build specs that implement Plan.md | Spec owner |
+| `docs/whatsapp-pipe.md` | WhatsApp side: what works, notes for teammates, concerns | 2 |
 
 ## Development
 

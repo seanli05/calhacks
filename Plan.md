@@ -496,9 +496,9 @@ Product decisions made by the team while planning the schema **[C29]**:
 | Scope | Build what the demo shows. The letter is always addressed to the user. |
 | Legal advice | None. Explain what the notice says, point to legal help, never interpret at the interview **[C33]**. |
 | Immigration identifiers | Always refs; the agent never gives them on a call **[C34] [C35]**. |
-| Language | The user selects their language. |
+| Language | The user selects their language. A first message with text gets a one-tap confirm in the detected language ("¿Seguimos en español? 1 Sí · 2 Otro idioma"); a photo-only first message gets a short multilingual menu. No silent detection: short replies are ambiguous, and a relative may type for the parent. The user can switch any time by asking (Oct 23). |
 | Which phone we ring | Always the user's WhatsApp number. |
-| Long letters | Several photos form one document **[C20]**. |
+| Long letters | Several photos form one document **[C20]**. Photos with no gap over ~6 s become one letter; the first gets an instant ack ("¿Tiene más páginas?"). A photo after research has started is asked about by text ("same letter or new? 1 · 2"), since the gap alone can't tell page 2 from a new letter (Oct 23). |
 | Which letter a message is about | The orchestrator reasons from the conversation and asks by text if unsure. |
 | Closing a letter | The user closes it; the agent suggests it when a call resolves **[C22]**. |
 | Consent | Asked before every call, including retries; the user is notified **[C21]**. |
