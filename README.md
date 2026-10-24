@@ -106,7 +106,7 @@ The webhook returns empty TwiML at once and handles the message in a background 
 - **Photos:** photos sent within 6 s of each other become one letter (`documents` row). Once a case exists, a new photo gets "same letter or new?".
 - **Other text:** echoed back until the orchestrator's Claude turn lands (Goal 4).
 
-Reply templates live in `relay/templates.py` (`en` and `es`). Status and open concerns for the WhatsApp side: [docs/whatsapp-pipe.md](docs/whatsapp-pipe.md).
+Reply templates live in `relay/templates.py` (`en` and `es`). Status, interfaces (ask_user, call status), decisions, and open concerns for the WhatsApp side: [docs/whatsapp-pipe.md](docs/whatsapp-pipe.md). To see ask_user and the call-status messages on your phone without the phone agent, set `DEV_ENDPOINTS=true` and use `POST /dev/fake-call` (local only; steps in that doc).
 
 ## Repo layout
 

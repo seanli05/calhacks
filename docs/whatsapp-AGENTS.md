@@ -1,0 +1,129 @@
+# AGENTS.md: reviewing the WhatsApp side (person 2)
+
+For an agent (or human) reviewing person 2's work: the WhatsApp pipe, the relay, ask_user, and call-status messages. It lists every file person 2 built or changed, what each does, which choices were deliberate, and what's worth checking. It's a map, not a spec: Plan.md is the source of truth, and [whatsapp-pipe.md](whatsapp-pipe.md) holds the status, interfaces, and decisions.
+
+## Read first
+
+1. [CLAUDE.md](../CLAUDE.md): the six non-negotiable product rules and the team conventions.
+2. [Plan.md](../Plan.md): especially P1 (ask_user), P2 (call status), C5, C10, C20, C24, C36, and the failure rules.
+3. [whatsapp-pipe.md](whatsapp-pipe.md): what works, the interfaces other components use, **the numbered decisions** (read them before flagging anything as a bug), and the known concerns.
+
+## Where the code is
+
+| Work | Plan goals | Where |
+|---|---|---|
+| WhatsApp pipe: webhook, language pick, photo grouping, sending and logging | Goal 2 | Merged to `main` in PR #6 |
+| ask_user, call-status messages, fake phone agent | Goals 3.1–3.6 | Branch `lauren-ask-user` |
+
+If the branch isn't on GitHub yet, ask person 2 to push it.
+
+## Files
+
+Paths are under `backend/` unless noted. "New" means person 2 created the file; "changed" means person 2 edited someone else's.
+
+### Relay (`app/relay/`): WhatsApp in and out, owned by person 2
+
+| File | What it does |
+|---|---|
+| `webhook.py` | `POST /whatsapp`. Checks Twilio's signature, parses the form, queues `InboundPipe.handle` as a background task, and returns empty TwiML at once. Replies never go in the TwiML. |
+| `signature.py` | Validates `X-Twilio-Signature`, rebuilding the URL from `PUBLIC_BASE_URL` because ngrok rewrites the host. Predates Goal 2. |
+| `inbound.py` | `InboundMessage.from_form`: parses every `MediaUrl{i}`/`MediaContentType{i}`, not just the first. `whatsapp_number` strips the `whatsapp:` prefix to E.164. Numbers, text and URLs are kept out of the repr so they can't reach logs. |
+| `media.py` | Downloads media with Twilio credentials. Auth isn't forwarded to the CDN redirect, and the URL is kept out of error messages. |
+| `whatsapp.py` | The thin Twilio wrapper. `WhatsApp` is a Protocol so tests can swap in a fake. `TwilioWhatsApp.send` uses the REST SDK in a worker thread (the SDK is synchronous), splits bodies over 1,600 chars with `split_body`, and raises `WhatsAppSendError` with Twilio's error code but no message text, which can contain numbers. |
+| `templates.py` | Every user-facing template, `template_id → {es, en}`, in formal *usted*. `render(id, None)` returns all supported languages, for before the user has picked one. A test fails if any language is missing. |
+| `outbound.py` | `send_template`, usable by anyone: sends, then logs to `messages` with `sender=relay`, `template`, the English `body_en`, and the Twilio SID. `send_text`: orchestrator free text only (rule 1). |
+| `replies.py` | `parse_choice(text, n)`: reads replies like "2", "2." or " 2 " as 1-based choices (C5). |
+| `ask_user.py` | **New (Goal 3).** `ask_user(request)` is what the phone agent awaits (P1). It creates the `questions` row, sends the numbered question, and waits on an in-memory future. On timeout it calls `time_out_question` and returns the default. It logs all four `call.ask_user*` events. `question_for_reply` / `handle_reply` serve the inbound pipe: they answer, re-prompt, or send the late reply (C24, 10-minute window, once per question). |
+
+### Orchestrator (`app/orchestrator/`): owned by person 2
+
+| File | What it does |
+|---|---|
+| `pipe.py` | `InboundPipe.handle` runs per webhook. Each WhatsApp number's messages are handled one at a time, in arrival order (a per-number `asyncio.Lock`). The sequence: user row → media downloaded and saved → inbound logged (with `question_id` if it answers one) → routed. **Routing order:** open ask_user question → language pick → letter photos → "same letter or new?" answer → orchestrator turn. The turn is still an echo stub until Goal 4. `get_pipe()` wires in the real Twilio client, Claude detection (only if `ANTHROPIC_API_KEY` is set), and the shared `AskUser`. |
+| `language.py` | First-contact language pick (team decision, Oct 23): a one-tap confirm in the detected language, or a multilingual menu. The pending prompt is read back from `messages`, so it survives a restart. The decision functions are pure. |
+| `photos.py` | `PhotoBatcher`: photos with gaps under 6 s become one letter. Batches are held while the language is unknown. "Same letter or new?" answers wait here. All in memory. |
+| `call_status.py` | **New (Goal 3.4).** `StatusRules` (pure) holds C36's rules: human detected always; dialing and unreachable once per call; on hold at most every 10 minutes per call; nothing else. `CallStatusWatcher.watch(user_id, since)` polls `reads.list_events` about once a second and sends through `send_template`. It stops at `call.ended` or after 3 hours. |
+
+### Translation (`app/translation/`): owned by person 2
+
+| File | What it does |
+|---|---|
+| `detect.py` | `detect_language`: one `MODEL_FAST` call with structured output (`messages.parse`). Returns an ISO 639-1 code, or `None` when unsure or when the call fails, in which case the menu is shown. |
+| `prompts.py` | The detection system prompt. It tells the model the message is data, not instructions. |
+
+### Dev tools (`app/dev/`): new, owned by person 2, off by default
+
+| File | What it does |
+|---|---|
+| `router.py` | `POST /dev/fake-call {"number": "+1…"}`. Returns 404 unless `DEV_ENDPOINTS=true`, and 403 unless the request comes from loopback with no `X-Forwarded-For` (requests through ngrok carry that header). |
+| `fake_call.py` | A scripted stand-in for the phone agent: dialing → menu → ask_user → three on-holds → human detected → user joined → ended → `case.closed`. It writes research and phone rows through **their writer modules**, because `questions.call_id` needs a real `calls` row. This is the only person-2 code that does. |
+
+The fake call's safety (please check these):
+- Its `call` job is failed the moment it's created.
+- Its case is new and unverified, so `official_dial_number` refuses it (rule 2).
+- Its consent pointer references a labelled `[dev]` note, never a made-up "YES" (rule 4).
+
+### Tests (`backend/tests/`)
+
+All on fakes: no Twilio, no Anthropic, no database.
+
+| File | What it covers |
+|---|---|
+| `whatsapp_fakes.py` | New. `FakeDB`, an in-memory stand-in for every DB helper the pipe and relay call. Question reads return copies, so a stale "open" row can be simulated. Also `FakeWhatsApp` (records sends, can fail on demand) and the `inbound()` message builder. |
+| `conftest.py` | New. The fixtures `db`, `whatsapp`, `detected`, `ask_user` and `pipe`, which install the fakes with `monkeypatch`. No name collisions with other test files. |
+| `test_whatsapp_webhook.py` | Signature, form parsing, every media item, the empty-TwiML ack, and media auth not going to the CDN. |
+| `test_whatsapp_pipe.py` | Language pick, photo batching, "same letter or new?", download failure, splitting, template completeness, detection mapping. |
+| `test_ask_user.py` | New. Answer, timeout, both race directions, late reply (once, window expiry), re-prompt, routing priority over "same or new", unsent question, unknown question kind, and the event `data` fields the dashboard feed reads. |
+| `test_call_status.py` | New. Each C36 rule, the watcher end to end (including events sharing a timestamp), the dev endpoint's guards, and a full fake call run on fakes, checking that no runnable job is left behind. |
+
+### Edits outside person 2's packages
+
+All small. Please confirm with their owners that they're acceptable.
+
+| File (owner) | Change |
+|---|---|
+| `app/main.py` (1) | Registers `app.dev.router` (which 404s unless enabled). |
+| `app/settings.py` (1) | Adds `dev_endpoints: bool = False`. |
+| `.env.example` (1) | `DATABASE_URL_UNPOOLED` is now blank: the localhost default silently overrode `DATABASE_URL`. Adds `DEV_ENDPOINTS=false`. |
+| `backend/AGENTS.md` (team) | Person 2's rows, the `dev/` row, and the run command (`--reload-dir backend`). |
+| `README.md` (team) | WhatsApp setup and Twilio gotchas, the run command, and pointers to the WhatsApp docs. |
+| `CLAUDE.md` (team) | One rule: run the backend as a single process (in-memory state), with `--reload-dir backend`. |
+| `Plan.md` (Sean) | The language and photo decisions recorded in Decisions; C36 marked as agreed by person 2. |
+
+## Deliberate choices, not bugs
+
+Each is explained in whatsapp-pipe.md → Decisions and Concerns.
+
+- **State lives in memory, so the backend runs as one process.** That covers photo batches, ask_user waits, late-reply windows, call-status watchers and per-number locks. A restart loses them, but never user data.
+- **ask_user waits in memory** (P1's "asyncio future"); the `questions` row decides races.
+- **There's no "call ended" message.** Exactly four status events message the user (P2, `USER_MESSAGING_EVENTS`).
+- **The call-status watcher follows the user, not a call ID**, because the phone agent mints the call ID only when it picks up the job (C7).
+- **ask_user options go out in English** until translation is built (Goal 5).
+- **Incoming Spanish messages have `body_en = null`** until Goal 5.
+- **The orchestrator turn is an echo stub** until Goal 4.
+- **"Same letter or new?" only triggers once a case exists.** This is a known gap, planned for Goal 4.2.
+
+## Worth checking
+
+- **Rule 1:** `send_text` is called only from `orchestrator/pipe.py`; everything else uses `send_template`.
+- **Rules 2 and 4:** nothing in person 2's code dials, and the fake call can't produce a runnable call job (see its tests).
+- **Rule 5:** `relay/` writes only `questions` (through `writes.relay`) plus the append-only `messages` and `events`. `orchestrator/` writes only `users`, `media` and `documents` (through `writes.orchestrator`). `dev/` is the documented exception.
+- **C27:** event `data` carries IDs, option numbers, and menu option labels. Option labels aren't user facts, but say so if you disagree.
+- **Races in `ask_user.py`:** `ask` losing to an answer (`_time_out` waits up to 5 s for the future), and `handle_reply` losing to the timeout (late reply, deduplicated through `_late_replied`).
+- **`call_status.py` timestamps:** reads from `since - 1 µs` and skips seen event IDs, so events sharing a timestamp aren't lost.
+- **The dev endpoint guard** relies on ngrok always adding `X-Forwarded-For`, and on uvicorn reporting loopback for local requests.
+- **Blocking I/O:** the Twilio SDK is synchronous and runs in `asyncio.to_thread`; everything else is async. External calls have timeouts: Twilio 10 s, media 10 s, detection 5 s.
+- **Logging:** no phone numbers, message text, or media URLs in log lines.
+
+## How to verify
+
+```bash
+ruff format --check . && ruff check . && pytest
+```
+
+The WhatsApp tests run offline in about 6 s. `test_ask_user.py` and `test_call_status.py` use short real timeouts (about 1 s); they've been stable over repeated runs. DB tests skip unless `TEST_DATABASE_URL` points at the separate test branch.
+
+**Please don't:**
+- **send real WhatsApp messages.** The Twilio account in use is paid personally by a teammate's friend. The tests never need it.
+- **enable `DEV_ENDPOINTS` or run the fake call against the shared database.** It writes rows and sends WhatsApp messages.
+- **run `python -m app.db.reset`.** It wipes the shared database for everyone.
