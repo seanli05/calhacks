@@ -38,6 +38,7 @@ recordings/
 *.sqlite
 *.db
 *.dump
+fixtures/private/
 
 # --- Editors / OS ---
 .vscode/*
