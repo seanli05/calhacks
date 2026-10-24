@@ -27,7 +27,15 @@ from app.db.writes import glossary as glossary_writes
 from app.settings import get_settings
 
 TERMS_CSV = Path(__file__).with_name("terms.csv")
-COLUMNS = ["term", "language", "translation", "trust_level", "source_url", "locator", "note"]
+COLUMNS = [
+    "term",
+    "language",
+    "translation",
+    "trust_level",
+    "source_url",
+    "locator",
+    "note",
+]
 
 
 class GlossaryError(ValueError):
