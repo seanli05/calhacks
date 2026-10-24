@@ -89,7 +89,7 @@ Files: `runner.py` (lifecycle, dispatch, hold, the person, the bridge), `runner_
 Settings: `CARTESIA_AGENT_VOICE_ID` (required for speech), `CARTESIA_STT_MODEL`, `CARTESIA_TTS_MODEL`, and `PUBLIC_BASE_URL` for Twilio to reach us. The Pipecat worker's idle timeout is off; its default would cancel the stream after 5 minutes on hold.
 
 **Open, for Phase 2 and the team:**
-- The live smoke test (`python -m app.phone.smoke`) is next. Untested until then: which URL Twilio signs on the websocket handshake (both `https` and `wss` forms are accepted), the mark round trip, the reconnect time, and `LOUD_RMS` against real hold music.
+- Live smoke test: `python -m app.phone.smoke` (steps in the README). It dials only the mock line (`MockLineOnly` refuses any other number a case resolves to) or, with `--own-number`, `PHONE_SMOKE_DIAL_NUMBER` through `SmokeNumberSource`, which only `smoke.py` has (a test checks nothing in `app` imports it). Smoke calls are dev calls to our own lines, so they use a fake job and fake stores and write nothing. Not yet checked on a live call: which URL Twilio signs on the websocket handshake (both `https` and `wss` forms are accepted), the mark round trip, the reconnect time, and `LOUD_RMS` against real hold music.
 - `ring_user` and `connect_user` raise `NotImplementedError` (Phase 3), so a full call on the real line aborts and hangs up once a person is detected.
 - No `bridging → hold`: a "person" who transfers after the ring can't be undone (state.py).
 
