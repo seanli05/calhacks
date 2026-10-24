@@ -1,6 +1,6 @@
-import { Placeholder } from "@/components/Placeholder";
+import { MemoryView } from "@/components/memory/MemoryView";
 
 export default async function MemoryPage({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = await params;
-  return <Placeholder userId={userId} title="What we know about you" />;
+  return <MemoryView userId={userId} />;
 }

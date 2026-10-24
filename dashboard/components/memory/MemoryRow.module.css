@@ -1,0 +1,54 @@
+/* The row folds its height to zero while fading, so the list closes up smoothly. */
+.row {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    opacity 300ms ease,
+    grid-template-rows 300ms ease 280ms;
+}
+
+.row + .row .inner {
+  border-top: 1px solid var(--line);
+}
+
+.inner {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 0;
+}
+
+.leaving {
+  opacity: 0;
+  grid-template-rows: 0fr;
+}
+
+.leaving .inner {
+  padding-block: 0;
+  transition: padding 300ms ease 280ms;
+}
+
+.body {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.failed {
+  flex-basis: 100%;
+  color: var(--coral);
+  font-size: var(--fs-sm);
+}
+
+@media (max-width: 640px) {
+  .inner {
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

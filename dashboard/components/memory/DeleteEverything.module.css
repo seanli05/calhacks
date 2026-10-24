@@ -1,0 +1,52 @@
+.wrap {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+}
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 22px;
+  border: 1px solid var(--coral);
+  background: var(--coral-soft);
+  animation: rise 240ms ease both;
+}
+
+.confirm h2 {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--coral);
+}
+
+.confirm p {
+  margin: 0;
+  font-size: var(--fs-md);
+  color: var(--ink);
+  max-width: 64ch;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.yes {
+  background: var(--coral);
+  border-color: var(--coral);
+  color: #fff;
+}
+
+.yes:hover {
+  border-color: var(--ink);
+}
+
+.actions button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
