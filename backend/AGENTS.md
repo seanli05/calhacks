@@ -7,7 +7,8 @@ A map of the backend for any agent (or human) picking up work. It points to the 
 1. [CLAUDE.md](../CLAUDE.md): product rules that can't be broken, plus team conventions (ownership, git, tests, secrets).
 2. [Plan.md](../Plan.md): **the source of truth.** What the product does, the handoff payloads (H1, R1, R2, H2, P1–P3), events, data model, failure rules. Its C-tags (C1–C35) explain each decision.
 3. [docs/data-layer-guide.md](../docs/data-layer-guide.md): how to use the database helpers and contracts, with recipes per component, case stages, gotchas, and open issues.
-4. The spec or task doc for your area (below).
+4. [docs/dashboard-AGENTS.md](../docs/dashboard-AGENTS.md) if your component writes rows or events: what it must write so the dashboard shows it (event `data` fields, brief keys, call states).
+5. The spec or task doc for your area (below).
 
 If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 
