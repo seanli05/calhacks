@@ -18,7 +18,7 @@ Each step updates its row when it starts and when it finishes, and pushes that c
 
 | Step | Owner | State | Commit on `main` | Notes |
 |---|---|---|---|---|
-| 1. Contracts, data layer, dashboard, Plan.md | person 1's session | not started | | |
+| 1. Contracts, data layer, dashboard, Plan.md | person 1's session | in progress | | Branch `chris/research-contracts` |
 | 2. Move and wire the research agent | person 3's session | not started | | |
 | 3. Hand-offs sent | person 1 | not started | | |
 
