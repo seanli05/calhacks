@@ -195,10 +195,11 @@ def test_date_only_appointment_leaves_the_time_out() -> None:
     )
 
 
-async def test_needs_user_input_sends_nothing_yet(
+async def test_needs_user_input_asks_research_question_and_waits(
     db: FakeDB, letter_results: LetterResults, verdicts: Verdicts
 ) -> None:
-    """C39's question flow isn't built yet; the user mustn't get an empty explanation."""
+    """C39: the user hears the question in their language; no explanation, and no
+    verdict is watched until research has read the letter."""
     user = await use_spanish(db)
     result = FastResult(
         case_id="case_1", status="needs_user_input", question_en="Which letter first?"
@@ -206,7 +207,12 @@ async def test_needs_user_input_sends_nothing_yet(
 
     await letter_results.fast_done(await finished_fast_job(db, user, "case_1", result))
 
-    assert db.messages == []
+    [message] = db.messages
+    assert message.body_original == "[es] Which letter first?"
+    assert message.body_en == "Which letter first?"
+    question = letter_results.question(user.id)
+    assert question is not None and question.case_id == "case_1"
+    assert question.document_ids == ["doc_1"]
     assert not verdicts.is_watching("case_1")
 
 

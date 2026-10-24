@@ -8,6 +8,7 @@ from app.contracts import (
     AskUserRequest,
     Component,
     EventType,
+    FastResult,
     JobStatus,
     JobType,
     ResearchFastJob,
@@ -267,3 +268,44 @@ async def test_ask_user_reply_does_not_wait_behind_a_slow_turn(
     assert not turn.done()
     release.set()
     await turn
+
+
+# C39: research asks which letter to read
+
+
+async def test_answer_to_research_question_reruns_the_fast_pass_with_the_note(
+    pipe: InboundPipe, db: FakeDB
+) -> None:
+    await use_spanish(db)
+    await send_letter(pipe, photos=2)
+    [first] = db.jobs_of(JobType.RESEARCH_FAST)
+    [payload] = fast_payloads(db)
+    db.finish_job(
+        first.id,
+        FastResult(
+            case_id=payload.case_id,
+            status="needs_user_input",
+            question_en="Which letter first?",
+        ),
+    )
+    await settle()
+
+    await pipe.handle(inbound("La de USCIS"))
+
+    old, new = fast_payloads(db)
+    assert (new.case_id, new.document_ids) == (old.case_id, old.document_ids)
+    assert new.user_note_en is not None and "La de USCIS" in new.user_note_en
+    assert old.user_note_en is None
+    assert db.outbound_templates()[-1] == "letter.reading_again"
+
+
+async def test_text_without_an_open_research_question_is_a_normal_turn(
+    pipe: InboundPipe, db: FakeDB
+) -> None:
+    await use_spanish(db)
+    await send_letter(pipe)
+
+    await pipe.handle(inbound("hola"))
+
+    assert len(db.jobs_of(JobType.RESEARCH_FAST)) == 1
+    assert "letter.reading_again" not in db.outbound_templates()

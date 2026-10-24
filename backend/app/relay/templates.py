@@ -147,6 +147,21 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         ),
     },
     # Plan.md → Failure rules: unreadable photo (C9).
+    "letter.which_letter": {
+        "es": (
+            "Antes de explicarle, necesito una respuesta: parece que las fotos son de "
+            "cartas distintas. ¿Cuál carta leo primero? Respóndame en pocas palabras."
+        ),
+        "en": (
+            "Before I explain, I need one answer: these photos look like they come "
+            "from different letters. Which letter should I read first? Reply in a few "
+            "words."
+        ),
+    },
+    "letter.reading_again": {
+        "es": "Gracias. Ahora leo esa carta y le escribo en cuanto termine.",
+        "en": "Thanks. I'm reading that letter now and will write as soon as I'm done.",
+    },
     "letter.retake": {
         "es": (
             "No pude leer bien la foto. ¿Me puede enviar otra? Ponga la carta sobre "

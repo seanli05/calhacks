@@ -2,8 +2,8 @@
 
 Order per message: user row → media saved → inbound logged → routed. Routing order:
 a reply to an ask_user question (the call is waiting), then the language pick, photo
-grouping, a "same letter or new?" answer, an answer to a consent request, or an
-orchestrator turn.
+grouping, a "same letter or new?" answer, an answer to research's question about the
+letter (C39), an answer to a consent request, or an orchestrator turn.
 
 One number's messages are routed one at a time, under a per-number lock. An
 orchestrator turn (slow: a Claude call) runs after that lock is released, under a
@@ -161,6 +161,8 @@ class InboundPipe:
             await self._letter_pages(user, pages)
         elif (pending := self.photos.pending(user.id)) is not None:
             return await self._same_or_new_answer(user, message, inbound, pending)
+        elif message.text and self.letters.question_pending(user.id):
+            await self._letter_answer(user, message, inbound)
         elif self._consent is not None and self._consent.pending(user.id) is not None:
             return await self._consent_answer(user, message, inbound)
         else:
@@ -293,6 +295,15 @@ class InboundPipe:
             self.photos.add(user.id, pending.media_ids)
             await send_template(self._whatsapp, user, "letter.received")
         return None
+
+    async def _letter_answer(
+        self, user: tables.User, message: InboundMessage, inbound: tables.Message
+    ) -> None:
+        """C39: any text answers research's question about the letter; research reads
+        it (in English) as data, so there's nothing to parse here."""
+        answer_en = inbound.body_en or message.text
+        if await self.letters.answer_question(user, answer_en):
+            await send_template(self._whatsapp, user, "letter.reading_again")
 
     async def _consent_answer(
         self, user: tables.User, message: InboundMessage, inbound: tables.Message

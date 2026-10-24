@@ -13,11 +13,12 @@ verdict never overtakes the explanation.
 
 import asyncio
 import logging
+from dataclasses import dataclass
 
 from pydantic import ValidationError
 
 from app.contracts import ChecklistKind, FastResult, FastResultStatus
-from app.contracts.common import LanguageCode
+from app.contracts.common import CaseId, DocumentId, LanguageCode, UserId
 from app.db import reads, tables
 from app.orchestrator.dates import format_date, format_time
 from app.orchestrator.verdicts import Verdicts
@@ -67,6 +68,14 @@ def date_line(result: FastResult, language: LanguageCode) -> str | None:
     return None
 
 
+@dataclass(frozen=True)
+class LetterQuestion:
+    """Research asked the user something before it can read the letter (C39)."""
+
+    case_id: CaseId
+    document_ids: list[DocumentId]
+
+
 class LetterResults:
     def __init__(
         self, whatsapp: WhatsApp, translator: Translator | None, verdicts: Verdicts
@@ -74,6 +83,14 @@ class LetterResults:
         self._whatsapp = whatsapp
         self._translator = translator
         self._verdicts = verdicts
+        # One open question per user; in memory, like the photo batcher.
+        self._questions: dict[UserId, LetterQuestion] = {}
+
+    def question(self, user_id: UserId) -> LetterQuestion | None:
+        return self._questions.get(user_id)
+
+    def take_question(self, user_id: UserId) -> LetterQuestion | None:
+        return self._questions.pop(user_id, None)
 
     async def fast_done(self, job: tables.Job) -> None:
         """React to a finished fast pass (the latest one for its case)."""
@@ -82,17 +99,11 @@ class LetterResults:
         except ValidationError:
             logger.exception("Bad R1 case_id=%s job_id=%s", job.case_id, job.id)
             return
-        if result.status == FastResultStatus.NEEDS_USER_INPUT:
-            # C39: asking research's question is person 2's next step; until then,
-            # say nothing rather than explain a letter research hasn't read.
-            logger.warning(
-                "R1 needs user input, not handled yet case_id=%s job_id=%s",
-                result.case_id,
-                job.id,
-            )
-            return
         user = await reads.get_user(job.user_id)
         if user is None:
+            return
+        if result.status == FastResultStatus.NEEDS_USER_INPUT:
+            await self._ask(user, result, job)
             return
         readable = result.status != FastResultStatus.NEEDS_BETTER_IMAGE
         try:
@@ -162,6 +173,38 @@ class LetterResults:
             )
         else:
             await send_template(self._whatsapp, user, "letter.retake")
+
+    async def _ask(
+        self, user: tables.User, result: FastResult, job: tables.Job
+    ) -> None:
+        """C39: ask research's question; the reply re-runs the fast pass (Letters).
+        The verdict isn't watched yet: research hasn't read the letter."""
+        question_en = result.question_en or ""
+        question = await self._localize(question_en, user.language or "en")
+        document_ids = list((job.payload or {}).get("document_ids", []))
+        self._questions[user.id] = LetterQuestion(result.case_id, document_ids)
+        try:
+            if question:
+                await send_text(
+                    self._whatsapp,
+                    user,
+                    question,
+                    body_en=question_en,
+                    case_id=result.case_id,
+                )
+            else:
+                # Untranslated: today the only question is "which letter first?".
+                await send_template(
+                    self._whatsapp, user, "letter.which_letter", case_id=result.case_id
+                )
+        except WhatsAppSendError as exc:
+            logger.error(
+                "Letter question not sent case_id=%s job_id=%s: %s",
+                result.case_id,
+                job.id,
+                exc,
+            )
+        logger.info("Asked the user research's question case_id=%s", result.case_id)
 
     async def _localize(self, text_en: str, language: LanguageCode) -> str | None:
         if not text_en:
