@@ -58,13 +58,16 @@ export const landing = {
         "Form I-797C, current edition",
         "Every link is on uscis.gov",
         "Receipt number has the right format",
-        "No payment demands or threats",
+        "No demands for payment or gift cards",
+        "No threats of arrest or deportation",
+        "No \"notario\" offers",
       ],
       official: "Official number found on uscis.gov",
     },
     menu: {
       lead: "Phone menus,",
       rest: " handled. We press the right buttons.",
+      prompt: "“To speak with a representative, press 2.”",
       options: [
         { key: "1", text: "Case status" },
         { key: "2", text: "Speak with a representative" },
@@ -87,7 +90,7 @@ export const landing = {
     prep: {
       lead: "Ready for the interview.",
       rest: " Key English words and what to bring.",
-      countdown: (days: number) => `Your interview is in ${days} days`,
+      days: "days until your interview",
       words: [
         { term: "interpreter", meaning: "someone who translates for you" },
         { term: "receipt notice", meaning: "the letter that proves we got your form" },
@@ -97,7 +100,8 @@ export const landing = {
     memory: {
       lead: "Your data, your call.",
       rest: " See what we know. Delete anything.",
-      facts: ["Prefers Spanish", "Has two children", "Interview on Nov 12"],
+      facts: ["Prefers Spanish", "Has two children", "Interview on Nov 12", "Needs an interpreter", "Asked to be called after 5 PM"],
+      deleteAll: "Delete everything",
       delete: "Delete",
       deleted: "(deleted)",
       cta: "What we know about you",

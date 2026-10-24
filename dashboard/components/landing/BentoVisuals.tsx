@@ -69,14 +69,20 @@ export function VerifyVisual() {
 export function MenuVisual() {
   const t = useStrings().landing.bento.menu;
   return (
-    <ol className={styles.menu}>
-      {t.options.map((o, i) => (
-        <li key={o.key} className={i === t.chosen ? styles.chosen : ""}>
-          <span className={styles.key}>{o.key}</span>
-          {o.text}
-        </li>
-      ))}
-    </ol>
+    <div className={styles.menuWrap}>
+      <p className={styles.prompt}>
+        <Icon name="keypad" />
+        {t.prompt}
+      </p>
+      <ol className={styles.menu}>
+        {t.options.map((o, i) => (
+          <li key={o.key} className={i === t.chosen ? styles.chosen : ""}>
+            <span className={styles.key}>{o.key}</span>
+            {o.text}
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 
@@ -118,8 +124,8 @@ export function PrepVisual() {
   return (
     <div className={styles.prep}>
       <div className={styles.countdown}>
-        <Icon name="clock" />
-        {t.countdown(DAYS_TO_INTERVIEW)}
+        <span className={styles.days}>{DAYS_TO_INTERVIEW}</span>
+        <span>{t.days}</span>
       </div>
       <div className={styles.prepCols}>
         <ul className={styles.words}>
@@ -160,6 +166,12 @@ export function MemoryVisual() {
           )}
         </li>
       ))}
+      <li className={styles.all}>
+        <span className={`btn danger ${styles.del}`}>
+          <Icon name="trash" size={15} />
+          {t.deleteAll}
+        </span>
+      </li>
     </ul>
   );
 }

@@ -109,9 +109,26 @@
   font-size: var(--fs-xl);
 }
 
-/* Menu: the options with the chosen one lit */
+/* Menu: the line's own prompt, then the options with the chosen one lit */
+.menuWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.prompt {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-family: var(--font-code);
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
 .menu {
-  margin: 0 0 28px;
+  margin: 0;
   padding: 0;
   list-style: none;
   display: flex;
@@ -269,10 +286,19 @@
 
 .countdown {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: var(--fs-lg);
+  align-items: baseline;
+  gap: 14px;
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.days {
+  font-size: clamp(64px, 5vw, 96px);
   font-weight: 650;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--ink);
 }
 
 .prepCols {
@@ -348,9 +374,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 16px 28px;
+  padding: 11px 28px;
   border-bottom: 1px solid var(--line);
   font-size: var(--fs-lg);
+}
+
+.facts .all {
+  justify-content: center;
+  background: var(--sunk);
 }
 
 .facts li:last-child {

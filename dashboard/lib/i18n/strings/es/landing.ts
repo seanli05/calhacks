@@ -57,13 +57,16 @@ export const landing: LandingStrings = {
         "Formulario I-797C, edición vigente",
         "Todos los enlaces son de uscis.gov",
         "El número de recibo tiene el formato correcto",
-        "Sin pedidos de pago ni amenazas",
+        "No pide pagos ni tarjetas de regalo",
+        "Sin amenazas de arresto o deportación",
+        "Sin ofertas de \"notarios\"",
       ],
       official: "Número oficial encontrado en uscis.gov",
     },
     menu: {
       lead: "Menús telefónicos,",
       rest: " resueltos. Marcamos las opciones correctas.",
+      prompt: "“Para hablar con un representante, oprima 2.”",
       options: [
         { key: "1", text: "Estado del caso" },
         { key: "2", text: "Hablar con un representante" },
@@ -86,7 +89,7 @@ export const landing: LandingStrings = {
     prep: {
       lead: "Listo para la entrevista.",
       rest: " Palabras clave en inglés y qué llevar.",
-      countdown: (days: number) => `Tu entrevista es en ${days} días`,
+      days: "días para tu entrevista",
       words: [
         { term: "interpreter", meaning: "intérprete" },
         { term: "receipt notice", meaning: "aviso de recibo" },
@@ -96,7 +99,8 @@ export const landing: LandingStrings = {
     memory: {
       lead: "Tus datos, tu decisión.",
       rest: " Mira lo que sabemos. Borra lo que quieras.",
-      facts: ["Prefiere español", "Tiene dos hijos", "Entrevista el 12 de nov."],
+      facts: ["Prefiere español", "Tiene dos hijos", "Entrevista el 12 de nov.", "Necesita intérprete", "Pidió llamadas después de las 5 p. m."],
+      deleteAll: "Borrar todo",
       delete: "Borrar",
       deleted: "(borrado)",
       cta: "Lo que sabemos de ti",
