@@ -132,8 +132,12 @@ async def seed() -> str:
         ),
     ]
     async with session() as db:
-        # The unit of work inserts in foreign-key order.
-        db.add_all([user, case, *refs, verification, *events])
+        # No ORM relationships, so flush parents before children ourselves.
+        db.add(user)
+        await db.flush()
+        db.add(case)
+        await db.flush()
+        db.add_all([*refs, verification, *events])
         await db.commit()
     if official_phone is None:
         print("TWILIO_MOCK_AGENCY_NUMBER is unset: the seed has no dialable number.")
