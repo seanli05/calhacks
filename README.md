@@ -47,11 +47,16 @@ Run the backend (from the repo root, with the venv active):
 uvicorn app.main:app --app-dir backend --reload   # http://localhost:8000/health
 ```
 
-Startup creates any missing tables. To rebuild the database and seed the demo case (one Spanish-speaking user, the I-797C case from `mock_agency`, verified), run the command below. **This wipes the shared database for everyone**, so check with the team first:
+The dashboard API lives under `/api` (routes in [docs/specs/dashboard-api.md](docs/specs/dashboard-api.md)); try `http://localhost:8000/api/demo`. Set `TWILIO_SANDBOX_JOIN_CODE` (the code on Twilio's sandbox page, without "join") so the landing page's QR can show the join message.
+
+Startup creates any missing tables. To rebuild the database and seed the demo case (one Spanish-speaking user, the I-797C case from `mock_agency`, verified, with the WhatsApp exchange, memory, and feed events up to the consent question), run the command below. **This wipes the shared database for everyone**, so check with the team first:
 
 ```bash
 cd backend && python -m app.db.reset --yes           # add --empty to skip the seed
+python -m app.db.reset --yes --after-call             # or: also a finished call, for the ended screens
 ```
+
+To try the seed without touching the shared database, point it at the test branch: `DATABASE_URL_UNPOOLED=<TEST_DATABASE_URL> python -m app.db.reset --yes`.
 
 Run the dashboard (Node 20, from the repo root):
 
@@ -73,7 +78,7 @@ Full guide, with per-component recipes: [docs/data-layer-guide.md](docs/data-lay
 | `app.db.reads` | Anyone. Includes `case_progress`, `official_dial_number` (the only way to get a number to dial), `resolve_ref`, `list_events` |
 | `app.db.jobs` | `enqueue` (creator); `claim_next`, `finish`, `fail` (handler) |
 | `app.db.events` / `app.db.messages` | `append_event` (everyone); `append_message` (orchestrator, relay) |
-| `app.db.deletes` | The "What we know about you" page |
+| `app.db.deletes` | The "What we know about you" page (through the dashboard API) |
 
 `case_progress(case_id)` returns one of `received`, `explaining`, `needs_better_image`, `checking`, `suspicious`, `unknown`, `awaiting_consent`, `calling`, `on_hold`, `connected`, `call_ended`, `closed`.
 

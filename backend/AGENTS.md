@@ -31,8 +31,8 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 |---|---|---|---|
 | `main.py`, `settings.py` | FastAPI app (creates tables on startup); the single settings object | 1 | Done |
 | `contracts/` | Shared Pydantic payloads; import from `app.contracts` | Team | Done (`CaseBrief` provisional) |
-| `db/` | Tables, reads, per-writer write modules, jobs, events, deletes, reset/seed | 1 | Done |
-| `api/` | Dashboard API | 1 | Not started; spec in `docs/specs/dashboard-api.md` |
+| `db/` | Tables, reads, per-writer write modules, jobs, events, deletes, reset/seed (`seed_story.py`: messages, memory, events, `--after-call`) | 1 | Done |
+| `api/` | Dashboard API: routes, feed and suggestion templates (`feed_templates.py` lists the event `data` fields it expects) | 1 | Done; spec in `docs/specs/dashboard-api.md` |
 | `relay/` | WhatsApp webhook (signature check, media download); ask_user relay | 2 | Echo bot only |
 | `orchestrator/`, `translation/`, `memory/` | WhatsApp agent, translation, memory writer | 2 | Not started |
 | `research/`, `glossary/` | Letter reading, verification, case brief; glossary | 3 | Work is on branch `research_agent` (top-level `research/`, own models) |

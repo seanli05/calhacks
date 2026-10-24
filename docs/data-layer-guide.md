@@ -174,7 +174,7 @@ if job:
 
 ### Dashboard
 
-Reads plus `app.db.deletes`: `delete_fact`, `delete_document` (and its images), `delete_transcript`, `delete_everything(user_id)` (keeps `users` and `events`). Each commits with a `*.deleted` event. The feed polls `reads.list_events(user_id, since=<last created_at>)`; `since` is exclusive. See [task-c-dashboard.md](specs/task-c-dashboard.md).
+Reads plus `app.db.deletes`: `delete_fact`, `delete_document` (and its images), `delete_transcript`, `delete_everything(user_id)` (keeps `users` and `events`). Each commits with a `*.deleted` event. The feed polls `reads.list_events(user_id, since=<last created_at>)`; `since` is exclusive. The dashboard API (`app/api/`) also uses `first_user`, `list_cases`, `list_calls`, `latest_brief`, `list_case_refs` (real values: mask before showing), `list_documents`, `list_transcripts`, and `latest_event`. See [task-c-dashboard.md](specs/task-c-dashboard.md) and [dashboard-api.md](specs/dashboard-api.md).
 
 ## Case stage
 

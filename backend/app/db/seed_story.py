@@ -175,8 +175,14 @@ class Story:
             self.event("research.fast_started", research, 0.1, "Reading the letter"),
             self.event("research.fast_done", research, 1, "Letter explained"),
             *(
-                self.event("memory.fact_saved", memory, 1, "Saved a fact", fact_id=f.id)
-                for f in facts
+                self.event(
+                    "memory.fact_saved",
+                    memory,
+                    1.1 + i / 10,
+                    "Saved a fact",
+                    fact_id=f.id,
+                )
+                for i, f in enumerate(facts)
             ),
             self.event("research.deep_started", research, 1.5, "Verifying the letter"),
             self.event(
@@ -186,7 +192,7 @@ class Story:
                 "Letter verified against uscis.gov (seed)",
                 source="uscis.gov",
             ),
-            self.event("research.deep_done", research, 3, "Verification finished"),
+            self.event("research.deep_done", research, 3.1, "Verification finished"),
             self.event(
                 "consent.requested",
                 Component.ORCHESTRATOR,
@@ -315,7 +321,7 @@ class Story:
             call_event("call.menu_choice", 1.5, "Pressed 2 (Asylum interview)", digit="2"),
             call_event("call.on_hold", 2, "On hold", agency=AGENCY),
             call_event("call.human_detected", 9, "A person answered", agency=AGENCY),
-            call_event("call.user_dialed", 9, "Ringing the user"),
+            call_event("call.user_dialed", 9.1, "Ringing the user"),
             call_event("call.user_joined", 10, "User joined the call", agency=AGENCY),
             call_event("call.ended", 14, "Call ended", minutes=14),
         ]  # fmt: skip
