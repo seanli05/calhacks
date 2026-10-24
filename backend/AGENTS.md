@@ -1,0 +1,75 @@
+# AGENTS.md: start here
+
+A map of the backend for any agent (or human) picking up work. It points to the docs that hold the details instead of repeating them.
+
+## Read in this order
+
+1. [CLAUDE.md](../CLAUDE.md): product rules that can't be broken, plus team conventions (ownership, git, tests, secrets).
+2. [Plan.md](../Plan.md): **the source of truth.** What the product does, the handoff payloads (H1, R1, R2, H2, P1–P3), events, data model, failure rules. Its C-tags (C1–C35) explain each decision.
+3. [docs/data-layer-guide.md](../docs/data-layer-guide.md): how to use the database helpers and contracts, with recipes per component, case stages, gotchas, and open issues.
+4. The spec or task doc for your area (below).
+
+If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
+
+## Docs index
+
+| Doc | What it's for |
+|---|---|
+| [README.md](../README.md) | Setup, run commands, env vars, WhatsApp sandbox + ngrok, repo layout, team table |
+| [docs/data-layer-guide.md](../docs/data-layer-guide.md) | Using `app.db` and `app.contracts` |
+| [docs/specs/data-layer-schema.md](../docs/specs/data-layer-schema.md) | Every table and column, and which component writes it (locked) |
+| [docs/specs/task-a-db.md](../docs/specs/task-a-db.md) | How the data layer was specified (done) |
+| [docs/specs/task-b-contracts.md](../docs/specs/task-b-contracts.md) | How the contracts were specified (done) |
+| [docs/specs/task-c-dashboard.md](../docs/specs/task-c-dashboard.md) | Next up: dashboard API + Next.js app. Starts with a design gate |
+| [mock_agency/README.md](../mock_agency/README.md) | The mock USCIS phone line the agent calls: menu tree, hold, officer |
+
+## Backend layout (`backend/app/`)
+
+| Package | What | Owner | State |
+|---|---|---|---|
+| `main.py`, `settings.py` | FastAPI app (creates tables on startup); the single settings object | 1 | Done |
+| `contracts/` | Shared Pydantic payloads; import from `app.contracts` | Team | Done (`CaseBrief` provisional) |
+| `db/` | Tables, reads, per-writer write modules, jobs, events, deletes, reset/seed | 1 | Done |
+| `api/` | Dashboard API | 1 | Not started (task C) |
+| `relay/` | WhatsApp webhook (signature check, media download); ask_user relay | 2 | Echo bot only |
+| `orchestrator/`, `translation/`, `memory/` | WhatsApp agent, translation, memory writer | 2 | Not started |
+| `research/`, `glossary/` | Letter reading, verification, case brief; glossary | 3 | Work is on branch `research_agent` (top-level `research/`, own models) |
+| `phone/` | Call state machine, hold/human detection, bridge, call report | 4 | Not on `main` yet |
+
+Tests live in `backend/tests/`. Contract fixtures in `backend/tests/fixtures/contracts/` double as fake inputs for any component.
+
+## Working rules, in short
+
+The full versions are in CLAUDE.md and the data-layer guide.
+
+- **Stay in your package.** Ask before touching contracts, the schema, Plan.md, or someone else's package.
+- **Database:** import only your own `app.db.writes.<component>` module, plus `reads`, `jobs`, `events`, `messages`. No raw SQL.
+- **Dialing:** the only number the phone agent may dial comes from `reads.official_dial_number(case_id)`.
+- **Sensitive values** (receipt number, A-Number, date of birth, interview location) go in `case_refs` and travel as `<ref:name>`. Events carry IDs, never content.
+- **Config:** everything comes from env vars via `app.settings`. Never commit secrets or personal data; the only phone number allowed in git is the mock agency line in `.env.example`.
+
+## Running things
+
+```bash
+python -m venv .venv && source .venv/bin/activate     # 3.12 per README; 3.13 works
+pip install -r requirements-dev.txt
+uvicorn app.main:app --app-dir backend --reload       # from the repo root
+ruff format . && ruff check --fix . && pytest         # before every push
+```
+
+- **Database:** one shared Neon Postgres; URLs are in the repo-root `.env.local` (ask person 1). It's already seeded with the demo case.
+- **`python -m app.db.reset --yes`** (run from `backend/`) wipes the shared database for everyone. Ask the team first.
+- **DB tests** run only when `TEST_DATABASE_URL` points at the separate Neon `test` branch. A full run with them takes about a minute.
+
+## Git
+
+- Branch per feature, small commits with one short imperative line and no AI attribution. Fast-forward merge to `main` (`gh` isn't installed).
+- Pull before you start and before you merge.
+- Several agents may share this clone. Do your work in your own worktree (`git worktree add ../calhacks26-<topic> -b <name>/<topic> main`), so branch switches don't collide.
+
+## Open issues
+
+Tracked in [data-layer-guide.md → Open issues](../docs/data-layer-guide.md#open-issues):
+- the provisional `CaseBrief` shape;
+- the research models that don't match the contracts yet;
+- the fake WhatsApp number in the seed.
