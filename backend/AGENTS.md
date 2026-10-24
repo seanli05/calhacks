@@ -7,7 +7,8 @@ A map of the backend for any agent (or human) picking up work. It points to the 
 1. [CLAUDE.md](../CLAUDE.md): product rules that can't be broken, plus team conventions (ownership, git, tests, secrets).
 2. [Plan.md](../Plan.md): **the source of truth.** What the product does, the handoff payloads (H1, R1, R2, H2, P1–P3), events, data model, failure rules. Its C-tags (C1–C35) explain each decision.
 3. [docs/data-layer-guide.md](../docs/data-layer-guide.md): how to use the database helpers and contracts, with recipes per component, case stages, gotchas, and open issues.
-4. The spec or task doc for your area (below).
+4. [docs/dashboard-AGENTS.md](../docs/dashboard-AGENTS.md) if your component writes rows or events: what it must write so the dashboard shows it (event `data` fields, brief keys, call states).
+5. The spec or task doc for your area (below).
 
 If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 
@@ -25,6 +26,8 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | [docs/specs/dashboard-build.md](../docs/specs/dashboard-build.md) | Building dashboard pages: conventions, work split, start prompts |
 | [docs/specs/dashboard-done.md](../docs/specs/dashboard-done.md) | Dashboard: what's left before it's done |
 | [docs/dashboard-AGENTS.md](../docs/dashboard-AGENTS.md) | **Integrating with the dashboard:** what each component must write (event `data`, brief keys, call states) so it shows up |
+| [docs/specs/phone-ports.md](../docs/specs/phone-ports.md) | Phone agent: its ports, fakes, and which rules they enforce |
+| [docs/research-integration.md](../docs/research-integration.md) | **Joining the research agent to `main`:** where it sits, decisions made, person 1's prep, steps for person 3 |
 | [docs/whatsapp-pipe.md](../docs/whatsapp-pipe.md) | WhatsApp side: what works, how to plug in (`send_template`, `messages` fields), concerns |
 | [docs/whatsapp-AGENTS.md](../docs/whatsapp-AGENTS.md) | Reviewing the WhatsApp side: every file person 2 built, deliberate choices, what to check |
 | [mock_agency/README.md](../mock_agency/README.md) | The mock USCIS phone line the agent calls: menu tree, hold, officer |
@@ -37,11 +40,11 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | `contracts/` | Shared Pydantic payloads; import from `app.contracts` | Team | Done (`CaseBrief` provisional) |
 | `db/` | Tables, reads, per-writer write modules, jobs, events, deletes, reset/seed (`seed_story.py`: messages, memory, events, `--after-call`) | 1 | Done |
 | `api/` | Dashboard API: routes, feed and suggestion templates (`feed_templates.py` lists the event `data` fields it expects; `stand_in_es.py` is a temporary Spanish table for the seed's strings, to delete once `translation/` lands) | 1 | Done; spec in `docs/specs/dashboard-api.md` |
-| `relay/` | WhatsApp webhook, Twilio send/download, templates (`send_template`); ask_user relay | 2 | Webhook, sending, templates (including results, consent and summary), ask_user (`relay.ask_user.ask_user(request)`, P1, option labels translated) done |
-| `orchestrator/`, `translation/`, `memory/` | WhatsApp agent, translation, memory writer | 2 | Pipe (language pick, photo grouping), call-status messages (C36, `orchestrator/call_status.py`), letter → `research_fast` with a job watcher (`orchestrator/letters.py`, `job_watch.py`), the Claude turn plus translation at the edges (`orchestrator/turn.py`, `translation/translate.py`), and results to the user: explanation, verdict, consent gate, call, summary (`letter_result.py`, `verdicts.py`, `consent.py`, `call_summary.py`) done; glossary grounding and the memory writer not started. Interfaces and decisions: [docs/whatsapp-pipe.md](../docs/whatsapp-pipe.md) |
-| `dev/` | Dev-only stand-ins: `POST /dev/fake-call` (a scripted call without the phone agent), `POST /dev/fake-research` (finishes research jobs from the contract fixtures), `POST /dev/fake-phone` (takes the call jobs queued after a YES and finishes them with the fixture report, never dialing). Off unless `DEV_ENDPOINTS=true`; local requests only | 2 | Done |
-| `research/`, `glossary/` | Letter reading, verification, case brief; glossary | 3 | Work is on branch `research_agent` (top-level `research/`, own models) |
-| `phone/` | Call state machine, hold/human detection, bridge, call report | 4 | Not on `main` yet |
+| `relay/` | WhatsApp webhook, Twilio send/download, templates (`send_template`); ask_user relay | 2 | Webhook, sending, templates, ask_user (`relay.ask_user.ask_user(request)`, P1) done |
+| `orchestrator/`, `translation/`, `memory/` | WhatsApp agent, translation, memory writer | 2 | Pipe (language pick, photo grouping), call-status messages (C36, `orchestrator/call_status.py`), letter → `research_fast` with a job watcher (`orchestrator/letters.py`, `job_watch.py`), and the Claude turn with five tools plus translation at the edges (`orchestrator/turn.py`, `translation/translate.py`) done; reacting to results, consent and calls, glossary grounding, memory not started. Interfaces and decisions: [docs/whatsapp-pipe.md](../docs/whatsapp-pipe.md) |
+| `dev/` | Dev-only stand-ins: `POST /dev/fake-call` (a scripted call without the phone agent), `POST /dev/fake-research` (finishes research jobs from the contract fixtures). Off unless `DEV_ENDPOINTS=true`; local requests only | 2 | Done |
+| `research/`, `glossary/` | Letter reading, verification, case brief; glossary | 3 | Work is on branch `research_agent` (top-level `research/`, own models); integration plan in [docs/research-integration.md](../docs/research-integration.md) |
+| `phone/` | Call state machine, hold/human detection, bridge, call report | 4 | State machine (`state.py`), menu decider (`menu.py`), ports and fakes (`ports.py`, `fakes.py`; see [docs/specs/phone-ports.md](../docs/specs/phone-ports.md)) done; phase classifier, runner, real audio next |
 
 Tests live in `backend/tests/`. Contract fixtures in `backend/tests/fixtures/contracts/` double as fake inputs for any component.
 

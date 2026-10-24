@@ -28,8 +28,9 @@ class Trigger(StrEnum):
     """An automated menu started again after hold (a transfer into another tree)."""
     HOLD_STARTED = "hold_started"
     HUMAN_DETECTED = "human_detected"
-    """Fire only once the Claude check confirms a live person: entering
-    `human_detected` messages the user "Someone picked up" (P2)."""
+    """Fire only on a confident human reading (`phase.py`): entering `human_detected`
+    messages the user "Someone picked up" (P2). Normally Claude's; if Claude is down,
+    only on strong combined cues, so an outage on hold can't lose the call."""
     FALSE_HUMAN = "false_human"
     """Back to hold after a confirmed human, e.g. a rep who says "let me transfer you"."""
     USER_DIALED = "user_dialed"

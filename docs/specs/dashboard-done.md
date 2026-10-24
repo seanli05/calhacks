@@ -2,7 +2,7 @@
 
 Owner: person 1 · Tracks: task C ([task-c-dashboard.md](task-c-dashboard.md) → Done when) · Design changes are out of scope here
 
-Every page and every API route is built and on `main`. This is the non-design work left before task C is officially done. Tick items off here as they land. How the rest plays out and what to ask of the team: [dashboard-closeout.md](dashboard-closeout.md). What teammates must write for the dashboard to show it: [docs/dashboard-AGENTS.md](../dashboard-AGENTS.md).
+Every page and every API route is built and on `main`. This is the non-design work left before task C is officially done. Tick items off here as they land. Everything person 1 built, how the rest plays out, and what to ask of the team: [person-1-brief.md](person-1-brief.md). What teammates must write for the dashboard to show it: [docs/dashboard-AGENTS.md](../dashboard-AGENTS.md).
 
 ## Must do
 
