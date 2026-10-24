@@ -109,6 +109,10 @@ The webhook returns empty TwiML at once and handles the message in a background 
 
 Reply templates live in `relay/templates.py` (`en` and `es`). Status, interfaces (ask_user, call status), decisions, and open concerns for the WhatsApp side: [docs/whatsapp-pipe.md](docs/whatsapp-pipe.md). To see ask_user and the call-status messages on your phone without the phone agent, set `DEV_ENDPOINTS=true` and use `POST /dev/fake-call` (local only; steps in that doc). `POST /dev/fake-research` stands in for the research agent the same way, and `POST /dev/fake-phone` for the phone agent's job loop, so the whole path (photo → explanation → verdict → consent → call → summary) runs on a phone.
 
+### The phone agent without a phone
+
+The call runner (`phone/runner.py`) runs a whole call on fakes. To watch one against a text phone tree with real Claude, run from `backend/` with `ANTHROPIC_API_KEY` set: `python -m app.phone.simulate --list`, then `python -m app.phone.simulate --tree speech_federal` (add `--interactive` to answer ask_user at the console). Ports, fakes, and the runner's policies: [docs/specs/phone-ports.md](docs/specs/phone-ports.md).
+
 ### Deploying for the demo
 
 Everything runs on one laptop (the one recording the video). Only the backend is public, through ngrok, so Twilio can reach it. The dashboard stays on `localhost`.

@@ -28,10 +28,47 @@ The call runner talks to the outside world only through the Protocols in `ports.
 
 ## Conventions for the runner
 
-- Wait only through `Clock` (`clock.sleep`, `with_timeout`), never `asyncio.sleep` or `asyncio.timeout`, or virtual time stops working.
-- Don't await `ask_user` inline: run it as a task and keep reading `events()` (menus reprompt and hang up long before 45 s). `test_a_whole_call_runs_on_fakes` shows the pattern.
+- Wait only through `Clock` (`clock.sleep`, `with_timeout`), never `asyncio.sleep` or `asyncio.timeout`, or virtual time stops working. (Model calls in 1b and 1c time themselves in real time; that's measured, not waited on.)
+- Don't await `ask_user` inline: run it as a task and keep reading `events()` (menus reprompt and hang up long before 45 s).
 - The relay logs every `call.ask_user*` event; the phone agent logs none of them.
 - Actions after the line ends raise `LineClosed`; a blocked identifier raises `BlockedIdentifier` and nothing is sent.
+
+## The runner (1e)
+
+`run_call(job_id, job, deps, *, llm, observer, config, report_builder) -> CallReport` runs one call and returns its saved report. It raises only if the call can't be created or the report can't be saved. The Phase 4 worker wraps it: `claim_next`, build `CallDeps` (with `load_blocked_values` → `GuardedTelephony`), `run_call`, then `finish` or `fail`. The runner refuses a `telephony` that isn't a `GuardedTelephony`, so C35 holds by construction and identifier values never reach it.
+
+Files: `runner.py` (lifecycle, dispatch, hold, the person, the bridge), `runner_menu.py` (menu and ask_user), `runner_base.py` (shared state, logging, classify, transcript, observer), `runner_parts.py` (config, inbox inputs, timers), `executor.py` (C37), `call_lines.py` (the fixed lines to the rep), `report.py` (stand-in P3 builder), `observe.py` (`StepRecord`).
+
+**Shape.** One inbox, one handler at a time. A pump task reads `events()` and stamps each event on arrival; the ask_user task and the timers (hold limit, user-answer backstop, menu budget) only post to the inbox. Model calls are awaited inside a handler, and whatever arrives meanwhile waits. Wrap-up is a `finally`: every exit (hang-up, timeout, crash) cancels the background work, hangs up, saves the transcript and the report, and fires `REPORT_SAVED`.
+
+**Policies** (numbers in `RunnerConfig`; first guesses, to tune on real lines):
+
+| Moment | What the runner does |
+|---|---|
+| Dial | `create_call`, read the brief, `dial_agency`, then log `call.dialing`, only once the dial went out, so the user never hears "Calling now" for a call that didn't happen. `UnverifiedNumber` → `AGENT_ABORTED` |
+| Menu utterance | 1c and 1b in parallel; 1b's answer is dropped if 1c leaves the menu or newer speech arrived. 1b gets all menu speech since the last decision used, so a split prompt is decided whole. `call.menu_heard` carries the reading and the action kind |
+| Back in a menu | The utterance that fired `MENU_RETURNED` is decided at once |
+| Press (C37) | Speak the digit word ("two"). Keys instead when the prompt names the keypad, or when a spoken press was answered with a no-match/no-input reprompt or the same prompt; then keys for the rest of that menu tree, until the next hold |
+| ask_user | Asked with a 30 s timeout. Reprompts of the asked prompt aren't decided again; the second one takes the default early (menus hang up after 2–3 no-inputs). A new prompt, hold, or a person drops the question (the task is cancelled) |
+| Music in a menu | ≥ 5 s → `HOLD_STARTED` with no model call |
+| Hold limit | From the first hold, never reset. If it passes in a menu or with a person, it fires on the next hold |
+| Menu gives up | Over 8 min in menus, or "representative" a 4th time in one menu stretch → `AGENT_ABORTED` |
+| Person | Ring the applicant at once (< 5 s) and say the intro meanwhile; `USER_DIALED` once ringing. So `FALSE_HUMAN` almost never fires: 1c's thresholds are the defense, and after the ring a transfer just means the applicant waits on hold too |
+| Bridging | Rep speech gets one fixed holding line, at most twice, ≥ 8 s apart. `UserUnreachable` (or the 45 s backstop) → the call-back line, then hang up |
+| Blocked identifier | Nothing sent, flagged; a second in a row says "representative" instead |
+| Unexpected error | `AGENT_ABORTED` and wrap-up. With the applicant on (no abort from `connected`), the bridge stays up and the runner only watches for the end |
+| `events()` ends unannounced | As a hang-up (`CALL_FINISHED` when connected) |
+
+`call.ended` data: `minutes`, `outcome`, `cause` (the trigger into wrap-up), and `error` (an exception's type name) when there was one.
+
+**Observer.** One `StepRecord` per handled input (plus the dial and the wrap-up): what was heard, the reading, the action, what went out, transitions, events logged, model latencies, and flags. It carries transcript text, so it stays local (simulator, playground, debugging). Never log it.
+
+**Simulator.** `python -m app.phone.simulate --tree NAME` (from `backend/`) runs a call against a text tree in `sim_trees.py` with real Claude on `SystemClock`. `FakeClock` can't wait for a real request: `run` either jumps virtual time past it or stops as "stuck". `heldout_consular` is held out; don't tune to it.
+
+**Open, for Phase 2 and the team:**
+- **Acting on part of a menu.** A decision is dropped only if the next utterance arrives while Claude is still deciding. When options come as separate utterances, the agent can press an early option before hearing a better one (seen in the simulator). The fix needs a "speech started" line event (from voice activity detection) so the runner can hold a choice until the menu goes quiet. That's a change to `line.py`.
+- `say` should return once the audio has played; the adapter must pin this.
+- No `bridging → hold`: a "person" who transfers after the ring can't be undone (state.py).
 
 ## Open, with person 2 (`relay/ask_user.py`)
 
