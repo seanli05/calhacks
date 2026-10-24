@@ -1,6 +1,4 @@
-"""Thin wrapper for downloading WhatsApp media from Twilio."""
-
-from collections.abc import AsyncIterator
+"""Download WhatsApp media from Twilio."""
 
 import httpx
 from pydantic import BaseModel
@@ -17,12 +15,6 @@ class MediaDownloadError(Exception):
 class DownloadedMedia(BaseModel):
     content_type: str
     data: bytes
-
-
-async def get_media_client() -> AsyncIterator[httpx.AsyncClient]:
-    """FastAPI dependency, overridden in tests with a fake transport."""
-    async with httpx.AsyncClient() as client:
-        yield client
 
 
 async def download_media(

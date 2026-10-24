@@ -55,6 +55,11 @@ Every change must keep these true. If one would be broken, stop and raise it wit
 - External services (Twilio, Cartesia, Anthropic, web) sit behind thin wrappers so they can be faked in tests and local runs.
 - `main` must always start. Integration breaks get fixed before new features land.
 
+### The mock agency is a test target, not a spec
+- Build the phone agent for real agency phone lines. Its behavior comes from Plan.md, the case brief, and how real phone menus and representatives behave. Never shape it to fit `mock_agency/`.
+- Don't read the mock's code or prompts to decide what the phone agent does. That includes its keyword lists, exact wording, menu numbers, retry counts, and timeouts. Don't copy its prompts into phone agent tests or evals; write varied, realistic cases on their own.
+- Use the mock only for end-to-end runs. If the agent does something a real line would accept and the mock handles it badly, fix the mock to behave more like a real line. Don't bend the agent.
+
 ### Thin harness
 - Use the official SDKs (Anthropic, Twilio, Cartesia) and Pipecat. **No LangChain, LangGraph, CrewAI, or similar frameworks.**
 - Prefer the SDK's built-in features (tool runner, structured outputs, prompt caching) over hand-rolled versions.
@@ -69,6 +74,7 @@ Every change must keep these true. If one would be broken, stop and raise it wit
 - The backend is async end to end. Don't call blocking I/O (sync HTTP, `time.sleep`, sync DB drivers) inside the event loop.
 - Anything user-facing must be fast. Slow work runs in the background, and the user gets a status message while they wait.
 - Put explicit timeouts on every external call and on every wait for the user.
+- The backend runs as one process: some state lives in memory (e.g. photo batching in the WhatsApp pipe). Never run it with `--workers`, and run the dev server with `--reload-dir backend` so changes in `.venv` don't restart it.
 
 ### Errors and observability
 - Follow the spec's failure rules exactly; don't improvise new behavior in the moment.

@@ -23,6 +23,7 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | [docs/specs/task-c-dashboard.md](../docs/specs/task-c-dashboard.md) | Dashboard task: steps and the approved design |
 | [docs/specs/dashboard-api.md](../docs/specs/dashboard-api.md) | Dashboard API routes, feed templates, masking, seed |
 | [docs/specs/dashboard-build.md](../docs/specs/dashboard-build.md) | Building dashboard pages: conventions, work split, start prompts |
+| [docs/whatsapp-pipe.md](../docs/whatsapp-pipe.md) | WhatsApp side: what works, how to plug in (`send_template`, `messages` fields), concerns |
 | [mock_agency/README.md](../mock_agency/README.md) | The mock USCIS phone line the agent calls: menu tree, hold, officer |
 
 ## Backend layout (`backend/app/`)
@@ -33,8 +34,8 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | `contracts/` | Shared Pydantic payloads; import from `app.contracts` | Team | Done (`CaseBrief` provisional) |
 | `db/` | Tables, reads, per-writer write modules, jobs, events, deletes, reset/seed (`seed_story.py`: messages, memory, events, `--after-call`) | 1 | Done |
 | `api/` | Dashboard API: routes, feed and suggestion templates (`feed_templates.py` lists the event `data` fields it expects) | 1 | Done; spec in `docs/specs/dashboard-api.md` |
-| `relay/` | WhatsApp webhook (signature check, media download); ask_user relay | 2 | Echo bot only |
-| `orchestrator/`, `translation/`, `memory/` | WhatsApp agent, translation, memory writer | 2 | Not started |
+| `relay/` | WhatsApp webhook, Twilio send/download, templates (`send_template`); ask_user relay | 2 | Webhook, sending, and templates done; ask_user next (Goal 3) |
+| `orchestrator/`, `translation/`, `memory/` | WhatsApp agent, translation, memory writer | 2 | Pipe done (language pick, photo grouping); Claude turn, translation, memory not started. See [docs/whatsapp-pipe.md](../docs/whatsapp-pipe.md) |
 | `research/`, `glossary/` | Letter reading, verification, case brief; glossary | 3 | Work is on branch `research_agent` (top-level `research/`, own models) |
 | `phone/` | Call state machine, hold/human detection, bridge, call report | 4 | Not on `main` yet |
 
@@ -55,7 +56,7 @@ The full versions are in CLAUDE.md and the data-layer guide.
 ```bash
 python -m venv .venv && source .venv/bin/activate     # 3.12 per README; 3.13 works
 pip install -r requirements-dev.txt
-uvicorn app.main:app --app-dir backend --reload       # from the repo root
+uvicorn app.main:app --app-dir backend --reload --reload-dir backend   # from the repo root; one process, never --workers
 ruff format . && ruff check --fix . && pytest         # before every push
 ```
 

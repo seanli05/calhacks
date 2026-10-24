@@ -71,6 +71,8 @@ We're building a WhatsApp-based agent that helps immigrant families deal with im
 | C33 | Explain, don't advise. The agent explains what the notice says and requires but gives no legal advice on the asylum case (eligibility, what to say at the interview, whether to hire someone). When asked, it says so and points to free legal help (stretch #14). The agent never offers to be the interview interpreter. **Needs team OK:** propose adding this to the non-negotiable rules in CLAUDE.md. | Advice on an asylum case is legal practice; a wrong answer can cost someone their case. The notice requires a human interpreter who meets specific rules. |
 | C34 | Immigration data handling. Receipt number, A-Number, interview location, and date of birth are always `<ref:...>` values. Details of the asylum claim (country of nationality, reasons for leaving) are never extracted into facts, briefs, or events, even if the user mentions them. Immigration facts are always held as `pending_consent` (C15). | Asylum applicants can be put at risk if their data leaks. "Store less" from the memory rules becomes concrete. |
 | C35 | The phone agent never types or says the A-Number, receipt number, or date of birth, in the phone menu or to the representative. The mock line's menu doesn't ask for them. If a real menu requires one, the agent takes the path that doesn't need it (e.g., "speak to a representative") or asks the user via ask_user which path to take; the user gives identifiers in their own voice once bridged. **Needs team decision:** whether entering the receipt number in a menu counts as answering a verification question (rule 3). | USCIS menus ask for these numbers, and they function as identity checks. Rule 3 forbids the agent answering for the user; this picks the strict reading until the team decides. |
+| C36 | The phone agent logs every call event unfiltered; the orchestrator decides which reach the user (P2), by fixed rules in code, sent as relay templates. It owns the "On hold" limit (one per 10 minutes per call); `call.human_detected` is always sent at once. Person 2 agreed (Oct 23). | Keeps the phone agent transparent and puts all user-facing policy in one place. Rules instead of a model call, because the user has only 30 s to answer once a human picks up. |
+| C37 | The phone agent answers phone menus by speaking (TTS on the live stream), not with DTMF. For a menu step that only accepts the keypad, it updates the call through the REST API with `<Play digits>` and then a new `<Connect><Stream>`, batching digits so it reconnects as rarely as possible and carrying call state across the new stream. It never sends identifiers this way **[C35]**. | Twilio Media Streams can't send DTMF. In a spike call, Pipecat's in-band tones weren't registered as key presses; speaking and the REST update both worked, each in about 5 s ([spikes/dtmf/README.md](spikes/dtmf/README.md)). Speaking keeps one unbroken stream, which hold detection and the bridge depend on; the REST update drops the stream on every use. |
 
 ## MVP and stretch goals
 
@@ -132,6 +134,7 @@ Three agents plus four shared modules. Only the orchestrator converses with the 
 - Asks for consent before every call, including retries. **[C21]**
 - Suggests closing a case when a call resolves with no follow-up; closes it when the user agrees. **[C22]**
 - Sends the interview checklist from R1 along with the explanation. **[C31]**
+- Decides which call events reach the user, by fixed rules, sent as relay templates. **[C36]**
 
 **Tools:** `start_research`, `get_case_status`, `request_consent`, `start_call`, `get_profile`, `list_active_cases`, `close_case` **[C22]**.
 
@@ -155,6 +158,7 @@ Three agents plus four shared modules. Only the orchestrator converses with the 
 
 - Runs the call state machine: dialing → menu → hold → human detected → bring in user → wrap-up.
 - Menu decisions from the case brief, with an explicit "unsure" option that triggers ask_user.
+- Answers menu prompts by speaking the choice (the digit or the option name) once the prompt finishes. For a step that only accepts the keypad, it falls back to a Twilio REST call update with `<Play digits>`. **[C37]**
 - Hold vs. human detection: voice activity detection, then a quick Claude check when speech follows music.
 - Briefly introduces itself to the representative as an automated assistant calling for the applicant, then calls the user into a conference.
 - Writes every decision to the events table and produces the call report.
@@ -294,13 +298,15 @@ If a menu asks for the A-Number, receipt number, or date of birth, the agent nev
 
 ### P2. Phone → User via relay (status)
 
+The phone agent logs every call event and filters nothing. The orchestrator decides which events reach the user, by the fixed rules below (code, not a model call), and sends them through the relay's pre-translated templates so they go out instantly. **[C36]**
+
 Only these events message the user; everything else goes to events and the dashboard only.
 
 | Event | Message |
 |---|---|
 | `call.dialing` | "Calling USCIS now." |
-| `call.on_hold` | "On hold." At most every 10 minutes. |
-| `call.human_detected` | "Someone picked up. I'm calling you now; please answer." |
+| `call.on_hold` | "On hold." The orchestrator sends at most one every 10 minutes per call. |
+| `call.human_detected` | "Someone picked up. I'm calling you now; please answer." Always sent at once, never held back (the user has 30 s to answer). |
 | `call.user_unreachable` | Agent tells the representative the account holder will call back and ends the call; orchestrator follows up. |
 
 ### P3. Phone → Orchestrator (call report)
@@ -432,7 +438,7 @@ Thin harness: official SDKs plus Pipecat for the call. No LangChain, LangGraph, 
 | Frontend | React/Next.js dashboard | Timeline, case view, memory page, WhatsApp mirror |
 | Tunnel | ngrok | Public URLs for Twilio webhooks |
 
-**Open technical risk:** sending key presses (DTMF) mid-call over Media Streams. Prove it on the mock line before kickoff; fallback is updating the call through Twilio's REST API.
+**Resolved risk: key presses over Media Streams [C37].** Twilio Media Streams can't send DTMF (a server can send only `media`, `mark`, `clear`). Pipecat falls back to playing the tones as audio, and in testing those weren't registered as key presses. The phone agent answers menus by speaking instead. For a step that only accepts the keypad, it updates the call through Twilio's REST API (`<Play digits>`, then a new `<Stream>`). Results: [spikes/dtmf/README.md](spikes/dtmf/README.md).
 
 ### Sponsor tracks
 
@@ -469,7 +475,8 @@ Person 2 has the most surface area; if it bottlenecks, move the message relay to
 
 - [ ] Activate the Twilio WhatsApp sandbox and get an echo bot replying
 - [ ] Two Twilio numbers: agent and mock agency
-- [ ] Prove DTMF key presses mid-call on the mock line
+- [x] Prove DTMF key presses mid-call on the mock line: in-stream DTMF doesn't work; speak menu choices instead **[C37]**
+- [ ] Twilio account for calls: upgraded (trial blocks `<Stream>` and inline TwiML) and an approved Trust Hub Primary Compliance Profile (required to call +1 numbers)
 - [ ] Anthropic and Cartesia API keys
 - [ ] Make the demo notice: a sample I-797C asylum interview notice with made-up receipt number, A-Number, location, and date (never a real notice)
 - [ ] Map the real USCIS Contact Center phone menu and copy it on the mock line (without receipt number entry **[C35]**)
@@ -489,9 +496,9 @@ Product decisions made by the team while planning the schema **[C29]**:
 | Scope | Build what the demo shows. The letter is always addressed to the user. |
 | Legal advice | None. Explain what the notice says, point to legal help, never interpret at the interview **[C33]**. |
 | Immigration identifiers | Always refs; the agent never gives them on a call **[C34] [C35]**. |
-| Language | The user selects their language. |
+| Language | The user selects their language. A first message with text gets a one-tap confirm in the detected language ("¿Seguimos en español? 1 Sí · 2 Otro idioma"); a photo-only first message gets a short multilingual menu. No silent detection: short replies are ambiguous, and a relative may type for the parent. The user can switch any time by asking (Oct 23). |
 | Which phone we ring | Always the user's WhatsApp number. |
-| Long letters | Several photos form one document **[C20]**. |
+| Long letters | Several photos form one document **[C20]**. Photos with no gap over ~6 s become one letter; the first gets an instant ack ("¿Tiene más páginas?"). A photo after research has started is asked about by text ("same letter or new? 1 · 2"), since the gap alone can't tell page 2 from a new letter (Oct 23). |
 | Which letter a message is about | The orchestrator reasons from the conversation and asks by text if unsure. |
 | Closing a letter | The user closes it; the agent suggests it when a call resolves **[C22]**. |
 | Consent | Asked before every call, including retries; the user is notified **[C21]**. |

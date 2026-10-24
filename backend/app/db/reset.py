@@ -105,8 +105,12 @@ def demo_fast_result(case_id: str) -> dict:
 def demo_brief(case_id: str, brief_id: str) -> dict:
     """A case brief for the demo call, in the shape of `CaseBrief` in
     research/models.py (branch research_agent). Provisional: the shared contract is
-    still a dict until persons 3 and 4 agree on the shape. The menu path follows
-    the English-only mock line (mock_agency/README.md)."""
+    still a dict until persons 3 and 4 agree on the shape.
+
+    Written as research would write it for the real USCIS Contact Center, not from
+    the mock line's tree (CLAUDE.md → the mock agency is a test target): the menu
+    path describes options by meaning, with no key numbers, since real menus
+    change and the phone agent decides from what it hears."""
     return {
         "brief_id": brief_id,
         "case_id": case_id,
@@ -124,21 +128,31 @@ def demo_brief(case_id: str, brief_id: str) -> dict:
             "the interpreter can't come"
         ),
         "expected_menu_path": [
-            "Main menu: press 2 (interview or appointment notice)",
-            "Appointment menu: press 2 (asylum interview)",
+            "If offered a language choice, choose English",
             (
-                "Receipt number prompt: never enter it (C35); stay silent until the "
-                "line moves on"
+                "Choose the option for an existing case, or for an interview or "
+                "appointment notice"
             ),
-            "Reason for calling: say the call goal in plain English",
             (
-                "Attendance menu: the user decides, so ask_user (1 attending as "
-                "scheduled, 2 need a new date)"
+                "If asked for a receipt number, A-Number, or date of birth, don't "
+                "give it (C35): say the caller doesn't have it, or pick the option "
+                "for callers without one. Don't stay silent; menus hang up on silence"
             ),
-            "Hold until an officer answers, then bring in the user",
+            "If asked why you're calling, state the call goal plainly",
+            (
+                "If a choice would commit the applicant to something (such as "
+                "rescheduling), ask the user first"
+            ),
+            (
+                "Ask for a representative when the menu allows it; hold until a "
+                "person answers, then bring in the user"
+            ),
         ],
         "questions_to_ask": [
-            "Is the interview on November 12 at 8:30 AM still scheduled?",
+            (
+                f"Is the interview on {DEMO_INTERVIEW_DATE:%B} "
+                f"{DEMO_INTERVIEW_DATE.day} at 8:30 AM still scheduled?"
+            ),
             (
                 "If the interpreter can't come, what should the applicant do before "
                 "the interview?"
@@ -165,23 +179,31 @@ def demo_brief(case_id: str, brief_id: str) -> dict:
                 "answer_source": "user, once bridged",
             },
             {
-                "question": "What is the receipt number?",
+                "question": "What is the receipt number or A-Number?",
+                "answer_source": "user, once bridged",
+            },
+            {
+                "question": "What is the mailing address on file?",
                 "answer_source": "user, once bridged",
             },
         ],
         "contingencies": [
             (
-                "If the officer asks identity questions before the user joins, say "
-                "the applicant will answer them and bring the user in"
+                "If the representative asks identity questions before the user "
+                "joins, say the applicant will answer them and bring the user in"
             ),
             "If the interview was moved, ask for the new date and time",
+            (
+                "If the representative says interview questions go to the local "
+                "asylum office, ask how to contact that office"
+            ),
         ],
         "open_uncertainties": ["Whether the applicant's interpreter is available"],
     }
 
 
 DEMO_HANDOFF_NOTE = (
-    "Calling the USCIS asylum office line to confirm an asylum interview and ask "
+    "Calling the USCIS Contact Center to confirm an asylum interview and ask "
     "about the interpreter. The applicant answers all identity questions in their "
     "own voice once bridged."
 )
