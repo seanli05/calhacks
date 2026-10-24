@@ -1,7 +1,8 @@
 """Drop and recreate every table, then seed the demo case.
 
-    python -m app.db.reset --yes          # rebuild and seed
-    python -m app.db.reset --yes --empty  # rebuild, no seed
+    python -m app.db.reset --yes               # rebuild and seed (awaiting consent)
+    python -m app.db.reset --yes --after-call  # ...plus a finished call
+    python -m app.db.reset --yes --empty       # rebuild, no seed
 
 The database is shared by the whole team, so this wipes everyone's data; it refuses
 to run without --yes. It's a dev tool, so seeding writes several owners' tables.
@@ -12,13 +13,15 @@ import argparse
 import asyncio
 import sys
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, timedelta
 from urllib.parse import urlsplit
 
-from app.contracts.common import Component, VerificationStatus
+from app.contracts.common import VerificationStatus
 from app.db import tables
 from app.db.engine import get_engine, session
 from app.db.schema import create_all, drop_all
+from app.db.seed_story import Story, placeholder_letter_png
+from app.db.tables import utcnow
 from app.settings import get_settings
 
 DEMO_WHATSAPP_NUMBER = "+15555550100"
@@ -39,6 +42,11 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         "--yes", action="store_true", help="confirm wiping the shared database"
     )
     parser.add_argument("--empty", action="store_true", help="skip the demo seed")
+    parser.add_argument(
+        "--after-call",
+        action="store_true",
+        help="also seed a finished call, to check the ended screens",
+    )
     return parser.parse_args(argv)
 
 
@@ -67,6 +75,11 @@ def demo_fast_result(case_id: str) -> dict:
                 "kind": "who_must_come",
                 "item": "All dependents listed on the I-589",
                 "citation": "p1 §I",
+            },
+            {
+                "kind": "bring",
+                "item": "A qualified interpreter if you are not fluent in English",
+                "citation": "p1 §III",
             },
             {
                 "kind": "bring",
@@ -174,16 +187,30 @@ DEMO_HANDOFF_NOTE = (
 )
 
 
-async def seed() -> str:
+async def seed(after_call: bool = False) -> str:
     """Seed one user and one explained, verified case with a brief, ready for
-    consent. Returns the case ID."""
+    consent, plus the WhatsApp exchange, memory, and feed events that led there.
+    With `after_call`, the user also consented and the call has ended. Returns the
+    case ID."""
     official_phone = get_settings().twilio_mock_agency_number or None
     user = tables.User(whatsapp_number=DEMO_WHATSAPP_NUMBER, language="es")
+    media = tables.Media(
+        user_id=user.id, content_type="image/png", data=placeholder_letter_png()
+    )
+    story = Story(user.id, "", utcnow() - timedelta(days=2))
+    document = tables.Document(
+        user_id=user.id,
+        pages=[{"media_id": media.id, "added_at": story.at(0).isoformat()}],
+        created_at=story.at(0),
+    )
     case = tables.Case(
         user_id=user.id,
+        document_ids=[document.id],
         doc_type="uscis_i797c_asylum_interview",
         deadline=DEMO_INTERVIEW_DATE,
+        created_at=story.at(0),
     )
+    story.case_id = case.id
     case.fast_result = demo_fast_result(case.id)
     refs = [
         tables.CaseRef(case_id=case.id, name=name, value=value)
@@ -203,41 +230,37 @@ async def seed() -> str:
             "red_flags": [],
         },
     )
-    events = [
-        tables.Event(
-            type="case.created",
-            source=Component.RESEARCH_AGENT,
-            user_id=user.id,
-            case_id=case.id,
-            summary_en="Case created (seed)",
-        ),
-        tables.Event(
-            type="verification.verified",
-            source=Component.RESEARCH_AGENT,
-            user_id=user.id,
-            case_id=case.id,
-            summary_en="Letter verified against uscis.gov (seed)",
-        ),
-    ]
     async with session() as db:
         # No ORM relationships, so flush parents before children ourselves.
         db.add(user)
         await db.flush()
-        db.add(case)
+        db.add_all([case, media, document])
         await db.flush()
-        db.add_all([*refs, brief, verification, *events])
+        db.add_all(
+            [*refs, brief, verification, *story.before_call(media.id, document.id)]
+        )
+        if after_call:
+            consent, consented = story.consent(minutes=6)
+            db.add_all([consent, consented])
+            await db.flush()
+            job, call, rest = story.finished_call(brief.id, consent, minutes=7)
+            db.add(job)
+            await db.flush()
+            db.add(call)
+            await db.flush()
+            db.add_all(rest)
         await db.commit()
     if official_phone is None:
         print("TWILIO_MOCK_AGENCY_NUMBER is unset: the seed has no dialable number.")
     return case.id
 
 
-async def reset(empty: bool) -> None:
+async def reset(empty: bool, after_call: bool) -> None:
     try:
         await drop_all()
         await create_all()
         if not empty:
-            case_id = await seed()
+            case_id = await seed(after_call)
             print(f"Seeded demo case {case_id}.")
     finally:
         await get_engine().dispose()
@@ -250,7 +273,7 @@ def main(argv: Sequence[str]) -> int:
     if not args.yes:
         print("This wipes every table on the shared database. Re-run with --yes.")
         return 2
-    asyncio.run(reset(args.empty))
+    asyncio.run(reset(args.empty, args.after_call))
     print("Done.")
     return 0
 
