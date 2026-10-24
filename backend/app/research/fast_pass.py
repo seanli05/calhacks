@@ -335,6 +335,10 @@ def build_output(
         raise FastPassError("model returned a readable letter with no explanation")
     if hedges:
         explanation = " ".join([explanation, *hedges])
+    # The summary replaces the explanation on WhatsApp, so it keeps the date hedges.
+    summary = (ex.summary_en or "").strip() or None
+    if summary and hedges:
+        summary = " ".join([summary, *hedges])
 
     r1 = FastResult(
         case_id=case_id,
@@ -351,6 +355,7 @@ def build_output(
         ],
         key_facts=key_facts,
         explanation_en=explanation,
+        summary_en=summary,
         urgency=_urgency(earliest, today, ex.urgency),
         verification="pending",
         proposed_facts=proposed,
@@ -360,12 +365,14 @@ def build_output(
     # (c) Scrub every text field, then the leak guard: the last word, after everything above.
     r1, signals = scrub_output(r1, signals, sensitive)
     call_purpose = _scrub(ex.call_purpose, sensitive) if ex.call_purpose else None
+    call_goal_short = _short_goal(ex.call_goal_short, sensitive)
     unknown_terms = [t for t in ex.unknown_terms if not _contains_any(t, sensitive)]
     assert_no_leaks(
         [
             r1.model_dump_json(),
             signals.model_dump_json(),
             call_purpose or "",
+            call_goal_short or "",
             *unknown_terms,
         ],
         sensitive,
@@ -375,9 +382,22 @@ def build_output(
         r1=r1,
         signals=signals,
         call_purpose=call_purpose,
+        call_goal_short=call_goal_short,
         unknown_terms=unknown_terms,
         sensitive_values=sensitive,
     )
+
+
+SHORT_GOAL_MAX_WORDS = 12
+
+
+def _short_goal(text: str | None, sensitive: list[SensitiveValue]) -> str | None:
+    """The user-facing call goal (C41): one line, at most 12 words, no trailing
+    period. Dropped, not described, if it holds a sensitive value."""
+    if not text or _contains_any(text, sensitive) or _mentions_asylum_claim(text):
+        return None
+    words = text.split()[:SHORT_GOAL_MAX_WORDS]
+    return " ".join(words).rstrip(" .;,:") or None
 
 
 def scrub_output(
@@ -398,8 +418,11 @@ def scrub_output(
     def ident(text: str | None) -> str | None:
         return None if text and _contains_any(text, sensitive) else text
 
-    sentences = re.split(r"(?<=[.!?])\s+", r1.explanation_en or "")
-    clean = [s for s in (_scrub(s, sensitive) for s in sentences if s) if s]
+    def sentences(text: str | None) -> list[str]:
+        parts = re.split(r"(?<=[.!?])\s+", text or "")
+        return [s for s in (_scrub(s, sensitive) for s in parts if s) if s]
+
+    clean = sentences(r1.explanation_en)
     key_facts = [
         f if f.ref is not None else f.model_copy(update={"quote": ident(f.quote)})
         for f in r1.key_facts
@@ -411,6 +434,8 @@ def scrub_output(
             "issuer": ident(r1.issuer),
             "what_is_asked": prose(r1.what_is_asked),
             "explanation_en": " ".join(clean) or PRIVACY_FALLBACK,
+            # Empty after the scrub: WhatsApp falls back to the explanation.
+            "summary_en": " ".join(sentences(r1.summary_en)) or None,
             "key_dates": [d for d in r1.key_dates if ident(d.raw) is not None],
             "checklist_en": [
                 c.model_copy(

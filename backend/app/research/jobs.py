@@ -146,6 +146,7 @@ async def _run_fast(
                 document_ids=payload.document_ids,
                 signals=output.signals,
                 call_purpose=output.call_purpose,
+                call_goal_short_en=output.call_goal_short,
             ),
             payload.user_id,
             case_id,
@@ -287,13 +288,11 @@ async def _run_deep(
     ver_row = await writes.save_verification(payload.case_id, verification)
 
     brief_id: str | None = None
-    call_goal_en = findings.call_goal_en
     if verification.status == "verified":
         brief = build_brief(case, findings)
         guard.check("case_briefs row", brief.model_dump(mode="json"))
         await writes.save_brief(payload.case_id, brief)
         brief_id = brief.brief_id
-        call_goal_en = brief.call_goal_en
 
     r2 = DeepResult(
         case_id=payload.case_id,
@@ -305,7 +304,9 @@ async def _run_deep(
             and verification.official_phone is not None
         ),
         brief_id=brief_id,
-        call_goal_en=call_goal_en,
+        # The short goal the user reads (C41); the brief keeps the full one for the
+        # phone agent. None makes the orchestrator fall back to the brief's goal.
+        call_goal_en=payload.call_goal_short_en,
     )
     await _finish(guard, job.id, r2)
     data: dict[str, Any] = {

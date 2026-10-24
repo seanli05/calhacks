@@ -29,6 +29,8 @@ class FastPassOutput(Contract):
     r1: FastResult
     signals: LegitimacySignals
     call_purpose: str | None = None
+    call_goal_short: str | None = None
+    """R2's short call goal (C41); travels in the deep job."""
     unknown_terms: list[str] = Field(default_factory=list)
     sensitive_values: list[SensitiveValue] = Field(default_factory=list)
 

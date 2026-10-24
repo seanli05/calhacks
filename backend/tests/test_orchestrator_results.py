@@ -136,7 +136,9 @@ async def test_explanation_carries_the_date_checklist_and_closing(
     [message] = db.messages
     assert message.sender == "orchestrator"
     assert message.case_id == "case_1"
-    assert message.body_original.startswith("[es] This is a notice from USCIS")
+    # The short summary leads (C41); the full explanation is for the dashboard.
+    assert message.body_original.startswith(f"[es] {result.summary_en}")
+    assert result.explanation_en not in message.body_original
     # The date line is a template with the date formatted in code, never translated.
     assert (
         render(
@@ -154,6 +156,20 @@ async def test_explanation_carries_the_date_checklist_and_closing(
     assert "What to bring:" in message.body_en
     assert "<ref:" not in message.body_original
     assert verdicts.is_watching("case_1")
+
+
+async def test_r1_without_a_summary_sends_the_explanation(
+    db: FakeDB, letter_results: LetterResults
+) -> None:
+    user = await use_spanish(db)
+    result = FastResult.model_validate(
+        fixture("fast_result.json", case_id="case_1", summary_en=None)
+    )
+
+    await letter_results.fast_done(await finished_fast_job(db, user, "case_1", result))
+
+    [message] = db.messages
+    assert message.body_original.startswith(f"[es] {result.explanation_en}")
 
 
 async def test_untranslated_explanation_falls_back_to_templates_never_english(
@@ -321,7 +337,7 @@ async def test_explanation_waits_for_a_turn_in_progress(
 
     first, second = [m.body_original for m in db.messages if m.direction == "out"]
     assert first == "turn reply"
-    assert second.startswith("[es] This is a notice from USCIS")
+    assert second.startswith("[es] This is a USCIS notice")
 
 
 @pytest.mark.parametrize(

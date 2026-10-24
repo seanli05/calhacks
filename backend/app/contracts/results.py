@@ -86,6 +86,9 @@ class FastResult(Contract):
     checklist_en: list[ChecklistItem] = Field(default_factory=list)
     key_facts: list[KeyFact] = Field(default_factory=list)
     explanation_en: str | None = None
+    summary_en: str | None = None
+    """Two short sentences for WhatsApp; `explanation_en` stays the full version
+    (dashboard). None on R1s from before C41."""
     urgency: Urgency | None = None
     verification: VerificationStatus = VerificationStatus.PENDING
     proposed_facts: list[ProposedFact] = Field(default_factory=list)

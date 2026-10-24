@@ -12,7 +12,7 @@ The case brief is research's instructions for one call. The research agent write
    - `build_brief(case, findings)` builds it (`app/research/brief.py`). It's deterministic: no model call.
    - `writes.research.save_brief(case_id, brief)` stores it in `case_briefs`. The row's ID is the brief's own `brief_id`, so R2 can name it, and `case_briefs.handoff_note` copies `brief.handoff_note`.
    - R2's `brief_id` points at it. A suspicious or unknown letter gets no brief, and R2's `brief_id` is `null`.
-2. **The orchestrator** reads the case's latest brief (`reads.latest_brief`). It uses `call_goal_en` in the consent question, and puts `brief_id` in the `CallJob` (H2).
+2. **The orchestrator** reads the case's latest brief (`reads.latest_brief`). It uses `call_goal_en` in the consent question when R2 carries no short goal (C41), and puts `brief_id` in the `CallJob` (H2).
 3. **The phone agent** reads it by `brief_id` through `CaseReader.get_brief`. The real adapter (`phone/adapters.py`) validates it against `CaseBrief`, so an invalid brief stops the call before it dials. Inside, the runner reads it as JSON, defensively.
 4. **The dashboard** shows `call_goal_en` and `questions_to_ask` (`api/cases.py`) before the call.
 

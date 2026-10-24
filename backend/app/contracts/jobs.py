@@ -71,6 +71,9 @@ class ResearchDeepJob(Contract):
     document_ids: list[DocumentId]
     signals: LegitimacySignals = Field(default_factory=LegitimacySignals)
     call_purpose: str | None = None
+    call_goal_short_en: str | None = None
+    """The call goal as the user reads it on WhatsApp: one clause, at most 12 words
+    (C41). Becomes R2's `call_goal_en`; the brief keeps the full goal."""
 
 
 class CallJob(Contract):

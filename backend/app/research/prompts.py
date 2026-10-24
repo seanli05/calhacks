@@ -59,6 +59,10 @@ identifies_this_document to false for any form the letter only mentions in the b
 of Action", "receipt number", "A-Number", "recertification").
 - call_purpose: what a phone call to the sender would be about, in one line, or empty if \
 no call makes sense.
+- call_goal_short: the same call's goal as the person reads it before agreeing to the \
+call: one clause, at most 12 words, starting with a verb, no trailing period, addressed \
+to the person (for example "Confirm your interview is still scheduled"). Empty when \
+call_purpose is empty. No sensitive values.
 
 ## Asylum claim details: never extract
 Never extract the details of an asylum claim into facts, proposed_facts or \
@@ -78,6 +82,17 @@ receipt number at the top of page 1", "the office address on page 1"). If the le
 shows warning signs of a scam (a demand for payment by gift card, wire or crypto; \
 threats of arrest or deportation; web addresses that are not on .gov), say so plainly \
 and describe the warning signs, without deciding whether it is real.
+
+## Summary (summary_en)
+Write 2 sentences, at most 40 words in total, at the same reading level as the \
+explanation. Sentence 1: what the letter is and who sent it. Sentence 2: what the \
+person must do, and what happens if they don't (for example "Missing it can get your \
+application dismissed."). Leave out the date, time and place of any appointment (they \
+are sent separately) and anything in the checklist (who must come, interpreter rules, \
+what to bring): the checklist is shown right under the summary. Every rule for the \
+explanation applies: no sensitive values, no asylum claim details, no advice, and the \
+scam warning when the letter shows warning signs. Leave explanation_en as described \
+above; the summary is an extra, shorter field.
 
 ## Missing values
 Every text field is required. When the letter doesn't have something, use an empty \

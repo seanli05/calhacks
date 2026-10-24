@@ -263,3 +263,15 @@ def test_declined_question_carries_no_answer() -> None:
         QuestionAnswer.model_validate(
             {"status": "declined_legal_advice", "answer_en": "You should appeal."}
         )
+
+
+def test_fast_result_from_before_c41_still_validates() -> None:
+    stored = {k: v for k, v in load("fast_result").items() if k != "summary_en"}
+    assert FastResult.model_validate(stored).summary_en is None
+    assert FastResult.model_validate(load("fast_result")).summary_en
+
+
+def test_deep_job_from_before_c41_still_validates() -> None:
+    stored = load("research_deep_job")
+    stored.pop("call_goal_short_en", None)
+    assert ResearchDeepJob.model_validate(stored).call_goal_short_en is None

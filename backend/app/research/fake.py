@@ -53,6 +53,7 @@ def fake_fast_pass_output(case_id: str = "case_fake") -> FastPassOutput:
             KeyFact(field="form_id", value="EX-100", quote="Form EX-100", page=1),
         ],
         explanation_en="This is a notice from Example Agency asking you to return a form by January 15, 2030.",
+        summary_en="This is a notice from Example Agency. You must return a form, or your case may be closed.",
         urgency="medium",
         proposed_facts=[
             ProposedFact(
@@ -70,6 +71,7 @@ def fake_fast_pass_output(case_id: str = "case_fake") -> FastPassOutput:
             case_number_format="3 letters + 10 digits",
         ),
         call_purpose="Confirm the form was received",
+        call_goal_short="Confirm your form was received",
         unknown_terms=["notice of action"],
         sensitive_values=[
             SensitiveValue(

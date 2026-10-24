@@ -65,6 +65,7 @@
     }
   ],
   "explanation_en": "This is a notice from USCIS scheduling your asylum interview...",
+  "summary_en": "This is a USCIS notice scheduling your asylum interview. You must go, or your application can be dismissed.",
   "urgency": "high",
   "verification": "pending",
   "proposed_facts": [

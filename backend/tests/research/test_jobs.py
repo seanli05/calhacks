@@ -50,7 +50,9 @@ def fast_job(
     return store.add_claimed_job(payload, "case_1")
 
 
-async def deep_job(store: FakeResearchDB) -> tables.Job:
+async def deep_job(
+    store: FakeResearchDB, short_goal: str | None = "Confirm your form was received"
+) -> tables.Job:
     out = fake_fast_pass_output("case_1")
     await store.create_case("case_1", "user_1", ["doc_1"])
     await store.save_fast_result("case_1", out.r1)
@@ -60,6 +62,7 @@ async def deep_job(store: FakeResearchDB) -> tables.Job:
         document_ids=["doc_1"],
         signals=out.signals.model_copy(update={"county": "Signal County"}),
         call_purpose=out.call_purpose,
+        call_goal_short_en=short_goal,
     )
     return store.add_claimed_job(payload, "case_1")
 
@@ -90,6 +93,7 @@ async def test_fast_happy_path(store: FakeResearchDB) -> None:
     assert memory.payload["source_ref"] == "doc_1"
     deep = next(j for j in store.jobs.values() if j.type == "research_deep")
     assert deep.payload["call_purpose"] == "Confirm the form was received"
+    assert deep.payload["call_goal_short_en"] == "Confirm your form was received"
     assert deep.payload["signals"] == fake_fast_pass_output().signals.model_dump(
         mode="json"
     )
@@ -247,6 +251,30 @@ async def test_deep_happy_path(store: FakeResearchDB) -> None:
         "red_flag_count": 0,
         "source": "example.gov",
     }
+
+
+async def test_r2_gets_the_short_goal_and_the_brief_keeps_the_full_one(
+    store: FakeResearchDB,
+) -> None:
+    job = await deep_job(store)
+    await handle_research_deep(job, deps())
+
+    r2 = DeepResult.model_validate(job.result)
+    assert r2.call_goal_en == "Confirm your form was received"
+    brief = store.case_briefs[r2.brief_id].brief
+    assert brief["call_goal_en"] == fake_deep_findings().call_goal_en
+    assert brief["call_goal_en"] != r2.call_goal_en
+
+
+async def test_deep_job_without_a_short_goal_leaves_r2_goal_empty(
+    store: FakeResearchDB,
+) -> None:
+    job = await deep_job(store, short_goal=None)
+    await handle_research_deep(job, deps())
+
+    r2 = DeepResult.model_validate(job.result)
+    assert r2.call_goal_en is None
+    assert store.case_briefs[r2.brief_id].brief["call_goal_en"]
 
 
 async def test_deep_puts_the_official_source_first(store: FakeResearchDB) -> None:

@@ -122,6 +122,10 @@ class Extraction(_Schema):
     explanation_en: OptStr = Field(
         description="3-6 plain English sentences; no sensitive values, no legal advice"
     )
+    summary_en: OptStr = Field(
+        description="2 short sentences, at most 40 words, for WhatsApp; no date, "
+        "time, place or checklist items",
+    )
     urgency: Literal["low", "medium", "high"]
     phones: list[ExtractedPhone] = Field(
         description="Phone numbers printed by the sender (not the recipient's)"
@@ -138,6 +142,10 @@ class Extraction(_Schema):
     county: OptStr = Field(description="County named on the letter, or empty")
     call_purpose: OptStr = Field(
         description="What a phone call to the sender would be about, one line"
+    )
+    call_goal_short: OptStr = Field(
+        description="The call's goal for the user: one clause, at most 12 words, "
+        "starting with a verb, no trailing period",
     )
     unknown_terms: list[str] = Field(
         description="Official jargon a family may not know, as printed"

@@ -76,6 +76,7 @@ We're building a WhatsApp-based agent that helps immigrant families deal with im
 | C38 | A `research_question` job answers the user's factual questions about their letter or process from official sources only. The orchestrator queues it with the question in English (and the `case_id` when it's about a case; research then reads only that case's R1 and refs). The result is `answered` with quotes from the official pages, or a decline: `not_confirmed`, `declined_legal_advice`, `declined_asylum_claim` (C33, C34), or `out_of_scope`. The orchestrator relays it. | Users ask questions the letter doesn't answer. Answering from the model's memory risks wrong immigration information; grounding every answer in a quoted official page keeps it checkable. |
 | C39 | R1 may be `needs_user_input` with `question_en`, when the pages look like different letters. The orchestrator asks the question, then queues `research_fast` again for the same case with the reply as `user_note_en`. The case stage is `needs_answer` meanwhile. | Photos sent within seconds become one letter, so two letters can land in one document. Only research can see that, and guessing would explain the wrong letter. |
 | C40 | Demo exception to rule 2: while `DEMO_DIAL_NUMBER` is set, `official_dial_number` returns it (the mock agency line) instead of the verified official number. Every other check still applies: an unverified case gets no number. Research still saves the real official number, so verification and the dashboard stay truthful. Clear it before calling real agencies. | Research finds the real USCIS number, so without this a rehearsal would call USCIS. Keeping the swap inside the one helper keeps a single path to any dialed number. |
+| C41 | Two short fields for WhatsApp. R1 gains `summary_en`: two sentences, at most 40 words, saying what the letter is and what the user must do, without the date, place or checklist items, which WhatsApp sends right under it. `explanation_en` stays the full version for the dashboard. The fast pass also writes a short call goal (one clause, at most 12 words, starting with a verb), carried in the deep job as `call_goal_short_en` and returned as R2's `call_goal_en`. The brief's `call_goal_en` stays the full goal the phone agent and the dashboard read. Both new fields are optional: without them the orchestrator sends `explanation_en`, and the consent question uses the brief's goal. | On a real phone the explanation came out as one ~250-word message that said the date and checklist three times, and the consent question's "What for:" line ran to several lines. |
 
 ## MVP and stretch goals
 
@@ -249,6 +250,7 @@ If `status` is `needs_better_image`, the other fields are empty and the orchestr
                 { "field": "receipt_number", "ref": "<ref:receipt_number>", "page": 1 },
                 { "field": "a_number", "ref": "<ref:a_number>", "page": 1 }],
   "explanation_en": "This is a notice from USCIS scheduling your asylum interview...",
+  "summary_en": "This is a USCIS notice scheduling your asylum interview. You must go, or your application can be dismissed.",
   "urgency": "high", "verification": "pending",
   "proposed_facts": [{ "fact": "Has an asylum interview scheduled", "source": "from_document" }] }
 ```
@@ -264,7 +266,7 @@ Trigger: verification and brief done.
                     "evidence": ["https://www.uscis.gov/contactcenter"], "red_flags": [] },
   "official_phone_purpose": "USCIS Contact Center", "alternative_contacts": [],
   "call_recommended": true, "brief_id": "brief_77",
-  "call_goal_en": "Confirm the interview is still scheduled; ask what to do if the interpreter can't come" }
+  "call_goal_en": "Confirm the interview is still scheduled" }
 ```
 
 Verification `status` is one of `pending`, `verified`, `suspicious`, `unknown`. **[C18]** `verification.signals` records how each signal from the letter compared with the official source (`match`, `not_found`, `conflict`, `uncertain`). `brief_id` is `null` when there's no call to brief, such as a suspicious letter, and `call_recommended` requires a verified official phone. `alternative_contacts` lists verified places to turn when the sender can't be called.
@@ -333,7 +335,8 @@ Trigger: call ends. Orchestrator sends the summary in the user's language; the m
 ### Other job payloads [C13]
 
 ```json
-{ "job": "research_deep", "case_id": "case_123", "user_id": "user_9", "document_ids": ["doc_1"] }
+{ "job": "research_deep", "case_id": "case_123", "user_id": "user_9", "document_ids": ["doc_1"],
+  "call_goal_short_en": "Confirm the interview is still scheduled" }
 
 { "job": "memory_write", "user_id": "user_9", "source": "from_call", "source_ref": "call_5",
   "proposed_facts": [{ "fact": "Asylum interview confirmed for Nov 18", "source": "from_call" }] }
