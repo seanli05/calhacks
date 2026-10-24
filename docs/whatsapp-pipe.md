@@ -25,7 +25,7 @@ The test suite (`pytest`) covers every routing path on fakes, with no network.
 
 ## If your code touches WhatsApp
 
-- **Phone agent (person 4).** Anything you send the user goes through `relay.outbound.send_template(whatsapp, user, template_id, values)`, never free text (rule 1). New templates go in `relay/templates.py` in both `en` and `es`; a test fails if one is missing. ask_user and call-status messages are Goal 3, next. Two choices are still open with you: how ask_user is wired (a relay function you await, or you poll the `questions` row), and whether status messages are triggered by your events or by a direct call.
+- **Phone agent (person 4).** Anything you send the user goes through `relay.outbound.send_template(whatsapp, user, template_id, values)`, never free text (rule 1). New templates go in `relay/templates.py` in both `en` and `es`; a test fails if one is missing. ask_user and call-status messages are Goal 3, next. Call-status messages follow C36 (agreed): you log every call event to `events` unfiltered, and the orchestrator picks which ones to send to the user as templates. Still open with you: how ask_user is wired (a relay function you await, or you poll the `questions` row).
 - **Dashboard (person 1).** In `messages`:
   - `sender` is `relay` for templates and `orchestrator` for free text.
   - Templated rows carry `template` and an English `body_en`.
@@ -44,6 +44,6 @@ The test suite (`pytest`) covers every routing path on fakes, with no network.
 
 ## Still open from Goal 1
 
-- **ask_user wiring** and **how call-status messages are triggered**: decide with person 4 (see above).
+- **ask_user wiring**: decide with person 4 (see above). Call-status delivery is settled by C36.
 - **Noticing finished jobs**: the orchestrator needs to know when research and call jobs finish. Either person 1 adds a helper like `list_finished_jobs(since)`, or it checks each job it knows about with `get_job`.
 - **Recording the language and photo decisions in Plan.md**: done in this change. Sean, check the wording.
