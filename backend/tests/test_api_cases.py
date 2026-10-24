@@ -144,7 +144,7 @@ def test_brief_with_missing_fields_is_null_not_an_error(
 
 
 def test_unknown_case_and_transcript_are_404(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+    client: TestClient, demo_case: tables.Case, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch(monkeypatch, get_case=None, get_transcript=None)
     assert client.get("/api/cases/case_x").status_code == 404

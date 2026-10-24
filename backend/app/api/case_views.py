@@ -1,13 +1,14 @@
 """Building blocks the case list and the case view share: R1, the appointment, the
 letter's pages, and call summaries."""
 
+import asyncio
 import logging
 
 from pydantic import ValidationError
 
 from app.api.common import localize
 from app.api.models import Appointment, CallReportInfo, CallSummary
-from app.contracts import CallReport, EventType, FastResult
+from app.contracts import CallReport, Event, EventType, FastResult
 from app.db import reads, tables
 from app.db.errors import NotFound
 
@@ -68,9 +69,26 @@ def _report_of(call: tables.Call, lang: str) -> CallReportInfo | None:
     )
 
 
+CallReads = tuple[tables.Call, Event | None, tables.Transcript | None]
+
+
+async def call_reads(call: tables.Call) -> CallReads:
+    """What a call summary needs from the database: the latest hold event and the
+    transcript. Kept apart from `build_call_summary` so it can run before the
+    language is known."""
+    on_hold, transcript = await asyncio.gather(
+        reads.latest_event(call.id, EventType.CALL_ON_HOLD),
+        reads.get_transcript(call.id),
+    )
+    return call, on_hold, transcript
+
+
 async def call_summary(call: tables.Call, lang: str) -> CallSummary:
-    on_hold = await reads.latest_event(call.id, EventType.CALL_ON_HOLD)
-    transcript = await reads.get_transcript(call.id)
+    return build_call_summary(await call_reads(call), lang)
+
+
+def build_call_summary(fetched: CallReads, lang: str) -> CallSummary:
+    call, on_hold, transcript = fetched
     return CallSummary(
         id=call.id,
         state=call.state,

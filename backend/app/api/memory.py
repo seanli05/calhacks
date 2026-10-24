@@ -1,6 +1,7 @@
 """The memory page (what we know about you): profile, facts, documents, transcripts,
 and the deletes behind each Delete button (C26)."""
 
+import asyncio
 from collections.abc import Awaitable, Callable
 
 from fastapi import APIRouter, HTTPException, Response
@@ -19,13 +20,15 @@ _SHOWN_FACTS = (FactStatus.ACTIVE, FactStatus.PENDING_CONSENT)
 
 @router.get("/users/{user_id}/memory")
 async def memory(user_id: str, lang: LangQuery = None) -> Memory:
-    lang = await resolve_language(user_id, lang)
-    profile = await reads.get_profile(user_id)
-    case_of = {
-        document_id: case
-        for case in await reads.list_cases(user_id)
-        for document_id in case.document_ids
-    }
+    lang, profile, cases, facts, documents, transcripts = await asyncio.gather(
+        resolve_language(user_id, lang),
+        reads.get_profile(user_id),
+        reads.list_cases(user_id),
+        reads.list_facts(user_id, _SHOWN_FACTS),
+        reads.list_documents(user_id),
+        reads.list_transcripts(user_id),
+    )
+    case_of = {document_id: case for case in cases for document_id in case.document_ids}
     return Memory(
         profile={k: str(v) for k, v in (profile.fields if profile else {}).items()},
         facts=[
@@ -38,11 +41,10 @@ async def memory(user_id: str, lang: LangQuery = None) -> Memory:
                 status=fact.status,
                 recorded_at=fact.recorded_at,
             )
-            for fact in await reads.list_facts(user_id, _SHOWN_FACTS)
+            for fact in facts
         ],
         documents=[
-            _document_info(document, case_of.get(document.id))
-            for document in await reads.list_documents(user_id)
+            _document_info(document, case_of.get(document.id)) for document in documents
         ],
         transcripts=[
             TranscriptInfo(
@@ -51,7 +53,7 @@ async def memory(user_id: str, lang: LangQuery = None) -> Memory:
                 case_id=case_id,
                 created_at=transcript.created_at,
             )
-            for transcript, case_id in await reads.list_transcripts(user_id)
+            for transcript, case_id in transcripts
         ],
     )
 
