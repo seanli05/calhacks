@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     twilio_whatsapp_from: str = "whatsapp:+14155238886"
     twilio_agent_number: str = ""
     twilio_mock_agency_number: str = ""
+    # The code on Twilio's WhatsApp sandbox page, without "join"; shown on the landing page.
+    twilio_sandbox_join_code: str = ""
 
     # Database. Neon provides both; the unpooled one is preferred because
     # asyncpg's prepared statements don't survive Neon's transaction pooler.

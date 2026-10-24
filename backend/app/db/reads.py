@@ -242,3 +242,91 @@ async def get_glossary(language: LanguageCode) -> list[tables.GlossaryTerm]:
             .order_by(tables.GlossaryTerm.term)
         )
         return list((await db.execute(query)).scalars())
+
+
+async def first_user() -> tables.User | None:
+    """The oldest user: the seeded demo user on a freshly reset database."""
+    async with session() as db:
+        query = select(tables.User).order_by(tables.User.created_at).limit(1)
+        return (await db.execute(query)).scalar_one_or_none()
+
+
+async def list_cases(user_id: UserId) -> list[tables.Case]:
+    """Every case, closed ones included, newest first."""
+    async with session() as db:
+        query = (
+            select(tables.Case)
+            .where(tables.Case.user_id == user_id)
+            .order_by(tables.Case.created_at.desc())
+        )
+        return list((await db.execute(query)).scalars())
+
+
+async def list_calls(case_id: CaseId) -> list[tables.Call]:
+    """The case's calls, oldest first."""
+    async with session() as db:
+        query = (
+            select(tables.Call)
+            .where(tables.Call.case_id == case_id)
+            .order_by(tables.Call.started_at)
+        )
+        return list((await db.execute(query)).scalars())
+
+
+async def latest_brief(case_id: CaseId) -> tables.CaseBrief | None:
+    async with session() as db:
+        query = (
+            select(tables.CaseBrief)
+            .where(tables.CaseBrief.case_id == case_id)
+            .order_by(tables.CaseBrief.created_at.desc())
+            .limit(1)
+        )
+        return (await db.execute(query)).scalar_one_or_none()
+
+
+async def list_case_refs(case_id: CaseId) -> list[tables.CaseRef]:
+    """Real values. Callers outside the agents must mask them before showing."""
+    async with session() as db:
+        query = (
+            select(tables.CaseRef)
+            .where(tables.CaseRef.case_id == case_id)
+            .order_by(tables.CaseRef.name)
+        )
+        return list((await db.execute(query)).scalars())
+
+
+async def list_documents(user_id: UserId) -> list[tables.Document]:
+    async with session() as db:
+        query = (
+            select(tables.Document)
+            .where(tables.Document.user_id == user_id)
+            .order_by(tables.Document.created_at)
+        )
+        return list((await db.execute(query)).scalars())
+
+
+async def list_transcripts(
+    user_id: UserId,
+) -> list[tuple[tables.Transcript, CaseId]]:
+    """The user's transcripts with the case each call belongs to, oldest first."""
+    async with session() as db:
+        query = (
+            select(tables.Transcript, tables.Call.case_id)
+            .join(tables.Call, tables.Call.id == tables.Transcript.call_id)
+            .join(tables.Case, tables.Case.id == tables.Call.case_id)
+            .where(tables.Case.user_id == user_id)
+            .order_by(tables.Transcript.created_at)
+        )
+        return [(row[0], row[1]) for row in (await db.execute(query)).all()]
+
+
+async def latest_event(call_id: CallId, event_type: EventType) -> Event | None:
+    async with session() as db:
+        query = (
+            select(tables.Event)
+            .where(tables.Event.call_id == call_id, tables.Event.type == event_type)
+            .order_by(tables.Event.created_at.desc())
+            .limit(1)
+        )
+        row = (await db.execute(query)).scalar_one_or_none()
+        return from_row(row) if row else None

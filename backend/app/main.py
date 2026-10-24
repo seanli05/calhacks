@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.router import router as api_router
 from app.db.engine import ping
 from app.db.schema import create_all
 from app.relay.webhook import router as whatsapp_router
@@ -18,6 +19,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="calhacks", lifespan=lifespan)
 app.include_router(whatsapp_router)
+app.include_router(api_router)
 
 
 @app.get("/health")
