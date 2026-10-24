@@ -19,9 +19,9 @@
   gap: var(--gap);
 }
 
-/* On the call the side columns hold the book and the tips, so they get a bit more. */
+/* On the call: the transcript gets 55% of the width, the book and the tips share the rest. */
 .onCall {
-  grid-template-columns: minmax(320px, 400px) minmax(0, 1fr) minmax(300px, 390px);
+  grid-template-columns: minmax(260px, 9fr) minmax(0, 22fr) minmax(260px, 9fr);
 }
 
 .live {

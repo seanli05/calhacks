@@ -257,3 +257,11 @@
 .compact .stamp {
   top: 12px;
 }
+
+.compact .facts {
+  gap: 8px;
+}
+
+.compact .fv {
+  font-size: var(--fs-sm);
+}

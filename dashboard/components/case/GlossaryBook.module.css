@@ -18,9 +18,9 @@
   min-width: 0;
   border: 1px solid var(--line-strong);
   background: var(--card);
-  padding: 9px 12px;
+  padding: 7px 10px;
   font: inherit;
-  font-size: var(--fs-md);
+  font-size: var(--fs-sm);
 }
 
 .search:focus {
@@ -50,7 +50,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0 10px;
-  padding: 9px 12px;
+  padding: 7px 10px;
   background: var(--card);
   border: 1px solid var(--line);
   animation: rise 300ms ease both;
@@ -66,14 +66,14 @@
 }
 
 .row b {
-  font-size: var(--fs-lg);
+  font-size: var(--fs-md);
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .term {
   grid-column: 1;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--muted);
 }
 
