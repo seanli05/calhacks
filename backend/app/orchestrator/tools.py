@@ -234,7 +234,9 @@ def _letter(fast_result: dict[str, Any] | None) -> dict[str, Any] | None:
         for item in fast_result.get("checklist_en", [])
     ]
     letter["identifiers_on_letter"] = [
-        fact.get("field") for fact in fast_result.get("key_facts", [])
+        fact.get("field")
+        for fact in fast_result.get("key_facts", [])
+        if fact.get("ref")
     ]
     return letter
 

@@ -118,6 +118,10 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         "es": "📅 Su entrevista: {date}, a las {time}. La dirección está en su carta.",
         "en": "📅 Your interview: {date}, at {time}. The address is on your letter.",
     },
+    "letter.appointment_date": {
+        "es": "📅 Su entrevista: {date}. Los detalles están en su carta.",
+        "en": "📅 Your interview: {date}. The details are on your letter.",
+    },
     "letter.deadline": {
         "es": "📅 Fecha límite: {date}.",
         "en": "📅 Deadline: {date}.",

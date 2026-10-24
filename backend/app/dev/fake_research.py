@@ -130,8 +130,8 @@ class FakeResearch:
                 payload.case_id, payload.user_id, payload.document_ids
             )
             await emit(EventType.CASE_CREATED, "Opened a case for the letter (fake)")
-        refs = [fact.ref for fact in result.key_facts]
-        if result.appointment is not None:
+        refs = [fact.ref for fact in result.key_facts if fact.ref]
+        if result.appointment is not None and result.appointment.location_ref:
             refs.append(result.appointment.location_ref)
         for ref in refs:
             name = ref.removeprefix("<ref:").removesuffix(">")

@@ -47,6 +47,12 @@ def checklist_en(result: FastResult) -> str:
 
 def date_line(result: FastResult, language: LanguageCode) -> str | None:
     """The interview date and time, or else the deadline, rendered in `language`."""
+    if result.appointment is not None and result.appointment.time is None:
+        return render(
+            "letter.appointment_date",
+            language,
+            date=format_date(result.appointment.date, language),
+        )
     if result.appointment is not None:
         return render(
             "letter.appointment",
@@ -75,6 +81,15 @@ class LetterResults:
             result = FastResult.model_validate(job.result)
         except ValidationError:
             logger.exception("Bad R1 case_id=%s job_id=%s", job.case_id, job.id)
+            return
+        if result.status == FastResultStatus.NEEDS_USER_INPUT:
+            # C39: asking research's question is person 2's next step; until then,
+            # say nothing rather than explain a letter research hasn't read.
+            logger.warning(
+                "R1 needs user input, not handled yet case_id=%s job_id=%s",
+                result.case_id,
+                job.id,
+            )
             return
         user = await reads.get_user(job.user_id)
         if user is None:

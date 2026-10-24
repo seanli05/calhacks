@@ -30,7 +30,7 @@ from app.orchestrator.call_status import CallStatusWatcher
 from app.orchestrator.consent import ConsentGate
 from app.orchestrator.dates import format_date, format_time
 from app.orchestrator.job_watch import JobWatcher
-from app.orchestrator.letter_result import LetterResults
+from app.orchestrator.letter_result import LetterResults, date_line
 from app.orchestrator.pipe import InboundPipe
 from app.orchestrator.tools import CaseTools
 from app.orchestrator.verdicts import Verdicts
@@ -184,6 +184,30 @@ async def test_unreadable_photo_asks_for_a_retake_with_the_tip(
     assert "[es] It's blurry." in message.body_original
     assert message.body_en == render("letter.retake_tip", "en", tip="It's blurry.")
     assert not verdicts.is_watching("case_1")  # no deep pass for an unreadable photo
+
+
+def test_date_only_appointment_leaves_the_time_out() -> None:
+    data = fixture("fast_result.json")
+    data["appointment"] = {"date": "2026-11-18", "citation": "p1"}
+    line = date_line(FastResult.model_validate(data), "en")
+    assert line == render(
+        "letter.appointment_date", "en", date=format_date(dt.date(2026, 11, 18), "en")
+    )
+
+
+async def test_needs_user_input_sends_nothing_yet(
+    db: FakeDB, letter_results: LetterResults, verdicts: Verdicts
+) -> None:
+    """C39's question flow isn't built yet; the user mustn't get an empty explanation."""
+    user = await use_spanish(db)
+    result = FastResult(
+        case_id="case_1", status="needs_user_input", question_en="Which letter first?"
+    )
+
+    await letter_results.fast_done(await finished_fast_job(db, user, "case_1", result))
+
+    assert db.messages == []
+    assert not verdicts.is_watching("case_1")
 
 
 # R2 (6.2)
