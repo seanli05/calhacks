@@ -2,7 +2,7 @@
 
 You are building the web dashboard: FastAPI routes in `backend/app/api/` over the DB helpers, and a Next.js app in `dashboard/`. Then you set up deployment (ngrok for Twilio). This doc is everything you need; the conversation that wrote it may be gone.
 
-**Progress:** step 1 (design) is approved, see [Design](#design). The dashboard foundation and the live case view are built. The rest is split for parallel work in [dashboard-build.md](dashboard-build.md) (pages, conventions, start prompts) and [dashboard-api.md](dashboard-api.md) (step 2 in detail, which supersedes the route table below).
+**Progress:** step 1 (design) is approved, see [Design](#design). The dashboard foundation and the live case view are built. The rest is split for parallel work in [dashboard-build.md](dashboard-build.md) (pages, conventions, start prompts) and [dashboard-api.md](dashboard-api.md) (step 2 in detail, which supersedes the route table below). What's left before this task is done: [dashboard-done.md](dashboard-done.md).
 
 ## Read first
 1. [CLAUDE.md](../../CLAUDE.md): product rules and conventions.
