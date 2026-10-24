@@ -398,6 +398,30 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "I couldn't reach you, so I told USCIS you'd call back and ended the call."
         ),
     },
+    # C15: facts the memory writer is holding until the user says it's OK. {facts}
+    # is a translated bullet list.
+    "memory.ask_save": {
+        "es": (
+            "¿Puedo guardar esto, para no tener que preguntárselo otra vez?\n"
+            "{facts}\n"
+            "Solo lo uso para ayudarle, y puede borrarlo cuando quiera.\n"
+            "1 Sí, guárdelo\n2 No, no lo guarde"
+        ),
+        "en": (
+            "May I remember this, so I don't have to ask you again?\n"
+            "{facts}\n"
+            "I only use it to help you, and you can delete it any time.\n"
+            "1 Yes, save it\n2 No, don't save it"
+        ),
+    },
+    "memory.saved": {
+        "es": "Listo, lo guardé.",
+        "en": "Done, I saved it.",
+    },
+    "memory.not_saved": {
+        "es": "De acuerdo, no lo guardé.",
+        "en": "All right, I didn't save it.",
+    },
 }
 
 

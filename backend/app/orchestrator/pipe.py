@@ -3,7 +3,9 @@
 Order per message: user row → media saved → inbound logged → routed. Routing order:
 a reply to an ask_user question (the call is waiting), then the language pick, photo
 grouping, a "same letter or new?" answer, an answer to research's question about the
-letter (C39), an answer to a consent request, or an orchestrator turn.
+letter (C39), an answer to a consent request, an answer to "may I save this?" (C15),
+or an orchestrator turn. After a turn, if no other numbered question is open, the
+user is asked about facts waiting for their OK.
 
 One number's messages are routed one at a time, under a per-number lock. An
 orchestrator turn (slow: a Claude call) runs after that lock is released, under a
@@ -23,11 +25,12 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.contracts import MessageDirection, MessageSender
 from app.contracts.common import LanguageCode, MediaId, MessageId, UserId
-from app.db import tables
+from app.db import reads, tables
 from app.db.messages import append_message
 from app.db.writes import orchestrator as writes
 from app.orchestrator.call_status import get_call_status
 from app.orchestrator.consent import ConsentGate
+from app.orchestrator.fact_consent import FactConsent
 from app.orchestrator.job_watch import get_job_watcher
 from app.orchestrator.language import (
     LanguageStep,
@@ -87,10 +90,12 @@ class InboundPipe:
         to_english: ToEnglish | None = None,
         turn: TurnRunner | None = None,
         consent: ConsentGate | None = None,
+        fact_consent: FactConsent | None = None,
     ) -> None:
         """Without `to_english`, non-English messages are logged with no `body_en`;
         without `turn`, free text is echoed (no Anthropic key); without `consent`,
-        nothing is routed to a consent request."""
+        nothing is routed to a consent request; without `fact_consent`, pending
+        facts are never asked about."""
         self._whatsapp = whatsapp
         self._detect = detect
         self._ask_user = ask_user
@@ -98,6 +103,7 @@ class InboundPipe:
         self._to_english = to_english
         self._turn = turn
         self._consent = consent
+        self._fact_consent = fact_consent
         self.photos = PhotoBatcher(self._letter_ready, quiet_window_s)
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self._turn_locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
@@ -166,6 +172,8 @@ class InboundPipe:
             await self._letter_answer(user, message, inbound)
         elif self._consent is not None and self._consent.pending(user.id) is not None:
             return await self._consent_answer(user, message, inbound)
+        elif self._fact_consent is not None and self._fact_consent.pending(user.id):
+            return await self._fact_consent_answer(user, message, inbound)
         else:
             return partial(self._orchestrator_turn, user, message, inbound.id)
         return None
@@ -328,6 +336,36 @@ class InboundPipe:
             await send_template(self._whatsapp, user, "consent.reprompt")
         return None
 
+    async def _fact_consent_answer(
+        self, user: tables.User, message: InboundMessage, inbound: tables.Message
+    ) -> Turn | None:
+        """A 1/yes or 2/no answers "may I save this?"; anything else closes the
+        question unanswered (the facts stay pending) and goes to the turn."""
+        assert self._fact_consent is not None
+        choice = parse_yes_no(message.text) if message.text else None
+        if choice is not None:
+            await self._fact_consent.answer(user, choice)
+            return None
+        self._fact_consent.drop(user.id)
+        return partial(self._orchestrator_turn, user, message, inbound.id)
+
+    async def _ask_about_facts(self, user_id: UserId) -> None:
+        """C15: after a turn, ask about facts waiting for the user's OK, unless
+        another numbered question is open (its "1" must not be read as this one's)."""
+        if self._fact_consent is None:
+            return
+        if (
+            (self._consent is not None and self._consent.pending(user_id) is not None)
+            or self.photos.pending(user_id) is not None
+            or self.letters.question_pending(user_id)
+            or await self._ask_user.question_for_reply(user_id) is not None
+        ):
+            return
+        # Re-read: the turn may have switched the user's language.
+        user = await reads.get_user(user_id)
+        if user is not None:
+            await self._fact_consent.ask(user)
+
     async def _letter_ready(self, user_id: UserId, media_ids: list[MediaId]) -> None:
         document = await writes.create_document(user_id, media_ids)
         logger.info(
@@ -354,6 +392,7 @@ class InboundPipe:
                 same_or_new_pending=same_or_new_pending,
                 consent_pending=consent_pending,
             )
+            await self._ask_about_facts(user.id)
         elif message.text:
             # No Anthropic key: echo, so the pipe can still be tried on a phone.
             await send_text(self._whatsapp, user, f"Echo: {message.text}")
@@ -394,6 +433,7 @@ def get_pipe() -> InboundPipe:
         to_english=translator.to_english,
         turn=turn.run,
         consent=consent,
+        fact_consent=FactConsent(whatsapp, translator),
     )
 
 

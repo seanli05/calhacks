@@ -79,6 +79,8 @@ class Settings(BaseSettings):
 
     # Run the research agent's job worker in this process (needs ANTHROPIC_API_KEY).
     research_worker: bool = True
+    # Run the memory writer's job worker in this process (needs ANTHROPIC_API_KEY).
+    memory_worker: bool = True
 
     @field_validator("demo_dial_number")
     @classmethod

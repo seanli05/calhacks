@@ -13,6 +13,7 @@ from app.contracts import (
     Component,
     Event,
     EventType,
+    FactSource,
     FactStatus,
     FastResult,
     FastResultStatus,
@@ -22,6 +23,7 @@ from app.contracts import (
     MessageDirection,
     MessageSender,
     QuestionStatus,
+    Sensitivity,
     Verification,
     VerificationStatus,
 )
@@ -347,6 +349,49 @@ class FakeDB:
             for f in self.facts
             if f.user_id == user_id and (statuses is None or f.status in statuses)
         ]
+
+    # Memory writer: facts and profile
+
+    async def add_fact(
+        self,
+        user_id: str,
+        fact: str,
+        category: str,
+        source: FactSource,
+        sensitivity: Sensitivity,
+        status: FactStatus,
+        source_ref: str | None = None,
+        supersedes: str | None = None,
+    ) -> tables.Fact:
+        row = tables.Fact(
+            user_id=user_id,
+            fact=fact,
+            category=category,
+            source=source,
+            sensitivity=sensitivity,
+            status=status,
+            source_ref=source_ref,
+            supersedes=supersedes,
+        )
+        self.facts.append(row)
+        return row
+
+    async def set_fact_status(self, fact_id: str, status: FactStatus) -> tables.Fact:
+        fact = next(f for f in self.facts if f.id == fact_id)
+        fact.status = status
+        return fact
+
+    async def delete_fact(self, fact_id: str) -> None:
+        self.facts = [f for f in self.facts if f.id != fact_id]
+
+    async def upsert_profile(
+        self, user_id: str, fields: dict[str, Any]
+    ) -> tables.Profile:
+        profile = self.profiles.setdefault(
+            user_id, tables.Profile(user_id=user_id, fields={})
+        )
+        profile.fields = {**profile.fields, **fields}
+        return profile
 
     def outbound_templates(self) -> list[str | None]:
         return [m.template for m in self.messages if m.direction == "out"]
