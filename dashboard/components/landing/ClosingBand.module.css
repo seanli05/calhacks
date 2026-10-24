@@ -1,23 +1,21 @@
+/* The painting has rounded corners baked in, so it sits inset rather than full-bleed. */
 .band {
-  background: var(--forest);
-  color: #fff;
-}
-
-.inner {
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: clamp(64px, 11vh, 128px) max(20px, env(safe-area-inset-right, 0px)) 120px
-    max(20px, env(safe-area-inset-left, 0px));
+  aspect-ratio: 2048 / 914;
+  min-height: 560px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 48px;
+  align-items: start;
+  gap: 40px;
+  padding: clamp(36px, 4.5vw, 80px);
+  background: url("/landing/mountains.avif") center / cover no-repeat;
+  border-radius: 14px;
+  overflow: hidden;
 }
 
 .copy {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
 }
 
 .title {
@@ -26,21 +24,43 @@
   font-weight: 650;
   line-height: 1.02;
   letter-spacing: -0.035em;
+  color: var(--ink);
   text-wrap: balance;
-}
-
-.mark {
-  color: var(--forest);
 }
 
 .sub {
   margin: 0;
+  align-self: flex-start;
+  padding: 6px 12px;
   font-size: var(--fs-xl);
-  color: #cfe3d8;
+  background: rgba(255, 254, 250, 0.82);
+  color: var(--ink);
 }
 
-@media (max-width: 900px) {
-  .inner {
+/* A paper card so the QR and buttons stay legible over the sky. */
+.cta {
+  padding: 26px;
+  background: rgba(255, 254, 250, 0.92);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+}
+
+@media (max-width: 1100px) {
+  .band {
+    aspect-ratio: auto;
     grid-template-columns: minmax(0, 1fr);
+    align-content: space-between;
+  }
+}
+
+@media (max-width: 640px) {
+  .band {
+    min-height: 520px;
+    padding: 28px 18px 18px;
+    border-radius: 10px;
+  }
+
+  .cta {
+    padding: 18px;
   }
 }

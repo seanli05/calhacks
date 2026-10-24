@@ -10,6 +10,7 @@ export interface TryLinks {
   joinMessage: string | null;
   /** The seeded user's newest case, or their case list. */
   demoHref: string | null;
+  memoryHref: string | null;
 }
 
 /** Where the landing CTAs point. Config and the demo user change rarely, so poll slowly. */
@@ -20,5 +21,6 @@ export function useTryLinks(): TryLinks {
     join: config ? waLink(config.whatsapp_number, config.sandbox_join_message ?? "") : null,
     joinMessage: config?.sandbox_join_message ?? null,
     demoHref: demo ? (demo.case_id ? `/u/${demo.user_id}/cases/${demo.case_id}` : `/u/${demo.user_id}`) : null,
+    memoryHref: demo ? `/u/${demo.user_id}/memory` : null,
   };
 }

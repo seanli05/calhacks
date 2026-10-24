@@ -27,41 +27,91 @@ export const landing = {
     ago: (min: number) => (min === 0 ? "now" : `${min} min ago`),
   },
 
-  features: {
+  /** The strip under the hero, like a spec sheet for every call. */
+  ticker: {
+    label: "On every call",
+    items: [
+      { k: "Number dialed", v: "verified on uscis.gov" },
+      { k: "Phone menu", v: "we get through it" },
+      { k: "Time on hold", v: "ours, not yours" },
+      { k: "Your OK", v: "asked first, every time" },
+      { k: "Your A-Number", v: "never said" },
+      { k: "Languages", v: "Español · English" },
+    ],
+  },
+
+  bento: {
+    title: ["Everything a letter asks of you.", "Handled on WhatsApp."],
     explain: {
-      kicker: "1 · Send a photo",
-      title: "Every letter, in words you know.",
-      body: "Send a photo of your letter on WhatsApp. We tell you what it is, what you need to do, and by when, in your language.",
+      lead: "Your letter, explained",
+      rest: " in your language: the date, the place, and what to bring.",
       docType: "Asylum interview notice",
-      bubble: "This is your asylum interview. It's on Thursday, November 12, at 9:00 AM. Bring your passport and an interpreter.",
+      bubble: "This is your asylum interview: Thursday, November 12, at 9:00 AM. Bring your passport and an interpreter.",
+      ask: "Want us to call USCIS for you?",
+      yes: "Yes, please",
     },
     verify: {
-      kicker: "2 · We check it's real",
-      title: "Scams copy real letters. We check.",
-      body: "We compare the letter with official sources. When we call, we use the number from the agency's own website, never the one printed on the letter.",
-      real: "This letter is real",
-      official: "Official number, from uscis.gov",
-      officialNote: "We call this one",
-      printed: "Number printed on the letter",
-      printedNote: "Never dialed",
+      lead: "Checked against USCIS",
+      rest: " before we trust a single line.",
+      verdict: "This letter is real",
+      checks: [
+        "Form I-797C, current edition",
+        "Every link is on uscis.gov",
+        "Receipt number has the right format",
+        "No payment demands or threats",
+      ],
+      official: "Official number found on uscis.gov",
+    },
+    menu: {
+      lead: "Phone menus,",
+      rest: " handled. We press the right buttons.",
+      options: [
+        { key: "1", text: "Case status" },
+        { key: "2", text: "Speak with a representative" },
+        { key: "3", text: "Change of address" },
+      ],
+      chosen: 1,
     },
     hold: {
-      kicker: "3 · We wait on hold",
-      title: "Hours on hold. Not yours.",
-      body: "We call the agency, get through the menu, and wait. When a real person picks up, your phone rings and you join the call.",
-      waited: "We waited",
+      lead: "We wait on hold.",
+      rest: " You get on with your day.",
+      onHold: "on hold",
+    },
+    ring: {
+      lead: "Your phone rings",
+      rest: " the moment a person picks up.",
       answered: "A person answered",
-      ringing: "Your phone is ringing",
+      calling: "Calling you now",
+      cta: "Watch a live call",
+    },
+    prep: {
+      lead: "Ready for the interview.",
+      rest: " Key English words and what to bring.",
+      countdown: (days: number) => `Your interview is in ${days} days`,
+      words: [
+        { term: "interpreter", meaning: "someone who translates for you" },
+        { term: "receipt notice", meaning: "the letter that proves we got your form" },
+      ],
+      checklist: ["Bring your passport", "Bring an interpreter", "Your spouse and children must come"],
+    },
+    memory: {
+      lead: "Your data, your call.",
+      rest: " See what we know. Delete anything.",
+      facts: ["Prefers Spanish", "Has two children", "Interview on Nov 12"],
+      delete: "Delete",
+      deleted: "(deleted)",
+      cta: "What we know about you",
     },
   },
 
   promises: {
     title: "What we'll never do.",
+    sub: "These are rules in our code, not settings.",
     items: [
-      { title: "Call a number from your letter", body: "Only the official number from the agency's own site." },
-      { title: "Speak for you", body: "When they ask who you are, you answer. Not us." },
-      { title: "Call without your OK", body: "We ask first, every time, and keep your answer." },
-      { title: "Keep what you want gone", body: "See everything we know about you. Delete it in one tap." },
+      { title: "Dial a number we haven't checked", body: "Only the official number, found on the agency's own site." },
+      { title: "Speak for you", body: "We never say your A-Number, receipt number or birth date. You answer for yourself." },
+      { title: "Call without your OK", body: "We ask before every call and keep your answer." },
+      { title: "Keep what you delete", body: "Delete anything, or everything, any time." },
     ],
   },
 

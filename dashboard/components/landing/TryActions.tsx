@@ -16,10 +16,10 @@ const QR_FG = "#0e3b2c";
  * "Try it on WhatsApp" + "Watch a live call", and the QR for judges scanning the
  * screen. The QR is hidden on phones, where the button does the same thing.
  */
-export function TryActions({ links, qrSize, onDark = false }: { links: TryLinks; qrSize: number; onDark?: boolean }) {
+export function TryActions({ links, qrSize }: { links: TryLinks; qrSize: number }) {
   const t = useStrings().landing;
   return (
-    <div className={`${styles.actions} ${onDark ? styles.dark : ""}`}>
+    <div className={styles.actions}>
       <div className={styles.buttons}>
         {links.join && (
           <a href={links.join} className={`btn primary ${styles.big}`} target="_blank" rel="noreferrer">

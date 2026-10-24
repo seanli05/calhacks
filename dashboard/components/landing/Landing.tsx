@@ -3,17 +3,18 @@
 import { Header } from "@/components/Header";
 import { useStrings } from "@/lib/i18n";
 
+import { Bento } from "./Bento";
 import { ClosingBand } from "./ClosingBand";
-import { FeatureRows } from "./FeatureRows";
 import { LiveCallDemo } from "./LiveCallDemo";
 import { Promises } from "./Promises";
+import { Ticker } from "./Ticker";
 import { TryActions } from "./TryActions";
 import { useTryLinks } from "./useTryLinks";
 import styles from "./Landing.module.css";
 
 /**
- * The page judges see first. Hero with a looping call, the three steps as feature
- * rows, our promises, and a closing band; both CTAs open WhatsApp or the live case.
+ * The page judges see first: a hero with a looping call, a ticker of what every call
+ * guarantees, a bento of the product, our promises, and the ask again over a painting.
  */
 export function Landing() {
   const t = useStrings().landing;
@@ -25,28 +26,33 @@ export function Landing() {
         <Header />
       </div>
       <main>
-        <section className={`${styles.wrap} ${styles.hero}`}>
-          <div className={styles.copy}>
-            <h1 className={styles.headline}>
-              <span>{t.headline[0]}</span> <span className="mark">{t.headline[1]}</span>
-            </h1>
-            <p className={styles.sub}>{t.sub}</p>
-            <TryActions links={links} qrSize={112} />
-          </div>
-          <div className={styles.demo}>
-            <LiveCallDemo />
-          </div>
-        </section>
+        <div className={styles.wrap}>
+          <section className={styles.hero}>
+            <div className={styles.copy}>
+              <h1 className={styles.headline}>
+                <span>{t.headline[0]}</span> <span className="mark">{t.headline[1]}</span>
+              </h1>
+              <p className={styles.sub}>{t.sub}</p>
+              <TryActions links={links} qrSize={112} />
+            </div>
+            <div className={styles.demo}>
+              <LiveCallDemo />
+            </div>
+          </section>
+          <Ticker />
+        </div>
 
         <div className={`${styles.wrap} ${styles.section}`}>
-          <FeatureRows />
+          <Bento links={links} />
         </div>
 
         <div className={`${styles.wrap} ${styles.section}`}>
           <Promises />
         </div>
 
-        <ClosingBand links={links} />
+        <div className={`${styles.wrap} ${styles.closing}`}>
+          <ClosingBand links={links} />
+        </div>
       </main>
     </div>
   );

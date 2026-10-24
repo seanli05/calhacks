@@ -9,7 +9,10 @@ export function Promises() {
   const t = useStrings().landing.promises;
   return (
     <section className={styles.band}>
-      <h2 className={styles.title}>{t.title}</h2>
+      <div className={styles.head}>
+        <h2 className={styles.title}>{t.title}</h2>
+        <p className={styles.sub}>{t.sub}</p>
+      </div>
       <ol className={styles.grid}>
         {t.items.map((item, i) => (
           <li key={i} className={styles.item}>
