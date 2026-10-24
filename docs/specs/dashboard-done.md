@@ -8,7 +8,7 @@ Every page and every API route is built and on `main`. This is the non-design wo
 
 - [ ] **1. Verify the API fixes.** The speed fix (concurrent reads) and the Spanish stand-in for seeded text (`backend/app/api/stand_in_es.py`) landed in `d83c8be` and `cf6aac3`. Check on the shared database with `NEXT_PUBLIC_DATA=live`: the case view updates within about a second, and the Spanish screens show no English except the muted lines under each item. `GET /api/cases/{id}` took about 4.2s before the fix and about 1.9s after it, measured on 2026-10-24. Each DB read costs about 375ms against Neon in `us-east-2`. Then `engine.py` dropped `pool_pre_ping`, recycled connections at 240s (under Neon's 5-minute suspend) and grew the pool to 20: warm, the case page is about 1.0s, the case list about 1.0s, the feed about 0.6s and the memory page about 0.46s (2026-10-24). Speed is done. What's left is checking the Spanish screens by eye.
 - [ ] **2. Make live data the default.** `dashboard/lib/api/client.ts` still serves fixtures unless `NEXT_PUBLIC_DATA=live`. Flip the default to live, keep `NEXT_PUBLIC_DATA=fixtures` for building pages without the backend, and update `dashboard/.env.example`, [dashboard-build.md](dashboard-build.md) and the README.
-- [ ] **3. Deployment (task step 5).** Write the exact commands in the README:
+- [x] **3. Deployment (task step 5).** Done: README → "Deploying for the demo". It covers:
   - `ngrok http 8000`, with a reserved ngrok domain if the account has one, so webhook URLs survive restarts;
   - `PUBLIC_BASE_URL`, and pointing the WhatsApp sandbox and the voice webhooks at it;
   - the dashboard on the recording laptop: `NEXT_PUBLIC_DATA=live npm run build && npm start`. It doesn't need to be public.

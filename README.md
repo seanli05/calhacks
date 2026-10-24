@@ -108,6 +108,38 @@ The webhook returns empty TwiML at once and handles the message in a background 
 
 Reply templates live in `relay/templates.py` (`en` and `es`). Status, interfaces (ask_user, call status), decisions, and open concerns for the WhatsApp side: [docs/whatsapp-pipe.md](docs/whatsapp-pipe.md). To see ask_user and the call-status messages on your phone without the phone agent, set `DEV_ENDPOINTS=true` and use `POST /dev/fake-call` (local only; steps in that doc).
 
+### Deploying for the demo
+
+Everything runs on one laptop (the one recording the video). Only the backend is public, through ngrok, so Twilio can reach it. The dashboard stays on `localhost`.
+
+1. **A fixed public URL.** Every free ngrok account gets one static domain (ngrok dashboard → **Domains**). Using it means the Twilio webhook URLs survive ngrok restarts:
+
+   ```bash
+   ngrok http --url=<your-name>.ngrok-free.app 8000
+   ```
+
+   Without a static domain, use `ngrok http 8000` and redo steps 2 and 3 every time ngrok restarts.
+2. **Point the backend at it.** In `.env`, set `PUBLIC_BASE_URL=https://<your-name>.ngrok-free.app` (no trailing slash). Keep `DEV_ENDPOINTS=false`. Then start the backend without `--reload`, as one process:
+
+   ```bash
+   uvicorn app.main:app --app-dir backend --port 8000
+   ```
+
+3. **Point Twilio at it.**
+   - WhatsApp: in the sandbox settings, set **When a message comes in** to `https://<your-name>.ngrok-free.app/whatsapp`, method POST (details in the WhatsApp steps above).
+   - Voice: the phone agent passes its webhook URLs, built from `PUBLIC_BASE_URL`, when it places each call, so the agent number shouldn't need a console setting. Person 4 confirms this when `phone/` lands.
+4. **Reset the shared database** to the seeded demo case (ask the team first; it wipes everyone's data): `cd backend && python -m app.db.reset --yes`.
+5. **Run the dashboard** as a production build on live data:
+
+   ```bash
+   cd dashboard && npm install
+   NEXT_PUBLIC_DATA=live npm run build && npm start   # http://localhost:3000
+   ```
+
+   `NEXT_PUBLIC_DATA` is baked in at build time, so rebuild after changing it. Open `http://localhost:3000`, follow the demo link to the case page, and record at 1920×1080.
+
+Checks before recording: `http://localhost:8000/health` and `https://<your-name>.ngrok-free.app/health` both answer, a WhatsApp message to the sandbox shows up in the ngrok inspector (http://127.0.0.1:4040), and your phone joined the sandbox within the last 3 days.
+
 ## Repo layout
 
 | Path | What | Owner |
