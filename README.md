@@ -5,7 +5,7 @@
 A WhatsApp agent that helps immigrant families deal with immigration letters, starting with the USCIS I-797C asylum interview notice. Send a photo of a letter, and the agent:
 
 1. explains it in your language: what it is, the deadline, and what's being asked;
-2. checks that it's legitimate by comparing the letter's phone number with the agency's official one;
+2. checks that it's legitimate against the agency's official site (form, links, receipt number format, official phone number);
 3. with your consent, calls the agency, navigates the phone menu, and waits on hold;
 4. rings your phone when a human picks up, then sends a summary on WhatsApp afterward.
 
@@ -38,10 +38,30 @@ You'll need:
 - Anthropic and Cartesia API keys
 - Twilio credentials, an agent number, and a mock agency number
 - Your phone joined to the Twilio WhatsApp sandbox (the session expires 3 days after joining, so re-join before the demo)
-- A local Postgres database (set `DATABASE_URL`)
+- The team's shared hosted Postgres URL (set `DATABASE_URL`; ask person 1)
 - ngrok for public webhook URLs (set `PUBLIC_BASE_URL`)
 
-Run commands for each service will be added here as they land.
+Run the backend (from the repo root, with the venv active):
+
+```bash
+uvicorn app.main:app --app-dir backend --reload   # http://localhost:8000/health
+```
+
+## Repo layout
+
+| Path | What | Owner |
+| --- | --- | --- |
+| `Plan.md` | The spec: source of truth | Team |
+| `backend/app/main.py`, `settings.py` | FastAPI app and the single settings object | 1 |
+| `backend/app/db/`, `api/` | Tables, DB helpers, dashboard API | 1 |
+| `backend/app/contracts/` | Shared Pydantic payloads (jobs, results, events) | Team |
+| `backend/app/orchestrator/`, `relay/`, `memory/`, `translation/` | WhatsApp side | 2 |
+| `backend/app/research/`, `glossary/` | Letter → case brief | 3 |
+| `backend/app/phone/` | The call | 4 |
+| `backend/tests/` | Backend tests | Everyone |
+| `dashboard/` | Next.js dashboard (coming) | 1 |
+| `mock_agency/` | Mock USCIS line on Cartesia; deploys on its own | 3 |
+| `docs/specs/` | Build specs that implement Plan.md | Spec owner |
 
 ## Development
 

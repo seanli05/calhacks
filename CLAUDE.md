@@ -44,7 +44,9 @@ Every change must keep these true. If one would be broken, stop and raise it wit
 - Agents talk to each other through `jobs` and `events` in Postgres, passing IDs and short fields. Don't import another component's internals or call its functions directly.
 
 ### Ownership and boundaries
-- Each person owns one area (see the spec's team split). Work mainly in your own package. If you need to change someone else's code, tell them first.
+- Each person owns one area (see the spec's team split). Work mainly in your own package.
+- Layout: all Python runs in one FastAPI app under `backend/app/`. Each component has its own package there (`orchestrator/`, `relay/`, `memory/`, `translation/`, `research/`, `glossary/`, `phone/`, `db/`, `api/`), with its owner in the package docstring. Shared payloads live in `backend/app/contracts/`. The dashboard goes in `dashboard/`; `mock_agency/` deploys on its own and imports nothing from the backend.
+- Build specs (columns, helper signatures, API shapes) live in `docs/specs/`. They implement Plan.md; they don't change it. If you need to change someone else's code, tell them first.
 - Keep modules small with one job each. If a file is growing past a few hundred lines or doing two things, split it.
 - Database access goes through shared DB helpers, not raw SQL scattered across agents.
 
