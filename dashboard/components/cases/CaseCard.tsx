@@ -70,7 +70,8 @@ export function CaseCard({ userId, summary }: { userId: string; summary: CaseSum
             <span className={styles.k}>{t.appointment}</span>
             <span>
               <b>
-                {longDate(appt.date, lang)}, {clockTime(appt.time, lang)}
+                {longDate(appt.date, lang)}
+                {appt.time && `, ${clockTime(appt.time, lang)}`}
               </b>{" "}
               · {countdown(appt.date, lang, now)}
               {appt.location && <span className={styles.loc}>{appt.location}</span>}

@@ -27,6 +27,10 @@ export const caseView = {
       title: "We need a clearer photo",
       sub: "Send another photo on WhatsApp, in good light, with the whole page.",
     },
+    needs_answer: {
+      title: "We need one answer from you",
+      sub: "Check WhatsApp: we asked you a question about your letter.",
+    },
     checking: {
       title: "Checking the letter is real",
       sub: "We compare it with official sources before calling anyone.",

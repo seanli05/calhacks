@@ -16,6 +16,7 @@ export const common = {
     received: "Letter received",
     explaining: "Reading your letter",
     needs_better_image: "Needs a clearer photo",
+    needs_answer: "Needs one answer",
     checking: "Checking it's real",
     suspicious: "Might not be real",
     unknown: "Couldn't confirm",

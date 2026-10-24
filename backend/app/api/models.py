@@ -55,7 +55,7 @@ class FeedItem(BaseModel):
 
 class Appointment(BaseModel):
     date: dt.date
-    time: str
+    time: str | None
     location: str | None
 
 

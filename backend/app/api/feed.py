@@ -30,6 +30,7 @@ async def feed(
     lang, events = await asyncio.gather(
         resolve_language(user_id, lang), reads.list_events(user_id, since)
     )
+    events = [e for e in events if e.type not in feed_templates.HIDDEN]
     if not events:
         return []
     refs = _References()

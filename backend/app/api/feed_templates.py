@@ -33,6 +33,11 @@ from string import Formatter
 
 Variants = dict[str, list[str]]
 
+HIDDEN: frozenset[str] = frozenset(
+    {"research.search", "research.fetch", "research.check"}
+)
+"""The deep pass's step log: many per check, for debugging, never in the feed."""
+
 TEMPLATES: dict[str, Variants] = {
     "case.created": {
         "en": ["We received your letter"],
@@ -61,6 +66,34 @@ TEMPLATES: dict[str, Variants] = {
     "research.deep_done": {
         "en": ["We finished checking your letter"],
         "es": ["Terminamos de revisar tu carta"],
+    },
+    "research.fast_slow": {
+        "en": ["Still reading your letter"],
+        "es": ["Seguimos leyendo tu carta"],
+    },
+    "research.fast_failed": {
+        "en": ["We couldn't finish reading your letter"],
+        "es": ["No pudimos terminar de leer tu carta"],
+    },
+    "research.deep_failed": {
+        "en": ["We couldn't finish checking your letter"],
+        "es": ["No pudimos terminar de revisar tu carta"],
+    },
+    "research.needs_user_input": {
+        "en": ["We need one answer from you"],
+        "es": ["Necesitamos una respuesta tuya"],
+    },
+    "research.question_started": {
+        "en": ["Looking up your question"],
+        "es": ["Estamos buscando la respuesta a tu pregunta"],
+    },
+    "research.question_done": {
+        "en": ["We found an answer to your question"],
+        "es": ["Encontramos una respuesta a tu pregunta"],
+    },
+    "research.question_failed": {
+        "en": ["We couldn't find an official answer"],
+        "es": ["No encontramos una respuesta oficial"],
     },
     "verification.verified": {
         "en": [

@@ -16,6 +16,7 @@ export const common: CommonStrings = {
     received: "Carta recibida",
     explaining: "Leyendo tu carta",
     needs_better_image: "Necesitamos otra foto",
+    needs_answer: "Falta una respuesta",
     checking: "Verificando la carta",
     suspicious: "Podría no ser real",
     unknown: "No pudimos confirmarla",

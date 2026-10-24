@@ -28,6 +28,10 @@ export const caseView: CaseStrings = {
       title: "Necesitamos una foto más clara",
       sub: "Manda otra foto por WhatsApp, con buena luz y la página completa.",
     },
+    needs_answer: {
+      title: "Necesitamos una respuesta tuya",
+      sub: "Revisa WhatsApp: te hicimos una pregunta sobre tu carta.",
+    },
     checking: {
       title: "Verificando que la carta es real",
       sub: "La comparamos con fuentes oficiales antes de llamar a nadie.",

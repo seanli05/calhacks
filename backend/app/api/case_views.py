@@ -29,10 +29,12 @@ def fast_result_of(case: tables.Case) -> FastResult | None:
 async def appointment_of(case_id: str, fast: FastResult | None) -> Appointment | None:
     if fast is None or fast.appointment is None:
         return None
-    try:
-        location = await reads.resolve_ref(case_id, fast.appointment.location_ref)
-    except NotFound:
-        location = None
+    location = None
+    if fast.appointment.location_ref:
+        try:
+            location = await reads.resolve_ref(case_id, fast.appointment.location_ref)
+        except NotFound:
+            location = None
     return Appointment(
         date=fast.appointment.date, time=fast.appointment.time, location=location
     )

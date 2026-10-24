@@ -25,6 +25,7 @@ export type CaseStage =
   | "received"
   | "explaining"
   | "needs_better_image"
+  | "needs_answer"
   | "checking"
   | "suspicious"
   | "unknown"
@@ -99,8 +100,8 @@ export interface CaseSummary {
 
 export interface Appointment {
   date: string;
-  /** Local time at the location, "HH:MM". */
-  time: string;
+  /** Local time at the location, "HH:MM"; null when the letter gives only a date. */
+  time: string | null;
   /** The office (not an identifier, so shown in full). */
   location: string | null;
 }

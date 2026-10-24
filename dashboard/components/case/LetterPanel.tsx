@@ -86,7 +86,8 @@ export function LetterPanel({ detail }: { detail: CaseDetail }) {
             <p>
               You are scheduled for an interview on{" "}
               <span className="mark">
-                {longDate(appt.date, "en")} at {clockTime(appt.time, "en")}
+                {longDate(appt.date, "en")}
+                {appt.time && ` at ${clockTime(appt.time, "en")}`}
               </span>
               <span className="pin">1</span>
               {appt.location && (
@@ -118,7 +119,8 @@ export function LetterPanel({ detail }: { detail: CaseDetail }) {
             <span>
               <span className={styles.fk}>{t.when}</span>
               <span className={styles.fv}>
-                {longDate(appt.date, lang)}, {clockTime(appt.time, lang)}
+                {longDate(appt.date, lang)}
+                {appt.time && `, ${clockTime(appt.time, lang)}`}
               </span>
             </span>
           </li>

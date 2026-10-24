@@ -2,13 +2,14 @@ import type { CaseStage, CallState } from "./api/types";
 
 /**
  * The five-step tracker (Letter → Verified → Calling → On hold → Person) collapses
- * the 12 case stages. Returns the index of the current step; 5 means all done.
+ * the 13 case stages. Returns the index of the current step; 5 means all done.
  */
 export function trackerIndex(stage: CaseStage): number {
   switch (stage) {
     case "received":
     case "explaining":
     case "needs_better_image":
+    case "needs_answer":
       return 0;
     case "checking":
     case "suspicious":
@@ -45,6 +46,7 @@ export function isHumanMoment(callState: CallState | null | undefined): boolean 
 /** Stages that are a warning about the letter itself. */
 export function isWarning(stage: CaseStage): "bad" | "warn" | null {
   if (stage === "suspicious") return "bad";
-  if (stage === "unknown" || stage === "needs_better_image") return "warn";
+  if (stage === "unknown" || stage === "needs_better_image" || stage === "needs_answer")
+    return "warn";
   return null;
 }

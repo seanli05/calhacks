@@ -127,3 +127,25 @@ def test_since_is_exclusive(monkeypatch: pytest.MonkeyPatch) -> None:
     client = _serve(monkeypatch, events)
     since = events[0].created_at.isoformat().replace("+00:00", "Z")
     assert [i["id"] for i in _texts(client, f"?since={since}")] == [events[1].event_id]
+
+
+def test_research_step_log_is_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
+    events = [
+        _event(EventType.RESEARCH_DEEP_STARTED),
+        _event(EventType.RESEARCH_SEARCH),
+        _event(EventType.RESEARCH_FETCH),
+        _event(EventType.RESEARCH_CHECK),
+        _event(EventType.RESEARCH_DEEP_DONE),
+    ]
+    client = _serve(monkeypatch, events)
+    assert [item["type"] for item in _texts(client)] == [
+        "research.deep_started",
+        "research.deep_done",
+    ]
+
+
+def test_every_research_type_is_templated_or_hidden() -> None:
+    from app.api.feed_templates import HIDDEN
+
+    research = {t for t in EventType if t.startswith("research.")}
+    assert research <= set(TEMPLATES) | HIDDEN
