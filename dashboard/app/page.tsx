@@ -1,6 +1,5 @@
-import { Placeholder } from "@/components/Placeholder";
-import { FIXTURE_USER_ID } from "@/lib/api/fixtures";
+import { Landing } from "@/components/landing/Landing";
 
 export default function LandingPage() {
-  return <Placeholder userId={FIXTURE_USER_ID} title="Landing" />;
+  return <Landing />;
 }
