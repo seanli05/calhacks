@@ -84,7 +84,7 @@ def demo_fast_result(case_id: str) -> dict:
         ],
         "explanation_en": "This is a notice from USCIS scheduling your asylum interview.",
         "urgency": "high",
-        "verification": "verified",
+        "verification": "pending",
         "proposed_facts": [],
     }
 
