@@ -84,7 +84,7 @@ The **call panel** at the top of the case view is driven by the `calls` row and 
 
 **After the call:**
 - `save_transcript(call_id, lines)`: each line `{"at", "speaker": "agent" | "agency" | "user", "text"}`. Any other speaker breaks the transcript sheet.
-- `save_call_report(call_id, report)`: `outcome`, `next_steps_en` (English list, shown as checkmarks), `reference_number`, `transcript_id`. The panel switches to the report at `ended`.
+- `save_call_report(call_id, report)`: `outcome`, `summary_en` (shown above the steps), `next_steps_en` (English list, shown as checkmarks), `reference_number`, `transcript_id`. The panel switches to the report at `ended`.
 - `set_call_state(..., ENDED)` sets `ended_at`.
 
 ## Check your work against the dashboard

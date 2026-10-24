@@ -107,6 +107,12 @@ export function CallHero({ detail, onOpenTranscript }: { detail: CaseDetail; onO
 
       {report && (
         <>
+          {report.summary && (
+            <p className={styles.summary}>
+              {report.summary.text}
+              {englishBelow(report.summary, lang) && <small>{report.summary.en}</small>}
+            </p>
+          )}
           <ul className={styles.list}>
             {report.next_steps.map((step, i) => (
               <li key={i}>

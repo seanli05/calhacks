@@ -132,6 +132,8 @@ export interface BriefInfo {
 
 export interface CallReportInfo {
   outcome: CallOutcome;
+  /** How the call went; null when the call never reached a person. */
+  summary: Localized | null;
   reference_number: string | null;
   rep_name: string | null;
   next_steps: Localized[];

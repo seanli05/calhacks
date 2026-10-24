@@ -144,6 +144,17 @@
   margin-top: 1px;
 }
 
+.summary {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+
+.summary small {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--h-faint);
+}
+
 .ref {
   margin: 0;
   font-family: var(--font-code);

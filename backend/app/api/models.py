@@ -82,6 +82,9 @@ class BriefInfo(BaseModel):
 
 class CallReportInfo(BaseModel):
     outcome: CallOutcome
+    summary: Localized | None
+    """How the call went, in two or three sentences; None when the call never
+    reached a person."""
     reference_number: str | None
     rep_name: str | None
     next_steps: list[Localized]

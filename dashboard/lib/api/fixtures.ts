@@ -175,6 +175,11 @@ function call(lang: string): CallSummary | null {
     report: ended
       ? {
           outcome: "resolved",
+          summary: L(
+            lang,
+            "El oficial Lee confirmó tu entrevista y explicó que debes llevar tu propio intérprete.",
+            "Officer Lee confirmed your interview and explained that you must bring your own interpreter.",
+          ),
           reference_number: null,
           rep_name: "Officer Lee",
           next_steps: [

@@ -63,6 +63,7 @@ def _report_of(call: tables.Call, lang: str) -> CallReportInfo | None:
         return None
     return CallReportInfo(
         outcome=report.outcome,
+        summary=localize(report.summary_en, lang) if report.summary_en else None,
         reference_number=report.reference_number,
         rep_name=report.rep_name,
         next_steps=[localize(step, lang) for step in report.next_steps_en],
