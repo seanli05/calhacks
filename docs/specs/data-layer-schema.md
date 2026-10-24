@@ -1,6 +1,6 @@
 # Spec: database schema and shared contracts
 
-Owner: person 1 · Status: **draft, not locked** · Implements: Plan.md → Handoffs, Data model and memory
+Owner: person 1 · Status: **locked** (changes go through person 1) · Implements: Plan.md → Handoffs, Data model and memory
 
 This turns Plan.md's table list and payloads into columns and Pydantic models. It doesn't change Plan.md. Where Plan.md left a mechanical detail open, the resolution is listed under [Resolutions](#resolutions).
 
