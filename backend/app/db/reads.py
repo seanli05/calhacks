@@ -320,12 +320,14 @@ async def list_transcripts(
         return [(row[0], row[1]) for row in (await db.execute(query)).all()]
 
 
-async def latest_event(call_id: CallId, event_type: EventType) -> Event | None:
+async def first_event(call_id: CallId, event_type: EventType) -> Event | None:
+    """The call's earliest event of this type. The phone agent repeats some events
+    (`call.on_hold` while it waits), and the first one marks when the state began."""
     async with session() as db:
         query = (
             select(tables.Event)
             .where(tables.Event.call_id == call_id, tables.Event.type == event_type)
-            .order_by(tables.Event.created_at.desc())
+            .order_by(tables.Event.created_at, tables.Event.id)
             .limit(1)
         )
         row = (await db.execute(query)).scalar_one_or_none()

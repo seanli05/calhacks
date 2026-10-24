@@ -42,7 +42,7 @@ Conventions:
 - `refs`: every `case_refs` row except `date_of_birth` and `interview_location`, masked.
 - `verification`: the latest verification. `evidence` and `red_flags` from its `result` JSON (R2 `Verification`); localize `red_flags`.
 - `brief`: the newest brief for the case. The brief JSON is still provisional (`backend/app/contracts/brief.py`), so read `call_goal_en` and `questions_to_ask` defensively and return null fields if they're missing.
-- `calls`: every call for the case, oldest first. `hold_started_at` is the `created_at` of the latest `call.on_hold` event for that call. `report` is from `calls.report` (P3) with `next_steps_en` localized. `transcript_id` is null when no transcript exists.
+- `calls`: every call for the case, oldest first. `hold_started_at` is the `created_at` of the first `call.on_hold` event for that call (the phone agent repeats it while waiting). `report` is from `calls.report` (P3) with `next_steps_en` localized. `transcript_id` is null when no transcript exists.
 
 ### Feed rendering
 
@@ -66,7 +66,7 @@ Skip any rule whose data is missing.
 
 ## New reads (`app.db.reads`)
 
-Same style as the existing ones: one `select`, explicit args, return table rows. Likely: `list_calls(case_id)`, `latest_brief(case_id)`, `list_case_refs(case_id)`, `list_documents(user_id)`, `list_transcripts(user_id)` (join through calls and cases), `first_user()`, `latest_event(call_id, type)`.
+Same style as the existing ones: one `select`, explicit args, return table rows. Likely: `list_calls(case_id)`, `latest_brief(case_id)`, `list_case_refs(case_id)`, `list_documents(user_id)`, `list_transcripts(user_id)` (join through calls and cases), `first_user()`, `first_event(call_id, type)`.
 
 ## Settings
 

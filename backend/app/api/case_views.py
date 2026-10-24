@@ -73,11 +73,11 @@ CallReads = tuple[tables.Call, Event | None, tables.Transcript | None]
 
 
 async def call_reads(call: tables.Call) -> CallReads:
-    """What a call summary needs from the database: the latest hold event and the
+    """What a call summary needs from the database: the first hold event and the
     transcript. Kept apart from `build_call_summary` so it can run before the
     language is known."""
     on_hold, transcript = await asyncio.gather(
-        reads.latest_event(call.id, EventType.CALL_ON_HOLD),
+        reads.first_event(call.id, EventType.CALL_ON_HOLD),
         reads.get_transcript(call.id),
     )
     return call, on_hold, transcript

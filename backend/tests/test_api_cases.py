@@ -86,7 +86,7 @@ def demo_case(monkeypatch: pytest.MonkeyPatch) -> tables.Case:
         ),
         latest_brief=brief,
         list_calls=[call],
-        latest_event=on_hold,
+        first_event=on_hold,
         get_transcript=None,
     )
     return case
