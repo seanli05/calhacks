@@ -55,10 +55,10 @@
   padding-top: clamp(64px, 10vh, 112px);
 }
 
-/* Room below for the fixtures bar. */
+/* The band sits inset by the same gutter on the sides and the bottom. */
 .closing {
   padding-top: clamp(64px, 10vh, 112px);
-  padding-bottom: 96px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
 }
 
 @media (max-width: 1100px) {

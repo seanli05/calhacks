@@ -1,5 +1,7 @@
-/* The painting has rounded corners baked in, so it sits inset rather than full-bleed. */
+/* The painting has rounded corners baked in, so it sits inset rather than full-bleed.
+   A definite width keeps min-height from widening the band through the aspect ratio. */
 .band {
+  width: 100%;
   aspect-ratio: 2048 / 914;
   min-height: 560px;
   display: grid;
