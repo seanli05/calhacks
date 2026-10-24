@@ -96,3 +96,4 @@ Dropped from the starting list: `case number` (USCIS uses receipt number), `good
 - Phase 3 (es): 75 rows, 69 official (USCIS en/es page twins + Judicial Council 2025 glossary), 6 machine. Each official translation checked against the downloaded source text.
 - Phase 4 (fa = Dari): 75 rows, 36 official (USCIS Dari page and flyers, 2 from NYC MOIA's Farsi flyer where Dari is identical), 39 machine. Farsi variant for every row in review_fa.csv (machine rows first). Generator: tools/review_sheet.py.
 - Phase 5 (ne): 75 rows, 8 official (NYC MOIA Immigration Court 101, Nepali; only words that extracted clean), 67 machine. review_ne.csv written.
+- Phase 6 (Tier 2, official only): ps 9 (USCIS Pashto page), vi 9, ru 8, ar 6 (NYC MOIA Immigration Court 101). Russian rows use the dictionary form of inflected source phrases (locator gives the source form). Left out: Punjabi, Urdu, Hindi (see SOURCES.md).
