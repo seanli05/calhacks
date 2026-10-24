@@ -400,3 +400,13 @@ async def test_leak_in_event_raises_before_write() -> None:
         await log.emit(ev.CHECK, "checked", {"note": f"saw {SECRET}"})
     assert SECRET not in str(exc.value)
     assert store.events == []
+
+
+async def test_guard_matches_short_values_only_as_whole_words() -> None:
+    guard = LeakGuard()
+    guard.add(["Ana", 'O"Neil Street 12'])
+
+    guard.check("event", {"summary_en": "Analysis of the notice, Banana"})
+    for leaked in ("Hello Ana.", "hello ANA", {"note": 'at O"Neil Street 12'}):
+        with pytest.raises(LeakDetected):
+            guard.check("event", leaked)

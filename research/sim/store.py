@@ -13,7 +13,12 @@ from pydantic import BaseModel
 from research.models import R1, CaseBrief, LegitimacySignals, Verification
 
 JobType = Literal[
-    "research_fast", "research_deep", "call", "memory_write", "glossary_lookup"
+    "research_fast",
+    "research_deep",
+    "research_question",
+    "call",
+    "memory_write",
+    "glossary_lookup",
 ]
 JobStatus = Literal["queued", "running", "done", "failed"]
 
@@ -81,6 +86,10 @@ class Store(Protocol):
 
     async def insert_case_ref(self, case_id: str, field: str, value: str) -> str:
         """Stores the real value and returns its `<ref:field>` placeholder."""
+        ...
+
+    async def get_case_refs(self, case_id: str) -> dict[str, str]:
+        """Real values for a case, by field. Read only to scrub them from text."""
         ...
 
     async def create_job(

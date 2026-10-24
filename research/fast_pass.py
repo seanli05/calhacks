@@ -53,6 +53,20 @@ SENSITIVE_FIELDS = frozenset(
         "ssn",
     }
 )
+SHORT_VALUE_LEN = 12
+"""Values this short (a first name, a city) match on word boundaries only."""
+# What a sensitive value becomes in prose; other fields get "a private detail".
+DESCRIPTIONS = {
+    "recipient_name": "the person named on the letter",
+    "recipient_address": "your address",
+    "interview_location": "the interview location",
+    "a_number": "your A-Number",
+    "receipt_number": "your receipt number",
+    "case_number": "your case number",
+    "date_of_birth": "your date of birth",
+    "ssn": "your Social Security number",
+}
+PRIVACY_FALLBACK = "Some details of this letter were left out to protect your privacy."
 APPOINTMENT_LOCATION_FIELD = "interview_location"
 CASE_NUMBER_FIELDS = ("receipt_number", "case_number")
 SENSITIVE_CATEGORIES = frozenset({"immigration", "income", "health"})  # C25
@@ -328,13 +342,16 @@ def build_output(
     )
     signals = build_signals(ex, sensitive, profile_county)
 
-    # (c) Leak guard: the last word, after everything above.
+    # (c) Scrub every text field, then the leak guard: the last word, after everything above.
+    r1, signals = scrub_output(r1, signals, sensitive)
+    call_purpose = _scrub(ex.call_purpose, sensitive) if ex.call_purpose else None
+    unknown_terms = [t for t in ex.unknown_terms if not _contains_any(t, sensitive)]
     assert_no_leaks(
         [
             r1.model_dump_json(),
             signals.model_dump_json(),
-            ex.call_purpose or "",
-            *ex.unknown_terms,
+            call_purpose or "",
+            *unknown_terms,
         ],
         sensitive,
         case_id=case_id,
@@ -342,10 +359,73 @@ def build_output(
     return FastPassOutput(
         r1=r1,
         signals=signals,
-        call_purpose=ex.call_purpose,
-        unknown_terms=ex.unknown_terms,
+        call_purpose=call_purpose,
+        unknown_terms=unknown_terms,
         sensitive_values=sensitive,
     )
+
+
+def scrub_output(
+    r1: R1, signals: LegitimacySignals, sensitive: list[SensitiveValue]
+) -> tuple[R1, LegitimacySignals]:
+    """Take every sensitive value out of R1 and the signals, so a letter with personal data still processes.
+
+    Prose fields get the value replaced by a plain description ("your address").
+    Identifier-like fields (fact values, URLs, form IDs, the issuer) and key dates
+    are dropped instead: a description there would be false data, and a date's
+    `iso` would still carry the value. The explanation drops only the sentences
+    that can't be cleaned.
+    """
+
+    def prose(text: str | None) -> str | None:
+        return _scrub(text, sensitive) if text else text
+
+    def ident(text: str | None) -> str | None:
+        return None if text and _contains_any(text, sensitive) else text
+
+    sentences = re.split(r"(?<=[.!?])\s+", r1.explanation_en or "")
+    clean = [s for s in (_scrub(s, sensitive) for s in sentences if s) if s]
+    key_facts = [
+        f if f.ref is not None else f.model_copy(update={"quote": ident(f.quote)})
+        for f in r1.key_facts
+        if f.ref is not None or ident(f.value) is not None
+    ]
+    r1 = r1.model_copy(
+        update={
+            "doc_type": ident(r1.doc_type) or "other_letter",
+            "issuer": ident(r1.issuer),
+            "what_is_asked": prose(r1.what_is_asked),
+            "explanation_en": " ".join(clean) or PRIVACY_FALLBACK,
+            "key_dates": [d for d in r1.key_dates if ident(d.raw) is not None],
+            "checklist_en": [
+                c.model_copy(
+                    update={"item": item, "citation": ident(c.citation) or "the letter"}
+                )
+                for c in r1.checklist_en
+                if (item := prose(c.item))
+            ],
+            "key_facts": key_facts,
+        }
+    )
+    signals = signals.model_copy(
+        update={
+            "letterhead": ident(signals.letterhead),
+            "sub_agency": ident(signals.sub_agency),
+            "county": ident(signals.county),
+            "return_address": ident(signals.return_address),
+            "phones": [
+                p.model_copy(
+                    update={"label": prose(p.label), "quote": prose(p.quote) or ""}
+                )
+                for p in signals.phones
+            ],
+            "urls": [u for u in signals.urls if ident(u)],
+            "form_ids": [f for f in signals.form_ids if ident(f)],
+            "payment_instructions": prose(signals.payment_instructions),
+            "signature_block": prose(signals.signature_block),
+        }
+    )
+    return r1, signals
 
 
 def build_signals(
@@ -470,12 +550,30 @@ def _add_sensitive(sensitive: list[SensitiveValue], field: str, value: str) -> s
     return ref
 
 
+def _value_pattern(value: str) -> re.Pattern[str]:
+    """Case-insensitive; short values only as whole words, so "Ana" doesn't hit "Analysis"."""
+    escaped = re.escape(value)
+    if len(value) <= SHORT_VALUE_LEN:
+        escaped = rf"(?<!\w){escaped}(?!\w)"
+    return re.compile(escaped, re.IGNORECASE)
+
+
+def _scrub(text: str, sensitive: list[SensitiveValue]) -> str | None:
+    """Replace each sensitive value with a description; None if one still shows (e.g. odd spacing)."""
+    for sv in sorted(sensitive, key=lambda s: len(s.value), reverse=True):
+        value = sv.value.strip()
+        if value:
+            description = DESCRIPTIONS.get(sv.field, "a private detail")
+            text = _value_pattern(value).sub(lambda _, d=description: d, text)
+    return None if _contains_any(text, sensitive) else text
+
+
 def _contains(text: str, value: str) -> bool:
-    """Case-insensitive match, plus a spacing-insensitive match for ID-like values."""
+    """Case-insensitive match (whole words for short values), plus a spacing-insensitive match for ID-like values."""
     value = value.strip()
     if not value:
         return False
-    if value.casefold() in text.casefold():
+    if _value_pattern(value).search(text):
         return True
     compact = re.sub(r"[^0-9a-z]", "", value.casefold())
     if len(compact) >= 6 and sum(c.isdigit() for c in compact) >= 4:

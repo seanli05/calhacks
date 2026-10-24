@@ -238,6 +238,48 @@ class ResearchDeepPayload(Contract):
     answers: dict[str, str] = {}
 
 
+QuestionStatus = Literal[
+    "answered",
+    "not_confirmed",
+    "declined_legal_advice",
+    "declined_asylum_claim",
+    "out_of_scope",
+]
+
+
+class ResearchQuestionPayload(Contract):
+    """research_question job payload. The orchestrator sends the question already in English."""
+
+    job: Literal["research_question"] = "research_question"
+    user_id: UserId
+    case_id: CaseId | None = None
+    question_en: str = Field(min_length=1, max_length=2000)
+
+
+class QuestionSource(Contract):
+    """An official page the answer rests on, with a quote code found on that page."""
+
+    url: str
+    quote: str = Field(min_length=1)
+
+
+class QuestionAnswer(Contract):
+    """research_question result. Only `answered` carries an answer, always with sources."""
+
+    status: QuestionStatus
+    answer_en: str | None = None
+    sources: list[QuestionSource] = []
+    reason_en: str | None = None
+
+    @model_validator(mode="after")
+    def _answer_has_sources(self) -> "QuestionAnswer":
+        if self.status == "answered" and not (self.answer_en and self.sources):
+            raise ValueError("an answered question needs answer_en and sources")
+        if self.status != "answered" and (self.answer_en or self.sources):
+            raise ValueError(f"status {self.status} carries no answer or sources")
+        return self
+
+
 # --- Internal to the research agent ---
 
 

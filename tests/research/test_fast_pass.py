@@ -10,6 +10,7 @@ from research.fast_pass import (
     EXTRACTION_SCHEMA,
     FastPassError,
     SensitiveLeak,
+    assert_no_leaks,
     build_output,
     run_fast_pass,
     shape_of,
@@ -207,14 +208,28 @@ def test_sensitive_values_hold_the_values() -> None:
         assert value not in shipped
 
 
+def test_planted_value_is_scrubbed_not_fatal() -> None:
+    out = build(canned(explanation_en=f"Your receipt number is {RECEIPT}."))
+    assert out.r1.status == "ok"
+    assert out.r1.explanation_en == "Your receipt number is your receipt number."
+
+
+def test_value_with_odd_spacing_drops_the_field() -> None:
+    out = build(canned(what_is_asked="Bring A 219 555 031 to the interview"))
+    assert out.r1.status == "ok"
+    assert out.r1.what_is_asked is None
+
+
 def test_leak_guard_fires_on_planted_value() -> None:
+    sensitive = build(canned()).sensitive_values
     with pytest.raises(SensitiveLeak):
-        build(canned(explanation_en=f"Your receipt number is {RECEIPT}."))
+        assert_no_leaks([f"Your receipt number is {RECEIPT}."], sensitive, case_id="c")
 
 
 def test_leak_guard_ignores_spacing() -> None:
+    sensitive = build(canned()).sensitive_values
     with pytest.raises(SensitiveLeak):
-        build(canned(what_is_asked="Bring A 219 555 031 to the interview"))
+        assert_no_leaks(["Bring A 219 555 031"], sensitive, case_id="c")
 
 
 def test_case_number_format_is_a_shape() -> None:
@@ -393,3 +408,121 @@ def test_schema_mismatch_raises() -> None:
 def test_no_pages_raises() -> None:
     with pytest.raises(FastPassError):
         run(fake_client("end_turn", "{}"), blocks=[])
+
+
+NAME = "Maria Ejemplo Prueba"
+HOME = "88 Sample Street, Springfield, ST 00000"
+DOB = "01/02/1990"
+
+
+def test_letter_with_full_name_and_home_address_processes_with_zero_leaks() -> None:
+    """A real-looking letter: the name and home address turn up all over the extraction."""
+    base = canned()
+    ex = canned(
+        facts=[
+            *[f.model_dump() for f in base.facts],
+            {
+                "field": "recipient_name",
+                "value": NAME,
+                "quote": f"To: {NAME}",
+                "page": 1,
+                "sensitive": True,
+            },
+            {
+                "field": "recipient_address",
+                "value": HOME,
+                "quote": HOME,
+                "page": 1,
+                "sensitive": True,
+            },
+            {
+                "field": "date_of_birth",
+                "value": DOB,
+                "quote": f"DOB: {DOB}",
+                "page": 1,
+                "sensitive": True,
+            },
+            {
+                "field": "mailed_to",
+                "value": HOME,
+                "quote": HOME,
+                "page": 1,
+                "sensitive": False,
+            },
+        ],
+        key_dates=[
+            *[d.model_dump() for d in base.key_dates],
+            {"type": "other", "raw": f"Date of birth: {DOB}", "iso": "1990-01-02"},
+        ],
+        explanation_en=(
+            f"This notice is for {NAME.upper()} at {HOME}. "
+            "USCIS scheduled an asylum interview. "
+            f"maria ejemplo prueba must bring ID. Receipt A 219 555 031 is listed."
+        ),
+        what_is_asked=f"{NAME} must attend the interview",
+        checklist=[
+            *[c.model_dump() for c in base.checklist],
+            {"kind": "bring", "item": f"Mail sent to {HOME}", "citation": "p1"},
+            {"kind": "bring", "item": "Photo ID", "citation": f"p1: {HOME}"},
+        ],
+        return_address=HOME,
+        signature_block=f"cc: {NAME}",
+        urls=["www.uscis.gov/contactcenter", f"https://example.gov/{NAME}"],
+        call_purpose=f"Confirm the interview for {NAME}",
+        unknown_terms=["Notice of Action", NAME],
+    )
+    out = build(ex)
+
+    assert out.r1.status == "ok"
+    shipped = " ".join(
+        [
+            out.r1.model_dump_json(),
+            out.signals.model_dump_json(),
+            out.call_purpose or "",
+            *out.unknown_terms,
+        ]
+    ).casefold()
+    for value in (NAME, HOME, DOB, "1990-01-02", "maria ejemplo", A_NUMBER):
+        assert value.casefold() not in shipped
+    assert out.r1.explanation_en == (
+        "This notice is for the person named on the letter at your address. "
+        "USCIS scheduled an asylum interview. "
+        "the person named on the letter must bring ID."
+    )
+    assert (
+        out.r1.what_is_asked
+        == "the person named on the letter must attend the interview"
+    )
+    assert (
+        out.call_purpose == "Confirm the interview for the person named on the letter"
+    )
+    assert out.signals.return_address is None
+    assert out.signals.urls == ["www.uscis.gov/contactcenter"]
+    assert out.unknown_terms == ["Notice of Action"]
+    assert "mailed_to" not in {f.field for f in out.r1.key_facts}
+    assert {sv.field for sv in out.sensitive_values} >= {
+        "recipient_name",
+        "recipient_address",
+        "date_of_birth",
+    }
+
+
+def test_short_value_matches_whole_words_only() -> None:
+    base = canned()
+    ex = canned(
+        facts=[
+            *[f.model_dump() for f in base.facts],
+            {
+                "field": "recipient_name",
+                "value": "Ana",
+                "quote": "Ana",
+                "page": 1,
+                "sensitive": True,
+            },
+        ],
+        explanation_en="Analysis of the case is done. Ana must attend.",
+    )
+    out = build(ex)
+    assert out.r1.explanation_en == (
+        "Analysis of the case is done. the person named on the letter must attend."
+    )

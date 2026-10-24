@@ -6,6 +6,7 @@ job row.
 """
 
 import json
+import re
 from collections.abc import Iterable
 from typing import Any
 
@@ -20,6 +21,9 @@ FAST_FAILED = "research.fast_failed"
 DEEP_STARTED = "research.deep_started"
 DEEP_DONE = "research.deep_done"
 DEEP_FAILED = "research.deep_failed"
+QUESTION_STARTED = "research.question_started"
+QUESTION_DONE = "research.question_done"
+QUESTION_FAILED = "research.question_failed"
 SEARCH = "research.search"
 FETCH = "research.fetch"
 CHECK = "research.check"
@@ -35,6 +39,10 @@ VERIFICATION_EVENT = {
 }
 
 
+SHORT_VALUE_LEN = 12
+"""Values this short only match as whole words, so a name like "Ana" doesn't hit "Analysis"."""
+
+
 class LeakDetected(RuntimeError):
     """A sensitive value was about to be written. The message names the target, never the value."""
 
@@ -43,17 +51,25 @@ class LeakGuard:
     """Holds the case's sensitive values in memory and rejects any write that contains one."""
 
     def __init__(self) -> None:
-        self._values: set[str] = set()
+        self._patterns: list[re.Pattern[str]] = []
 
     def add(self, values: Iterable[str]) -> None:
-        self._values.update(v for v in values if v)
+        for value in values:
+            value = value.strip()
+            if not value:
+                continue
+            # Match the value as written and as it appears inside JSON strings.
+            escaped = json.dumps(value, ensure_ascii=False)[1:-1]
+            for form in {value, escaped}:
+                pattern = re.escape(form)
+                if len(value) <= SHORT_VALUE_LEN:
+                    pattern = rf"(?<!\w){pattern}(?!\w)"
+                self._patterns.append(re.compile(pattern, re.IGNORECASE))
 
     def check(self, target: str, payload: Any) -> None:
         text = json.dumps(payload, default=str, ensure_ascii=False)
-        for value in self._values:
-            escaped = json.dumps(value, ensure_ascii=False)[1:-1]
-            if value in text or escaped in text:
-                raise LeakDetected(f"sensitive value found in {target}")
+        if any(p.search(text) for p in self._patterns):
+            raise LeakDetected(f"sensitive value found in {target}")
 
 
 class EventLog:

@@ -625,7 +625,9 @@ def _accept_phone(
         return None, None, "The proposed number's page was not fetched by our tool"
     if page.status_code >= 400:
         return None, None, f"{page.final_url} returned HTTP {page.status_code}"
-    if checks.domain_trust(page.final_url, pages) == "untrusted":
+    # Bot-wall and error pages are not evidence, so their links vouch for nothing.
+    ok_pages = [p for p in pages if p.status_code < 400]
+    if checks.domain_trust(page.final_url, ok_pages) == "untrusted":
         return (
             None,
             None,

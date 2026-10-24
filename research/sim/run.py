@@ -20,13 +20,20 @@ import httpx
 from pydantic import ValidationError
 
 from research.deep_pass import LogFn
-from research.fake import fake_deep_findings, fake_fast_pass_output
-from research.jobs import ResearchDeps, handle_research_deep, handle_research_fast
+from research.fake import FAKE_URL, fake_deep_findings, fake_fast_pass_output
+from research.jobs import (
+    ResearchDeps,
+    handle_research_deep,
+    handle_research_fast,
+    handle_research_question,
+)
 from research.models import (
     R1,
     DeepFindings,
     FastPassOutput,
     LegitimacySignals,
+    QuestionAnswer,
+    QuestionSource,
     ResearchDeepPayload,
     ResearchFastPayload,
 )
@@ -49,6 +56,7 @@ CONTENT_TYPES = {
 HANDLERS = {
     "research_fast": handle_research_fast,
     "research_deep": handle_research_deep,
+    "research_question": handle_research_question,
 }
 
 NOT_MERGED = (
@@ -119,6 +127,19 @@ async def fake_deep_pass(
     return findings
 
 
+async def fake_answer_question(
+    question_en: str, *, log: LogFn | None = None, **_: Any
+) -> QuestionAnswer:
+    if log:
+        await log("research.search", "Searched the web", {})
+        await log("research.fetch", "Fetched the official page", {"url": FAKE_URL})
+    return QuestionAnswer(
+        status="answered",
+        answer_en="Fake answer: bring the notice and photo ID to the interview.",
+        sources=[QuestionSource(url=FAKE_URL, quote="Bring this notice.")],
+    )
+
+
 def fake_deps() -> ResearchDeps:
     settings = ResearchSettings(
         _env_file=None,  # type: ignore[call-arg]
@@ -131,6 +152,7 @@ def fake_deps() -> ResearchDeps:
         fast_pass_fn=fake_fast_pass,
         deep_pass_fn=fake_deep_pass,
         to_blocks_fn=fake_to_blocks,
+        question_fn=fake_answer_question,
     )
 
 
@@ -226,6 +248,10 @@ def job_summary(job: Job) -> str:
         return ""
     if job.type == "research_fast":
         return f"R1 status={job.result['status']} doc_type={job.result.get('doc_type')}"
+    if job.type == "research_question":
+        return (
+            f"answer status={job.result['status']} sources={len(job.result['sources'])}"
+        )
     v = job.result["verification"]
     return (
         f"R2 verification={v['status']} call_recommended={job.result['call_recommended']} "

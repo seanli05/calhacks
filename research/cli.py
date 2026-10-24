@@ -1,4 +1,4 @@
-"""Run the research passes alone: `python -m research.cli {fast,deep,eval,seed}`."""
+"""Run the research passes alone: `python -m research.cli {fast,deep,ask,eval,seed}`."""
 
 import argparse
 import asyncio
@@ -287,6 +287,44 @@ def run_seed(
     return 0
 
 
+async def run_ask(question: str) -> int:
+    """Answer one process question with the real model and web; print the result and log."""
+    import httpx
+
+    from research.jobs import QUESTION_TIMEOUT_S
+    from research.question import answer_question
+
+    settings = _load_settings()
+    if settings is None:
+        print(NO_KEY_MESSAGE)
+        return 2
+    started = time.monotonic()
+
+    async def log(event: str, summary: str, data: dict) -> None:
+        print(f"[{time.monotonic() - started:6.1f}s] {event:<16} {summary}", flush=True)
+
+    async with _client(settings) as client, httpx.AsyncClient(timeout=10.0) as http:
+        try:
+            answer = await asyncio.wait_for(
+                answer_question(
+                    question,
+                    client=client,
+                    model=settings.model_default,
+                    http=http,
+                    log=log,
+                ),
+                QUESTION_TIMEOUT_S,
+            )
+        except TimeoutError:
+            print(
+                f"Timed out after {QUESTION_TIMEOUT_S:.0f} s (job result: not_confirmed)"
+            )
+            return 1
+    print(f"\n== {time.monotonic() - started:.1f}s")
+    print(answer.model_dump_json(indent=2))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="research.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -312,6 +350,9 @@ def main(argv: list[str] | None = None) -> None:
         "--replay", action="store_const", const="replay", dest="mode"
     )
 
+    ask = sub.add_parser("ask", help="answer a general process question (English)")
+    ask.add_argument("question")
+
     eval_ = sub.add_parser("eval", help="score the fast pass against fixtures")
     eval_.add_argument("--fixtures", default=Path("fixtures/letters"), type=Path)
     eval_.add_argument("--runs", default=1, type=int)
@@ -330,6 +371,8 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     if args.command == "seed":
         sys.exit(run_seed(args.html, args.url, args.phone, args.captured, args.purpose))
+    if args.command == "ask":
+        sys.exit(asyncio.run(run_ask(args.question)))
     if args.command == "fast":
         sys.exit(
             asyncio.run(run_fast(args.pages, args.county, args.signals_out, args.fake))

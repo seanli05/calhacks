@@ -4,6 +4,6 @@
 target-version = "py312"
 
 [tool.pytest.ini_options]
-testpaths = ["backend/tests", "mock_agency/tests"]
+testpaths = ["backend/tests", "mock_agency/tests", "tests/research"]
 pythonpath = ["backend"]
 asyncio_mode = "auto"

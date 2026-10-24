@@ -28,11 +28,14 @@ from research.models import (
     DeepFindings,
     FastPassOutput,
     LegitimacySignals,
+    QuestionAnswer,
     ResearchDeepPayload,
     ResearchFastPayload,
+    ResearchQuestionPayload,
     Verification,
 )
 from research.preprocess import ContentBlock, UnsupportedMedia, to_content_blocks
+from research.question import answer_question
 from research.sim.settings import ResearchSettings
 from research.sim.store import CaseRecord, Job, JobType, Store
 from research.verify_cache import VerifyCache
@@ -52,10 +55,12 @@ logger = logging.getLogger(__name__)
 FAST_SLOW_S = 45.0
 FAST_CAP_S = 120.0
 DEEP_TIMEOUT_S = 180.0
+QUESTION_TIMEOUT_S = 30.0
 
 ToBlocksFn = Callable[[bytes, str], Awaitable[list[ContentBlock]]]
 FastPassFn = Callable[..., Awaitable[FastPassOutput]]
 DeepPassFn = Callable[..., Awaitable[DeepFindings]]
+QuestionFn = Callable[..., Awaitable[QuestionAnswer]]
 
 
 @dataclass
@@ -68,10 +73,12 @@ class ResearchDeps:
     fast_pass_fn: FastPassFn = run_fast_pass
     deep_pass_fn: DeepPassFn = run_deep_pass
     to_blocks_fn: ToBlocksFn = to_content_blocks
+    question_fn: QuestionFn = answer_question
     seed: VerifyCache | None = None
     fast_slow_s: float = FAST_SLOW_S
     fast_cap_s: float = FAST_CAP_S
     deep_timeout_s: float = DEEP_TIMEOUT_S
+    question_timeout_s: float = QUESTION_TIMEOUT_S
 
 
 async def handle_research_fast(job: Job, store: Store, deps: ResearchDeps) -> None:
@@ -285,6 +292,78 @@ async def _run_deep(
         ev.DEEP_DONE,
         "Finished checking the letter",
         {"ver_id": ver_id, "call_recommended": r2.call_recommended},
+    )
+
+
+async def handle_research_question(job: Job, store: Store, deps: ResearchDeps) -> None:
+    """Run a `research_question` job: answer one process question from official pages.
+
+    Never talks to the user; the orchestrator reads the job result (QuestionAnswer)
+    and relays it. Logs `research.question_*` events without the question text.
+    """
+    guard = LeakGuard()
+    log = EventLog(store, guard, case_id=job.case_id, job_id=job.job_id)
+    try:
+        await _run_question(job, store, deps, guard, log)
+    except Exception as exc:
+        await _fail(store, log, ev.QUESTION_FAILED, f"unexpected {type(exc).__name__}")
+        raise
+
+
+async def _run_question(
+    job: Job, store: Store, deps: ResearchDeps, guard: LeakGuard, log: EventLog
+) -> None:
+    payload = ResearchQuestionPayload.model_validate(job.payload)
+    await store.update_job(job.job_id, "running")
+    await log.emit(ev.QUESTION_STARTED, "Started researching a question")
+    sensitive: list[str] = []
+    if payload.case_id:
+        sensitive = list((await store.get_case_refs(payload.case_id)).values())
+    guard.add(sensitive)
+
+    async def research_log(
+        event_type: str, summary_en: str, data: dict[str, Any]
+    ) -> None:
+        if event_type not in ev.RESEARCH_LOG_TYPES:
+            raise ValueError(f"question pass logged unknown event type {event_type!r}")
+        await log.emit(event_type, summary_en, data)
+
+    try:
+        answer = await asyncio.wait_for(
+            deps.question_fn(
+                payload.question_en,
+                sensitive=sensitive,
+                client=deps.anthropic,
+                model=deps.settings.model_default,
+                http=deps.http,
+                log=research_log,
+            ),
+            deps.question_timeout_s,
+        )
+    except (TimeoutError, httpx.HTTPError, APIError) as exc:
+        reason = (
+            f"The research did not finish within {deps.question_timeout_s:.0f} seconds"
+            if isinstance(exc, TimeoutError)
+            else "The research could not reach the web or the model"
+        )
+        logger.warning(
+            "question pass failed case_id=%s job_id=%s error=%s",
+            payload.case_id,
+            job.job_id,
+            type(exc).__name__,
+        )
+        answer = QuestionAnswer(status="not_confirmed", reason_en=reason)
+        await log.emit(
+            ev.QUESTION_FAILED,
+            "Could not finish researching the question; result is not_confirmed",
+            {"error": type(exc).__name__},
+        )
+
+    await _finish(store, guard, job.job_id, answer.model_dump(mode="json"))
+    await log.emit(
+        ev.QUESTION_DONE,
+        f"Finished researching a question: {answer.status}",
+        {"status": answer.status, "source_count": len(answer.sources)},
     )
 
 

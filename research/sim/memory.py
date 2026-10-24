@@ -63,6 +63,9 @@ class InMemoryStore:
         self.case_refs[(case_id, field)] = value
         return f"<ref:{field}>"
 
+    async def get_case_refs(self, case_id: str) -> dict[str, str]:
+        return {f: v for (c, f), v in self.case_refs.items() if c == case_id}
+
     async def create_job(
         self, job_type: JobType, payload: dict[str, Any], case_id: str | None = None
     ) -> str:

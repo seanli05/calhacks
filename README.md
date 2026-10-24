@@ -175,6 +175,12 @@ python -m research.cli seed fixtures/web/seed/uscis_contactcenter.html \
 
 The dev page takes a photo or PDF upload and shows the explanation, checklist, verdict, official phone with its trust chain, and the event log. Tick "fake passes" to run without an API key, or "skip deep" for extraction only. For redacted test copies, "simulate redacted fields" assumes a blacked-out case number has the issuer's expected shape; the verdict is then labeled SIMULATED (dev page only, never the real flow). Nothing is saved.
 
+General questions from the chat run as a `research_question` job (question in English; result is `QuestionAnswer` in `research/models.py`). Answers are process facts only, and every kept source is a `.gov` URL whose quote code found word for word in text we hold for it: a web search citation's `cited_text`, or a page fetched by us or by Anthropic's `web_fetch` (uscis.gov blocks our fetcher). Otherwise the status is `not_confirmed` or a decline, and anything over 30 s is `not_confirmed`. Try one from the terminal or the dev page's "Ask a general question" box:
+
+```bash
+python -m research.cli ask "How do I reschedule a USCIS biometrics appointment?"
+```
+
 ## Development
 
 ```bash

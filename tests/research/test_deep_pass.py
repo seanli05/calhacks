@@ -748,3 +748,35 @@ async def test_form_printed_twice_is_judged_once(directory_web: Path) -> None:
     )
     form = next(s for s in findings.verification.signals if s.signal == "form_id")
     assert form.evidence == ["I-797C (edition 2024-04-01): known USCIS form (config)"]
+
+
+@pytest.mark.asyncio
+async def test_bot_wall_page_does_not_vouch_for_a_linked_domain(tmp_path: Path) -> None:
+    """A 403 .gov page is not evidence, so its links can't make another domain trusted."""
+    state_list = "https://www.examplestate.gov/county-offices"
+    county_site = "https://www.examplecountyhelp.org/contact"
+    web_dir = tmp_path / "web"
+    save_fixture(
+        web_dir,
+        state_list,
+        f'<p>Access Denied</p><a href="{county_site}">County</a>',
+        status_code=403,
+    )
+    save_fixture(web_dir, county_site, COUNTY_HTML)
+    turns = [
+        turn("tool_use", fetch("f1", state_list), fetch("f2", county_site)),
+        turn(
+            "tool_use",
+            submit(
+                "(202) 555-0123",
+                county_site,
+                issuer_official_domain="examplecountyhelp.org",
+            ),
+        ),
+    ]
+
+    findings = await run("county_renewal.json", FakeClient(turns), web_dir)
+    v = findings.verification
+    assert v.official_phone is None
+    assert v.status != "verified"
+    assert "examplecountyhelp.org is not a trusted domain" in v.evidence
