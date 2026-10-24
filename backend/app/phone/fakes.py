@@ -36,7 +36,7 @@ from app.contracts.common import (
 from app.db.errors import NotFound, UnverifiedNumber
 from app.db.ids import new_id
 from app.phone.line import AgencyHungUp, AgencyUnreachable, LineEvent
-from app.phone.ports import LineClosed, NumberSource, TranscriptLine
+from app.phone.ports import Clock, LineClosed, NumberSource, TranscriptLine
 
 _SETTLE_ROUNDS = 20
 """Loop turns given to woken tasks before the clock moves again. Enough for the
@@ -219,9 +219,7 @@ class NoAnswer:
 class FakeRelay:
     """Replies come from `replies` in order, then `NoAnswer` once they run out."""
 
-    def __init__(
-        self, clock: FakeClock, replies: Iterable[Answer | NoAnswer] = ()
-    ) -> None:
+    def __init__(self, clock: Clock, replies: Iterable[Answer | NoAnswer] = ()) -> None:
         self._clock = clock
         self._replies = deque(replies)
         self.asked: list[AskUserRequest] = []
@@ -304,7 +302,7 @@ class FakeTelephony:
     def __init__(
         self,
         numbers: NumberSource,
-        clock: FakeClock,
+        clock: Clock,
         script: Iterable[Step] = (),
         responder: Responder | None = None,
     ) -> None:
