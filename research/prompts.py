@@ -49,6 +49,11 @@ copy what the sender printed. These are used to check legitimacy, so include eve
 address and phone number exactly, even suspicious ones. Never put the recipient's \
 address in return_address. payment_instructions is any request for money and how to \
 pay (fee, gift cards, wire transfer, crypto); empty if the letter asks for no money.
+- form_ids: the forms that identify THIS document: the form number in the header or \
+title (e.g. "I-797C, Notice of Action"), the Case Type form in the header box, and the \
+footer edition line (e.g. "Form I-797C (Rev. 10/13/21)", edition "10/13/21"). Set \
+identifies_this_document to false for any form the letter only mentions in the body \
+(e.g. "you may apply for work authorization on Form I-765", "submit Form G-28").
 - county: only if the letter names one.
 - unknown_terms: official words or phrases a family may not know (for example "Notice \
 of Action", "receipt number", "A-Number", "recertification").

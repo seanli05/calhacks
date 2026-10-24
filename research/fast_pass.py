@@ -372,11 +372,13 @@ def build_signals(
         if cleaned and cleaned not in urls:
             urls.append(cleaned)
 
+    # Forms the body only mentions (I-765, G-28...) say nothing about legitimacy.
     form_ids = [
         f"{f.form_id.strip()} (edition {f.edition.strip()})"
         if f.edition
         else f.form_id.strip()
         for f in ex.form_ids
+        if f.identifies_this_document
     ]
     case_number = next(
         (

@@ -1,6 +1,6 @@
 """Pure checks: phone matching, domain trust, lookalikes, the verdict table."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -9,6 +9,7 @@ from research.checks import (
     case_number_shape,
     decide_verdict,
     domain_trust,
+    edition_date,
     form_number,
     form_on_page,
     lookalike,
@@ -136,3 +137,17 @@ def test_address_on_page() -> None:
     html = "<p>Service Center, 100 Main St., Springfield, ST 00000</p>"
     assert address_on_page("100 Main Street, Springfield, ST 00000", html)
     assert not address_on_page("200 Main Street, Springfield, ST 00000", html)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("I-797C (edition 10/13/21)", date(2021, 10, 13)),
+        ("Form I-797C (Rev. 01/20/2025)", date(2025, 1, 20)),
+        ("I-797C", None),
+        ("I-797C (edition 13/45/21)", None),
+        ("I-797C (edition 01/01/2099)", None),
+    ],
+)
+def test_edition_date(raw: str, expected: date | None) -> None:
+    assert edition_date(raw, date(2026, 10, 23)) == expected

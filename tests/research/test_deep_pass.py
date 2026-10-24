@@ -1,6 +1,7 @@
 """Deep pass with a scripted fake client and a replayed synthetic web. No network."""
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -11,7 +12,7 @@ import pytest
 from research.deep_pass import run_deep_pass
 from research.fetch_tool import replay_resolver, replay_transport, save_fixture
 from research.models import LegitimacySignals
-from research.verify_cache import VerifyCache
+from research.verify_cache import VerifyCache, seed_entry
 
 SIGNALS_DIR = Path("fixtures/signals")
 CONTACT = "https://www.uscis.gov/contactcenter"
@@ -128,9 +129,12 @@ async def run(
     web_dir: Path,
     *,
     cache: VerifyCache | None = None,
+    seed: VerifyCache | None = None,
     log: Log | None = None,
+    signals_update: dict[str, Any] | None = None,
 ):
     signals, purpose, doc_type = load_signals(signals_file)
+    signals = signals.model_copy(update=signals_update or {})
     async with httpx.AsyncClient(transport=replay_transport(web_dir)) as http:
         return await run_deep_pass(
             signals,
@@ -142,6 +146,7 @@ async def run(
             log=log,
             doc_type=doc_type,
             cache=cache,
+            seed=seed,
             resolve=replay_resolver,
         )
 
@@ -494,3 +499,252 @@ async def test_directory_result_cached_under_issuer(
     )
     assert findings.verification.official_phone == "+18005550100"
     assert findings.verification.evidence[0].startswith("Verified from usa.gov on ")
+
+
+SEED_HTML = """<h1>U.S. Citizenship and Immigration Services</h1>
+<p>Contact Center: 800-555-0100</p>
+<p>Form I-589, Application for Asylum and for Withholding of Removal</p>"""
+# Redacted copy: no case number, no form edition, so only a fetched page can match form_id.
+REDACTED = {"case_number_format": None, "form_ids": ["I-797C", "I-589"]}
+
+
+def seeded(tmp_path: Path, html: str = SEED_HTML) -> VerifyCache:
+    seed = VerifyCache(tmp_path / "seed")
+    seed.save(
+        seed_entry(
+            html,
+            CONTACT,
+            "800-555-0100",
+            datetime(2026, 10, 20, tzinfo=UTC),
+            "case_questions",
+        )
+    )
+    return seed
+
+
+@pytest.mark.asyncio
+async def test_seed_snapshot_checked_when_issuer_blocked(
+    directory_web: Path, tmp_path: Path
+) -> None:
+    turns = directory_turns("1-800-555-0100", USA_GOV)
+    without = await run(
+        "uscis_interview.json",
+        FakeClient(turns),
+        directory_web,
+        signals_update=REDACTED,
+    )
+    assert without.verification.status == "unknown"
+
+    log = Log()
+    findings = await run(
+        "uscis_interview.json",
+        FakeClient(directory_turns("1-800-555-0100", USA_GOV)),
+        directory_web,
+        seed=seeded(tmp_path),
+        log=log,
+        signals_update=REDACTED,
+    )
+    v = findings.verification
+    assert v.status == "verified"
+    assert v.official_phone == "+18005550100"
+    assert {s.signal: s.state for s in v.signals}["form_id"] == "match"
+    # The number came from usa.gov; the snapshot only supplied the form match.
+    assert v.evidence[0] == (
+        "Checked against the uscis.gov snapshot from 2026-10-20 "
+        "(the live uscis.gov site could not be fetched)"
+    )
+    assert any(d.get("check") == "seed_snapshot" for _, _, d in log.events)
+
+
+@pytest.mark.asyncio
+async def test_seed_snapshot_ignored_when_issuer_reachable(
+    web: Path, tmp_path: Path
+) -> None:
+    findings = await run(
+        "uscis_interview.json",
+        FakeClient(good_turns()),
+        web,
+        seed=seeded(tmp_path),
+    )
+    assert not any("snapshot" in e for e in findings.verification.evidence)
+
+
+def test_seed_entry_refuses_page_without_the_number() -> None:
+    with pytest.raises(ValueError):
+        seed_entry(
+            "<p>U.S. Citizenship and Immigration Services</p>",
+            CONTACT,
+            "800-555-0100",
+            datetime(2026, 10, 20, tzinfo=UTC),
+            "case_questions",
+        )
+
+
+@pytest.mark.asyncio
+async def test_number_verified_from_snapshot_replaces_bot_wall(
+    blocked_web: Path, tmp_path: Path
+) -> None:
+    # The stub was fetched as www.uscis.gov/contactcenter; the seed is saved without www.
+    seed = VerifyCache(tmp_path / "seed")
+    seed.save(
+        seed_entry(
+            SEED_HTML,
+            "https://uscis.gov/contactcenter/",
+            "800-555-0100",
+            datetime(2026, 10, 20, tzinfo=UTC),
+            "case_questions",
+        )
+    )
+    turns = [
+        turn("tool_use", fetch("f1", CONTACT)),
+        turn("tool_use", submit("800-555-0100", CONTACT)),
+    ]
+    findings = await run(
+        "uscis_interview.json", FakeClient(turns), blocked_web, seed=seed
+    )
+    v = findings.verification
+    assert v.status == "verified"
+    assert v.official_phone == "+18005550100"
+    assert v.evidence[0].startswith("Verified from uscis.gov snapshot on 2026-10-20")
+
+
+@pytest.mark.asyncio
+async def test_seed_used_when_no_number_was_submitted(
+    blocked_web: Path, tmp_path: Path
+) -> None:
+    turns = [
+        turn("tool_use", fetch("f1", CONTACT)),
+        SimpleNamespace(
+            content=[],
+            stop_reason="refusal",
+            stop_details=SimpleNamespace(category="cyber"),
+        ),
+    ]
+    findings = await run(
+        "uscis_interview.json", FakeClient(turns), blocked_web, seed=seeded(tmp_path)
+    )
+    v = findings.verification
+    assert v.official_phone == "+18005550100"
+    assert v.evidence[0].startswith("Verified from uscis.gov on 2026-10-20")
+
+
+COUNTY_CONTACT = "https://www.examplecounty.gov/social-services/contact"
+COUNTY_HTML = """<h1>County of Example, Department of Social Services</h1>
+<p>100 Main Street, Springfield, ST 00000</p>
+<p>Customer service: (202) 555-0123</p>"""
+
+
+@pytest.mark.asyncio
+async def test_seed_applies_to_county_letters_without_fixed_domain(
+    tmp_path: Path,
+) -> None:
+    """County hints have no issuer_domains; the seed is found via the submitted domain."""
+    web_dir = tmp_path / "county_web"
+    save_fixture(web_dir, COUNTY_CONTACT, "<p>Access Denied</p>", status_code=403)
+    seed = VerifyCache(tmp_path / "seed")
+    seed.save(
+        seed_entry(
+            COUNTY_HTML,
+            COUNTY_CONTACT,
+            "(202) 555-0123",
+            datetime(2026, 10, 20, tzinfo=UTC),
+            "renewal",
+        )
+    )
+
+    def turns() -> list[SimpleNamespace]:
+        return [
+            turn("tool_use", fetch("f1", COUNTY_CONTACT)),
+            turn(
+                "tool_use",
+                submit(
+                    "(202) 555-0123",
+                    COUNTY_CONTACT,
+                    issuer_official_domain="examplecounty.gov",
+                    phone_label="Customer service",
+                    phone_purpose="Benefits renewal questions",
+                ),
+            ),
+        ]
+
+    without = await run("county_renewal.json", FakeClient(turns()), web_dir)
+    assert without.verification.official_phone is None
+
+    findings = await run("county_renewal.json", FakeClient(turns()), web_dir, seed=seed)
+    v = findings.verification
+    assert v.official_phone == "+12025550123"
+    assert v.status == "verified"
+    assert v.evidence[0].startswith(
+        "Verified from examplecounty.gov snapshot on 2026-10-20"
+    )
+
+
+@pytest.mark.asyncio
+async def test_seed_never_rescues_a_scam(tmp_path: Path) -> None:
+    signals, purpose, doc_type = load_signals("scam_uscis.json")
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda r: httpx.Response(500))
+    ) as http:
+        findings = await run_deep_pass(
+            signals,
+            purpose,
+            None,
+            client=FakeClient([]),
+            model="m",
+            http=http,
+            doc_type=doc_type,
+            seed=seeded(tmp_path),
+        )
+    v = findings.verification
+    assert v.status == "suspicious"
+    assert v.official_phone is None
+    assert not any("snapshot" in e for e in v.evidence)
+
+
+@pytest.mark.asyncio
+async def test_known_form_with_edition_matches_from_config(
+    directory_web: Path,
+) -> None:
+    findings = await run(
+        "uscis_interview.json",
+        FakeClient(directory_turns("1-800-555-0100", USA_GOV)),
+        directory_web,
+        signals_update={
+            "case_number_format": None,
+            "form_ids": ["I-797C (edition 10/13/21)", "I-765", "G-28"],
+        },
+    )
+    form = next(s for s in findings.verification.signals if s.signal == "form_id")
+    assert form.state == "match"
+    assert form.evidence == [
+        "I-797C (edition 2021-10-13): known USCIS form (config)",
+        "I-765 ignored: not on the known USCIS form list",
+        "G-28 ignored: not on the known USCIS form list",
+    ]
+    assert findings.verification.status == "verified"
+
+
+@pytest.mark.asyncio
+async def test_unknown_forms_alone_are_not_found_not_uncertain(
+    directory_web: Path,
+) -> None:
+    findings = await run(
+        "uscis_interview.json",
+        FakeClient(directory_turns("1-800-555-0100", USA_GOV)),
+        directory_web,
+        signals_update={"form_ids": ["I-765", "I-797C (edition 13/45/21)"]},
+    )
+    form = next(s for s in findings.verification.signals if s.signal == "form_id")
+    assert form.state == "not_found"
+
+
+@pytest.mark.asyncio
+async def test_form_printed_twice_is_judged_once(directory_web: Path) -> None:
+    findings = await run(
+        "uscis_interview.json",
+        FakeClient(directory_turns("1-800-555-0100", USA_GOV)),
+        directory_web,
+        signals_update={"form_ids": ["I-797C", "I-797C (edition 04/01/24)"]},
+    )
+    form = next(s for s in findings.verification.signals if s.signal == "form_id")
+    assert form.evidence == ["I-797C (edition 2024-04-01): known USCIS form (config)"]

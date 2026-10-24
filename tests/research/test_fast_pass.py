@@ -107,7 +107,15 @@ def canned(**overrides: Any) -> Extraction:
             {"raw": "1-510-555-0142", "label": "dup", "quote": "1-510-555-0142"},
         ],
         "urls": ["www.uscis.gov/contactcenter.", "www.uscis.gov/contactcenter"],
-        "form_ids": [{"form_id": "I-797C", "edition": "04/01/24"}],
+        "form_ids": [
+            {
+                "form_id": "I-797C",
+                "edition": "04/01/24",
+                "identifies_this_document": True,
+            },
+            {"form_id": "I-765", "edition": None, "identifies_this_document": False},
+            {"form_id": "G-28", "edition": None, "identifies_this_document": False},
+        ],
         "return_address": "USCIS, P.O. Box 77530, San Francisco, CA 94107",
         "payment_instructions": None,
         "signature_block": None,
@@ -226,6 +234,7 @@ def test_phones_normalized_deduped_and_bad_ones_dropped() -> None:
 def test_signals_fields() -> None:
     signals = build(canned()).signals
     assert signals.urls == ["www.uscis.gov/contactcenter"]
+    # Forms only mentioned in the body (I-765, G-28) are not legitimacy signals.
     assert signals.form_ids == ["I-797C (edition 04/01/24)"]
     assert signals.return_address == "USCIS, P.O. Box 77530, San Francisco, CA 94107"
 

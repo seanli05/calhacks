@@ -35,6 +35,7 @@ from research.models import (
 from research.preprocess import ContentBlock, UnsupportedMedia, to_content_blocks
 from research.sim.settings import ResearchSettings
 from research.sim.store import CaseRecord, Job, JobType, Store
+from research.verify_cache import VerifyCache
 
 # SIM: drop this fallback when Track A lands fast_pass.FastPassError
 try:
@@ -67,6 +68,7 @@ class ResearchDeps:
     fast_pass_fn: FastPassFn = run_fast_pass
     deep_pass_fn: DeepPassFn = run_deep_pass
     to_blocks_fn: ToBlocksFn = to_content_blocks
+    seed: VerifyCache | None = None
     fast_slow_s: float = FAST_SLOW_S
     fast_cap_s: float = FAST_CAP_S
     deep_timeout_s: float = DEEP_TIMEOUT_S
@@ -297,10 +299,11 @@ async def _call_deep_pass(
     }
     # Track B may add a doc_type kwarg; pass it only when the function takes it.
     params = inspect.signature(deps.deep_pass_fn).parameters
-    if "doc_type" in params or any(
-        p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
-    ):
+    any_kwargs = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
+    if "doc_type" in params or any_kwargs:
         kwargs["doc_type"] = case.r1.doc_type
+    if deps.seed is not None and ("seed" in params or any_kwargs):
+        kwargs["seed"] = deps.seed
     return await deps.deep_pass_fn(case.signals, case.call_purpose, county, **kwargs)
 
 

@@ -181,6 +181,21 @@ def form_number(raw: str) -> str | None:
     return f"{match.group(1)}-{match.group(2)}" if match else None
 
 
+def edition_date(raw: str, today: date) -> date | None:
+    """`I-797C (edition 10/13/21)` -> 2021-10-13. None if missing, not a real date, or in the future."""
+    match = re.search(r"\b(\d{1,2})/(\d{1,2})/(\d{2}|\d{4})\b", raw)
+    if not match:
+        return None
+    month, day, year = (int(g) for g in match.groups())
+    if year < 100:
+        year += 2000
+    try:
+        edition = date(year, month, day)
+    except ValueError:
+        return None
+    return edition if edition <= today else None
+
+
 def text_of(html: str) -> str:
     """Visible text, whitespace collapsed."""
     soup = BeautifulSoup(html, "html.parser")

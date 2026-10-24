@@ -12,9 +12,12 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from research.fetch_tool import FetchedPage
+from research import checks
+from research.fetch_tool import FetchedPage, extract_links, registered_domain
 
 DEFAULT_CACHE_DIR = Path("fixtures/web/verify_cache")
+SEED_CACHE_DIR = Path("fixtures/web/seed_cache")
+"""Read-only snapshots saved from a browser. Kept apart so live runs never overwrite them."""
 
 
 class CachedVerification(BaseModel):
@@ -48,3 +51,35 @@ class VerifyCache:
         if not path.exists():
             return None
         return CachedVerification.model_validate(json.loads(path.read_text()))
+
+
+def seed_entry(
+    html: str,
+    url: str,
+    phone: str,
+    captured_at: datetime,
+    purpose: str,
+    phone_purpose: str | None = None,
+) -> CachedVerification:
+    """Build a seed from a page saved in a browser. Refuses a page that doesn't show `phone`."""
+    e164 = checks.normalize_phone(phone)
+    if e164 is None or not checks.phone_on_page(e164, html):
+        raise ValueError(f"{phone} does not appear on the saved copy of {url}")
+    page = FetchedPage(
+        url=url,
+        final_url=url,
+        status_code=200,
+        html=html,
+        links=extract_links(html, url),
+        fetched_at=captured_at,
+    )
+    return CachedVerification(
+        issuer_domain=registered_domain(url),
+        purpose=purpose,
+        official_phone=e164,
+        official_phone_purpose=phone_purpose,
+        source_url=url,
+        trust_chain=[url],
+        fetched_at=captured_at,
+        pages=[page],
+    )

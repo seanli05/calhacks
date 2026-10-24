@@ -54,12 +54,39 @@ def test_questions_from_appointment_and_interpreter_rule() -> None:
         )
     ]
     brief = build_brief(
+        case(
+            doc_type="uscis_i797c_asylum_interview",
+            appointment=appointment,
+            checklist_en=checklist,
+        ),
+        fake_deep_findings(),
+    )
+
+    assert brief.questions_to_ask[:2] == [
+        "Is the interview still on?",
+        "What should we do if the interpreter can't come?",
+    ]
+    assert brief.appointment == appointment
+
+
+def test_questions_capped_and_deadlines_go_in_handoff_note() -> None:
+    checklist = [
+        ChecklistItem(kind="who_must_come", item="An interpreter", citation="p1"),
+        ChecklistItem(kind="bring", item="Passport", citation="p1"),
+        ChecklistItem(
+            kind="deadline", item="Send address changes within 10 days.", citation="p2"
+        ),
+    ]
+    appointment = Appointment(date=date(2030, 2, 1), citation="p1")
+    brief = build_brief(
         case(appointment=appointment, checklist_en=checklist), fake_deep_findings()
     )
 
-    assert "Is the appointment on 2030-02-01 still scheduled?" in brief.questions_to_ask
-    assert "What should we do if the interpreter can't come?" in brief.questions_to_ask
-    assert brief.appointment == appointment
+    assert len(brief.questions_to_ask) <= 4
+    assert not any("deadline" in q.lower() for q in brief.questions_to_ask)
+    assert "Send address changes within 10 days." in brief.handoff_note
+    text = " ".join([brief.handoff_note, *brief.questions_to_ask])
+    assert ".." not in text and ".?" not in text
 
 
 def test_facts_keep_refs_and_drop_unsafe_values() -> None:
@@ -75,3 +102,32 @@ def test_facts_keep_refs_and_drop_unsafe_values() -> None:
     assert "What is the receipt number?" in [
         q.question for q in brief.likely_rep_questions
     ]
+
+
+def test_rep_questions_use_human_labels() -> None:
+    facts = [
+        KeyFact(field="a_number", ref="<ref:a_number>", page=1),
+        KeyFact(field="interview_location", ref="<ref:interview_location>", page=1),
+    ]
+    brief = build_brief(case(key_facts=facts), fake_deep_findings())
+
+    asked = [q.question for q in brief.likely_rep_questions]
+    assert "What is the A-Number?" in asked
+    assert "What is the interview location?" in asked
+
+
+def test_interview_question_without_readable_date_and_appointment_wording() -> None:
+    interview = case(doc_type="uscis_i797c_asylum_interview", appointment=None)
+    brief = build_brief(interview, fake_deep_findings())
+    assert brief.questions_to_ask[0] == "Is the interview still on?"
+
+    appointment = Appointment(date=date(2030, 2, 1), citation="p1")
+    other = case(doc_type="housing_inspection_notice", appointment=appointment)
+    brief = build_brief(other, fake_deep_findings())
+    assert brief.questions_to_ask[0] == "Is the appointment still on?"
+
+
+def test_punctuation_only_call_purpose_is_skipped() -> None:
+    record = case().model_copy(update={"call_purpose": " . "})
+    brief = build_brief(record, fake_deep_findings())
+    assert not any(q.startswith("Can you help us") for q in brief.questions_to_ask)

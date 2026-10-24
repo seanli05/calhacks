@@ -34,6 +34,7 @@ from research.preprocess import ContentBlock, UnsupportedMedia
 from research.sim.memory import InMemoryStore
 from research.sim.settings import ResearchSettings
 from research.sim.store import Document, DocumentPage, Job
+from research.verify_cache import SEED_CACHE_DIR, VerifyCache
 
 CONTENT_TYPES = {
     ".jpg": "image/jpeg",
@@ -327,7 +328,12 @@ async def run(args: argparse.Namespace) -> int:
             ) as client,
             httpx.AsyncClient(timeout=10.0) as http,
         ):
-            deps = ResearchDeps(settings=settings, anthropic=client, http=http)
+            deps = ResearchDeps(
+                settings=settings,
+                anthropic=client,
+                http=http,
+                seed=VerifyCache(SEED_CACHE_DIR),
+            )
             try:
                 await simulate(store, deps, pages, answers, ask_terminal)
             except NotImplementedError:

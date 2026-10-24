@@ -1,4 +1,4 @@
-"""Run the research passes alone: `python -m research.cli {fast,deep,eval}`."""
+"""Run the research passes alone: `python -m research.cli {fast,deep,eval,seed}`."""
 
 import argparse
 import asyncio
@@ -142,7 +142,7 @@ async def run_deep(
     )
     from research.models import LegitimacySignals
     from research.sim.settings import ResearchSettings
-    from research.verify_cache import VerifyCache
+    from research.verify_cache import SEED_CACHE_DIR, VerifyCache
 
     raw = json.loads(signals_path.read_text())
     signals = LegitimacySignals.model_validate(raw.get("signals", raw))
@@ -193,6 +193,7 @@ async def run_deep(
                         log=log,
                         doc_type=doc_type,
                         cache=VerifyCache(),
+                        seed=VerifyCache(SEED_CACHE_DIR),
                         resolve=system_resolver,
                         run_record=run_path if mode == "record" else None,
                     )
@@ -243,6 +244,49 @@ async def run_eval(fixtures_dir: Path, runs: int = 1) -> int:
     return 0 if ok else 1
 
 
+def run_seed(
+    html_path: Path, url: str, phone: str, captured: str, purpose: str | None
+) -> int:
+    """Load a page saved from a browser into the seed cache, after checking the phone is on it."""
+    from datetime import UTC, datetime
+
+    from research.fetch_tool import registered_domain
+    from research.hints import DEFAULT_HINT, HINTS
+    from research.verify_cache import SEED_CACHE_DIR, VerifyCache, seed_entry
+
+    # The deep pass looks seeds up by (domain, purpose key); a wrong key is never found.
+    valid = sorted(
+        {DEFAULT_HINT.default_purpose}
+        | {key for hint in HINTS.values() for key in hint.purpose_pages}
+    )
+    if purpose is None:
+        domain = registered_domain(url)
+        defaults = [
+            h.default_purpose for h in HINTS.values() if domain in h.issuer_domains
+        ]
+        if not defaults:
+            print(f"Pass --purpose for {domain} (one of: {', '.join(valid)})")
+            return 2
+        purpose = defaults[0]
+    if purpose not in valid:
+        print(f"Unknown purpose {purpose!r} (one of: {', '.join(valid)})")
+        return 2
+    captured_at = datetime.fromisoformat(captured).replace(tzinfo=UTC)
+    try:
+        entry = seed_entry(
+            html_path.read_text(errors="replace"), url, phone, captured_at, purpose
+        )
+    except ValueError as exc:
+        print(f"Not seeded: {exc}")
+        return 1
+    VerifyCache(SEED_CACHE_DIR).save(entry)
+    print(
+        f"Seeded {entry.issuer_domain} ({purpose}) from {url}, captured {captured}: "
+        f"{entry.official_phone} found on the page"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="research.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -272,7 +316,20 @@ def main(argv: list[str] | None = None) -> None:
     eval_.add_argument("--fixtures", default=Path("fixtures/letters"), type=Path)
     eval_.add_argument("--runs", default=1, type=int)
 
+    seed = sub.add_parser(
+        "seed", help="load a page saved from a browser as an official snapshot"
+    )
+    seed.add_argument("html", type=Path)
+    seed.add_argument("--url", required=True, help="the page's real URL")
+    seed.add_argument("--phone", required=True, help="official number on the page")
+    seed.add_argument("--captured", required=True, help="date saved, YYYY-MM-DD")
+    seed.add_argument(
+        "--purpose", help="purpose key; inferred for issuers with a fixed domain"
+    )
+
     args = parser.parse_args(argv)
+    if args.command == "seed":
+        sys.exit(run_seed(args.html, args.url, args.phone, args.captured, args.purpose))
     if args.command == "fast":
         sys.exit(
             asyncio.run(run_fast(args.pages, args.county, args.signals_out, args.fake))

@@ -32,6 +32,16 @@ CLAIM_FIELDS = frozenset(
     {"country_of_nationality", "nationality", "reasons_for_leaving", "asylum_claim"}
 )
 
+MAX_QUESTIONS = 4
+
+# What the rep would call each ref field; others fall back to the field name.
+FIELD_LABELS = {
+    "a_number": "A-Number",
+    "receipt_number": "receipt number",
+    "interview_location": "interview location",
+    "date_of_birth": "applicant's date of birth",
+}
+
 CONTINGENCIES = (
     (
         "If the menu asks for the receipt number, A-Number, or date of birth, take "
@@ -57,6 +67,12 @@ def build_brief(case: CaseRecord, findings: DeepFindings) -> CaseBrief:
         or case.call_purpose
         or "Confirm the notice details and what the user needs to do next"
     )
+    deadlines = [
+        _strip_period(item.item) for item in r1.checklist_en if item.kind == "deadline"
+    ]
+    deadline_note = (
+        f" Deadlines on the notice: {'; '.join(deadlines)}." if deadlines else ""
+    )
     return CaseBrief(
         brief_id=f"brief_{uuid.uuid4().hex[:12]}",
         case_id=case.case_id,
@@ -69,7 +85,8 @@ def build_brief(case: CaseRecord, findings: DeepFindings) -> CaseBrief:
         must_not_do=[*REQUIRED_MUST_NOT_DO, *EXTRA_MUST_NOT_DO],
         facts=_safe_facts(r1.key_facts),
         handoff_note=(
-            f"Calling {issuer} about a {doc_type} notice. Goal: {call_goal}. "
+            f"Calling {issuer} about a {doc_type} notice. "
+            f"Goal: {_strip_period(call_goal)}.{deadline_note} "
             "The user gives any identifiers in their own voice once bridged."
         ),
         likely_rep_questions=_rep_questions(r1.key_facts),
@@ -83,26 +100,32 @@ def build_brief(case: CaseRecord, findings: DeepFindings) -> CaseBrief:
 
 
 def _questions(case: CaseRecord) -> list[str]:
+    """Plan.md demo goal first (interview still on, interpreter backup), capped."""
     r1 = case.r1
     questions: list[str] = []
-    if case.call_purpose:
-        purpose = case.call_purpose.rstrip(".")
+    # An interview notice asks even when the date was unreadable; other letters say "appointment".
+    if "interview" in f"{r1.doc_type or ''} {r1.what_is_asked or ''}".lower():
+        questions.append("Is the interview still on?")
+    elif r1.appointment:
+        questions.append("Is the appointment still on?")
+    if any(
+        item.kind == "who_must_come" and "interpreter" in item.item.lower()
+        for item in r1.checklist_en
+    ):
+        questions.append("What should we do if the interpreter can't come?")
+    purpose = _strip_period(case.call_purpose or "")
+    if purpose:
         if purpose.endswith("?"):
             questions.append(purpose)
         else:
             questions.append(f"Can you help us {purpose[0].lower()}{purpose[1:]}?")
-    if r1.appointment:
-        questions.append(
-            f"Is the appointment on {r1.appointment.date.isoformat()} still scheduled?"
-        )
-    for item in r1.checklist_en:
-        if item.kind == "who_must_come" and "interpreter" in item.item.lower():
-            questions.append("What should we do if the interpreter can't come?")
-        elif item.kind == "deadline":
-            questions.append(f"Can you confirm this deadline: {item.item}?")
     if any(item.kind == "bring" for item in r1.checklist_en):
         questions.append("Is there anything else we should bring?")
-    return list(dict.fromkeys(questions))
+    return list(dict.fromkeys(questions))[:MAX_QUESTIONS]
+
+
+def _strip_period(text: str) -> str:
+    return text.strip().rstrip(".").rstrip()
 
 
 def _safe_facts(facts: list[KeyFact]) -> list[KeyFact]:
@@ -118,7 +141,10 @@ def _rep_questions(facts: list[KeyFact]) -> list[RepQuestion]:
     fields = [
         f.field for f in facts if f.ref is not None and f.field not in CLAIM_FIELDS
     ]
-    asked = [f"What is the {field.replace('_', ' ')}?" for field in fields]
+    asked = [
+        f"What is the {FIELD_LABELS.get(field, field.replace('_', ' '))}?"
+        for field in fields
+    ]
     asked += [
         "What is the applicant's full name?",
         "What is the applicant's date of birth?",

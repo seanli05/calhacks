@@ -73,6 +73,11 @@ class ExtractedPhone(_Schema):
 class ExtractedFormId(_Schema):
     form_id: str = Field(description="e.g. I-797C")
     edition: OptStr = Field(description="Edition date as printed, or empty")
+    identifies_this_document: bool = Field(
+        description="True if printed as this notice's own form: in the header/title, "
+        "the Case Type box, or the footer edition line. False if the letter only "
+        "mentions it (e.g. 'you may file Form I-765')"
+    )
 
 
 class ExtractedProposedFact(_Schema):

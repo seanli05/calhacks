@@ -43,6 +43,23 @@ You'll need:
 
 Run commands for each service will be added here as they land.
 
+### Research agent (solo, no Postgres)
+
+```bash
+python -m research.sim fixtures/letters/i797c_asylum_interview_degraded/   # add --fake for no API key
+python -m research.sim.devui   # dev test page at http://127.0.0.1:8000
+```
+
+If an agency site blocks our fetch (uscis.gov returns 403), save its contact page from a browser and seed it. The page is re-checked by code on every run and is only used when the live site can't be fetched:
+
+```bash
+python -m research.cli seed fixtures/web/seed/uscis_contactcenter.html \
+  --url https://www.uscis.gov/contactcenter --phone +18003755283 --captured 2026-10-23
+# other issuers: add --purpose (case_questions, renewal, housing_case, general)
+```
+
+The dev page takes a photo or PDF upload and shows the explanation, checklist, verdict, official phone with its trust chain, and the event log. Tick "fake passes" to run without an API key, or "skip deep" for extraction only. For redacted test copies, "simulate redacted fields" assumes a blacked-out case number has the issuer's expected shape; the verdict is then labeled SIMULATED (dev page only, never the real flow). Nothing is saved.
+
 ## Development
 
 ```bash

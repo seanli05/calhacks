@@ -10,6 +10,7 @@ import json
 import logging
 import re
 from collections.abc import Awaitable, Callable
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
@@ -245,35 +246,43 @@ def _case_number_signal(signals: LegitimacySignals, hint: Hint) -> list[SignalRe
 def _form_signal(
     signals: LegitimacySignals, hint: Hint, pages: list[FetchedPage]
 ) -> SignalResult:
-    forms = [f for f in (checks.form_number(raw) for raw in signals.form_ids) if f]
-    if not forms:
+    # One entry per form; the header and footer often print the same one.
+    raws_by_form: dict[str, list[str]] = {}
+    for raw in signals.form_ids:
+        if (form := checks.form_number(raw)) is not None:
+            raws_by_form.setdefault(form, []).append(raw)
+    if not raws_by_form:
         return SignalResult(
             signal="form_id",
             state="not_found",
             evidence=["No form number on the letter"],
         )
     anchor_pages = [p for p in pages if is_gov(p.final_url)]
+    issuer = hint.issuer_short or "issuer"
+    today = date.today()
     matched: list[str] = []
     evidence: list[str] = []
-    uncertain = False
-    for form in forms:
+    for form, raws in raws_by_form.items():
+        # A form off the known list proves nothing either way: ignore it.
+        if hint.known_forms and form not in hint.known_forms:
+            evidence.append(f"{form} ignored: not on the known {issuer} form list")
+            continue
         page = next(
             (p for p in anchor_pages if checks.form_on_page(form, p.html)), None
         )
+        editions = [checks.edition_date(raw, today) for raw in raws]
+        edition = next((e for e in editions if e), None) if hint.known_forms else None
         if page is not None:
             matched.append(form)
             evidence.append(page.final_url)
-        elif hint.known_forms and form not in hint.known_forms:
-            uncertain = True
-            evidence.append(f"{form} is not a form this issuer is known to send")
+        elif edition is not None:
+            matched.append(form)
+            evidence.append(
+                f"{form} (edition {edition.isoformat()}): known {issuer} form (config)"
+            )
         else:
             evidence.append(f"{form} was not found on a fetched official page")
-    if uncertain:
-        state = "uncertain"
-    elif matched:
-        state = "match"
-    else:
-        state = "not_found"
+    state = "match" if matched else "not_found"
     return SignalResult(signal="form_id", state=state, evidence=evidence)
 
 
@@ -1035,6 +1044,7 @@ async def run_deep_pass(
     log: LogFn | None = None,
     doc_type: str | None = None,
     cache: VerifyCache | None = None,
+    seed: VerifyCache | None = None,
     resolve: Resolver = system_resolver,
     discovery_timeout_s: float = DISCOVERY_TIMEOUT_S,
     max_iterations: int = MAX_ITERATIONS,
@@ -1113,6 +1123,7 @@ async def run_deep_pass(
         discovery,
         cache=cache,
         log=log,
+        seed=seed,
     )
 
 
@@ -1152,6 +1163,46 @@ async def replay_deep_pass(
     )
 
 
+async def _add_seed_pages(
+    seed: VerifyCache | None,
+    discovery: _Discovery,
+    hint: Hint,
+    purpose: str,
+    log: LogFn | None,
+) -> tuple[str, str, list[FetchedPage]] | None:
+    """When the issuer's site gave us no usable page, add its saved copy to the pages checked.
+
+    Same condition as the directory fallback. The copy goes through every code
+    check like a live page and replaces any error stub for the same URL.
+    Returns (domain, capture date, snapshot pages) if used.
+    """
+    if seed is None:
+        return None
+    ok_pages = [p for p in discovery.pages if p.status_code < 400]
+    issuer_domains = _issuer_domains(hint, discovery.submission)
+    if not _issuer_site_unavailable(discovery, ok_pages, issuer_domains):
+        return None
+    for domain in issuer_domains:
+        entry = seed.load(domain, purpose)
+        if entry is None:
+            continue
+        pages = [p for p in entry.pages if p.status_code < 400]
+        discovery.pages = [
+            p
+            for p in discovery.pages
+            if _page_for(p.url, pages) is None and _page_for(p.final_url, pages) is None
+        ] + pages
+        captured = entry.fetched_at.date().isoformat()
+        await _log(
+            log,
+            "research.check",
+            f"Using the saved {domain} snapshot from {captured}",
+            {"check": "seed_snapshot", "source_url": entry.source_url},
+        )
+        return domain, captured, pages
+    return None
+
+
 async def _finish(
     signals: LegitimacySignals,
     hint: Hint,
@@ -1162,11 +1213,24 @@ async def _finish(
     *,
     cache: VerifyCache | None,
     log: LogFn | None,
+    seed: VerifyCache | None = None,
 ) -> DeepFindings:
     """Verify by code, log the result, save to or fall back on the cache."""
+    used_seed = await _add_seed_pages(seed, discovery, hint, purpose, log)
     findings, source, issuer_domains = _verify(
         signals, hint, call_purpose, red_flags, discovery
     )
+    if used_seed is not None:
+        domain, captured, seed_pages = used_seed
+        # "Verified" only when the official number itself came from the snapshot.
+        note = (
+            f"Verified from {domain} snapshot on {captured}"
+            if any(source is p for p in seed_pages)
+            else f"Checked against the {domain} snapshot from {captured}"
+        )
+        findings.verification.evidence.insert(
+            0, f"{note} (the live {domain} site could not be fetched)"
+        )
     for result in findings.verification.signals:
         await _log(
             log,
@@ -1215,15 +1279,19 @@ async def _finish(
         return findings
 
     if discovery.failures:
-        return await _apply_cache(
-            findings,
-            cache=cache,
-            signals=signals,
-            hint=hint,
-            purpose=purpose,
-            call_purpose=call_purpose,
-            red_flags=red_flags,
-            issuer_domains=issuer_domains,
-            log=log,
-        )
+        # Last good live result first, then a saved snapshot; each is re-checked.
+        for fallback in (cache, seed):
+            rechecked = await _apply_cache(
+                findings,
+                cache=fallback,
+                signals=signals,
+                hint=hint,
+                purpose=purpose,
+                call_purpose=call_purpose,
+                red_flags=red_flags,
+                issuer_domains=issuer_domains,
+                log=log,
+            )
+            if rechecked is not findings:
+                return rechecked
     return findings
