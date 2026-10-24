@@ -27,6 +27,7 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | [docs/specs/dashboard-done.md](../docs/specs/dashboard-done.md) | Dashboard: what's left before it's done |
 | [docs/dashboard-AGENTS.md](../docs/dashboard-AGENTS.md) | **Integrating with the dashboard:** what each component must write (event `data`, brief keys, call states) so it shows up |
 | [docs/specs/phone-ports.md](../docs/specs/phone-ports.md) | Phone agent: its ports, fakes, and which rules they enforce |
+| [docs/e2e-run.md](../docs/e2e-run.md) | **Running the whole flow end to end:** the team host's backend (default) or your own, the WhatsApp webhook, dashboards for teammates, who plays the agency, troubleshooting |
 | [docs/specs/phone-live-checks.md](../docs/specs/phone-live-checks.md) | Phone agent: manual calls on real phones (the bridge, the minute alone with the rep, finding the person, the mock line), with results |
 | [docs/overnight-2026-10-24.md](../docs/overnight-2026-10-24.md) | What person 1's session changed overnight Oct 24, by owner, for review |
 | [docs/specs/case-brief.md](../docs/specs/case-brief.md) | **The case brief:** the research → phone contract, field by field, who writes and reads each, the rules every brief keeps |

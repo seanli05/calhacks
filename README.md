@@ -88,6 +88,8 @@ Full guide, with per-component recipes: [docs/data-layer-guide.md](docs/data-lay
 
 ### WhatsApp (Twilio sandbox + ngrok)
 
+To run the whole flow (photo → research → consent → call → summary): [docs/e2e-run.md](docs/e2e-run.md). By default you use the team host's backend and need only your phone.
+
 1. Install ngrok (version 3.20 or newer; run `ngrok update` if needed) and add your token: `ngrok config add-authtoken <token>`.
 2. Run `ngrok http 8000` and copy the `https://...` URL.
 3. In `.env`, set `PUBLIC_BASE_URL` to that URL (no trailing slash, no `/whatsapp`) and fill in `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`. Use the team's one funded Twilio account (ask person 2): a trial account with a negative balance rejected every reply. Restart the server; `--reload` doesn't pick up `.env` changes.
