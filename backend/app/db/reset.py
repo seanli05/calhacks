@@ -89,8 +89,94 @@ def demo_fast_result(case_id: str) -> dict:
     }
 
 
+def demo_brief(case_id: str, brief_id: str) -> dict:
+    """A case brief for the demo call, in the shape of `CaseBrief` in
+    research/models.py (branch research_agent). Provisional: the shared contract is
+    still a dict until persons 3 and 4 agree on the shape. The menu path follows
+    the English-only mock line (mock_agency/README.md)."""
+    return {
+        "brief_id": brief_id,
+        "case_id": case_id,
+        "doc_type": "uscis_i797c_asylum_interview",
+        "issuer": "USCIS",
+        "deadline": DEMO_INTERVIEW_DATE.isoformat(),
+        "appointment": {
+            "date": DEMO_INTERVIEW_DATE.isoformat(),
+            "time": "08:30",
+            "location_ref": "<ref:interview_location>",
+            "citation": "p1",
+        },
+        "call_goal_en": (
+            "Confirm the asylum interview is still scheduled; ask what to do if "
+            "the interpreter can't come"
+        ),
+        "expected_menu_path": [
+            "Main menu: press 2 (interview or appointment notice)",
+            "Appointment menu: press 2 (asylum interview)",
+            (
+                "Receipt number prompt: never enter it (C35); stay silent until the "
+                "line moves on"
+            ),
+            "Reason for calling: say the call goal in plain English",
+            (
+                "Attendance menu: the user decides, so ask_user (1 attending as "
+                "scheduled, 2 need a new date)"
+            ),
+            "Hold until an officer answers, then bring in the user",
+        ],
+        "questions_to_ask": [
+            "Is the interview on November 12 at 8:30 AM still scheduled?",
+            (
+                "If the interpreter can't come, what should the applicant do before "
+                "the interview?"
+            ),
+        ],
+        "must_not_do": [
+            "Never give the A-Number, receipt number, or date of birth",
+            "Never discuss the asylum claim",
+        ],
+        "glossary_terms": ["asylum interview", "interpreter", "dependent"],
+        "facts": [
+            {"field": "receipt_number", "ref": "<ref:receipt_number>", "page": 1},
+            {"field": "a_number", "ref": "<ref:a_number>", "page": 1},
+            {
+                "field": "interview_location",
+                "ref": "<ref:interview_location>",
+                "page": 1,
+            },
+        ],
+        "handoff_note": DEMO_HANDOFF_NOTE,
+        "likely_rep_questions": [
+            {
+                "question": "What is the applicant's full name and date of birth?",
+                "answer_source": "user, once bridged",
+            },
+            {
+                "question": "What is the receipt number?",
+                "answer_source": "user, once bridged",
+            },
+        ],
+        "contingencies": [
+            (
+                "If the officer asks identity questions before the user joins, say "
+                "the applicant will answer them and bring the user in"
+            ),
+            "If the interview was moved, ask for the new date and time",
+        ],
+        "open_uncertainties": ["Whether the applicant's interpreter is available"],
+    }
+
+
+DEMO_HANDOFF_NOTE = (
+    "Calling the USCIS asylum office line to confirm an asylum interview and ask "
+    "about the interpreter. The applicant answers all identity questions in their "
+    "own voice once bridged."
+)
+
+
 async def seed() -> str:
-    """Seed one user, one explained and verified case. Returns the case ID."""
+    """Seed one user and one explained, verified case with a brief, ready for
+    consent. Returns the case ID."""
     official_phone = get_settings().twilio_mock_agency_number or None
     user = tables.User(whatsapp_number=DEMO_WHATSAPP_NUMBER, language="es")
     case = tables.Case(
@@ -103,6 +189,8 @@ async def seed() -> str:
         tables.CaseRef(case_id=case.id, name=name, value=value)
         for name, value in DEMO_REFS.items()
     ]
+    brief = tables.CaseBrief(case_id=case.id, handoff_note=DEMO_HANDOFF_NOTE)
+    brief.brief = demo_brief(case.id, brief.id)
     verification = tables.Verification(
         case_id=case.id,
         status=VerificationStatus.VERIFIED,
@@ -137,7 +225,7 @@ async def seed() -> str:
         await db.flush()
         db.add(case)
         await db.flush()
-        db.add_all([*refs, verification, *events])
+        db.add_all([*refs, brief, verification, *events])
         await db.commit()
     if official_phone is None:
         print("TWILIO_MOCK_AGENCY_NUMBER is unset: the seed has no dialable number.")

@@ -34,6 +34,7 @@ from app.db.schema import create_all, drop_all
 from app.db.tables import utcnow
 from app.db.writes import memory, orchestrator, phone, research
 from app.settings import Settings, get_settings, to_asyncpg_url
+from sqlmodel import select
 
 TEST_DATABASE_URL = Settings().test_database_url
 
@@ -248,3 +249,8 @@ async def test_seed_builds_a_case_awaiting_consent() -> None:
     case_id = await reset.seed()
     assert await reads.case_progress(case_id) == CaseStage.AWAITING_CONSENT
     assert await reads.resolve_ref(case_id, "a_number") == "A212345678"
+    async with session() as db:
+        query = select(tables.CaseBrief).where(tables.CaseBrief.case_id == case_id)
+        brief = (await db.execute(query)).scalar_one()
+    assert brief.brief["brief_id"] == brief.id
+    assert "Never discuss the asylum claim" in brief.brief["must_not_do"]

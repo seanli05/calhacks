@@ -92,12 +92,20 @@ from app.db.events import append_event
 from app.db.ids import new_id
 from app.db.tables import utcnow
 
-await append_event(Event(
-    event_id=new_id("event"), created_at=utcnow(),
-    type=EventType.CALL_MENU_CHOICE, source=Component.PHONE_AGENT,
-    user_id=user_id, case_id=case_id, call_id=call_id, job_id=job_id,
-    summary_en="Pressed 2 (Appointments)", data={"digit": "2"},
-))
+await append_event(
+    Event(
+        event_id=new_id("event"),
+        created_at=utcnow(),
+        type=EventType.CALL_MENU_CHOICE,
+        source=Component.PHONE_AGENT,
+        user_id=user_id,
+        case_id=case_id,
+        call_id=call_id,
+        job_id=job_id,
+        summary_en="Pressed 2 (Appointments)",
+        data={"digit": "2"},
+    )
+)
 ```
 
 - `user_id` is required on every event (schema resolution 3).
@@ -109,14 +117,14 @@ await append_event(Event(
 ```python
 from app.db import jobs
 
-job = await jobs.claim_next(JobType.RESEARCH_FAST)   # None if the queue is empty
+job = await jobs.claim_next(JobType.RESEARCH_FAST)  # None if the queue is empty
 if job:
-    payload = jobs.payload_of(job)                    # -> ResearchFastJob
+    payload = jobs.payload_of(job)  # -> ResearchFastJob
     try:
-        result = ...                                  # do the work
-        await jobs.finish(job.id, result)             # result: a contract model or dict
+        result = ...  # do the work
+        await jobs.finish(job.id, result)  # result: a contract model or dict
     except SomeSpecificError as exc:
-        await jobs.fail(job.id, str(exc))             # no secrets in the error text
+        await jobs.fail(job.id, str(exc))  # no secrets in the error text
 ```
 
 - `claim_next` uses `FOR UPDATE SKIP LOCKED`, so several workers can poll one type safely. There's no notification: poll on an interval (about 1 s) in a background task.
@@ -212,7 +220,7 @@ Rules 1, 3, and 6 (only the orchestrator talks free-form, never impersonate the 
 
 - Unit tests must not hit the network. Monkeypatch the helpers you call (they're plain async functions), and use the contract fixtures as inputs.
 - DB-backed tests run only when `TEST_DATABASE_URL` is set; copy the fixture pattern from `test_db_helpers.py`.
-- The seeded demo case (`reset --yes` on the test branch) gives a verified case at `awaiting_consent`, useful for phone and orchestrator work.
+- The seeded demo case (`reset --yes` on the test branch) gives a verified case at `awaiting_consent` with a brief, useful for phone and orchestrator work. Seed values are in `backend/app/db/reset.py`.
 
 ## Open issues
 
@@ -225,6 +233,6 @@ Open as of this writing; ask person 1 for the latest.
   - It stores `signals`/`call_purpose` on the case, which has no column.
   
   These need reconciling (contracts or models) before research writes to the DB.
-- **`CaseBrief`** is a placeholder `dict`. Person 3's model in `research/models.py` is the likely shape; persons 3 and 4 to confirm.
-- **Demo seed** uses a fake WhatsApp number and `TWILIO_MOCK_AGENCY_NUMBER` as the verified "official" number. It has no brief yet, so a call can't start from it until one is added.
+- **`CaseBrief`** is a placeholder `dict`. The seed uses the shape of `CaseBrief` in `research/models.py` (branch `research_agent`) as a working version: `call_goal_en`, `expected_menu_path`, `questions_to_ask`, `must_not_do`, `facts` (refs), `handoff_note`, `likely_rep_questions`, `contingencies`. Build against it; persons 3 and 4 still need to confirm it.
+- **Demo seed** uses a fake WhatsApp number, so the real demo phone won't match the seeded user yet, and `TWILIO_MOCK_AGENCY_NUMBER` as the verified "official" number (unset means nothing to dial).
 - **Declined sensitive facts:** C15 says the memory writer deletes a fact the user says no to. There's no memory-writer delete helper yet. Ask person 1 before deleting through `app.db.deletes` (that path logs a user-facing `fact.deleted` event).
