@@ -27,6 +27,7 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | [docs/specs/dashboard-done.md](../docs/specs/dashboard-done.md) | Dashboard: what's left before it's done |
 | [docs/dashboard-AGENTS.md](../docs/dashboard-AGENTS.md) | **Integrating with the dashboard:** what each component must write (event `data`, brief keys, call states) so it shows up |
 | [docs/specs/phone-ports.md](../docs/specs/phone-ports.md) | Phone agent: its ports, fakes, and which rules they enforce |
+| [docs/research-integration.md](../docs/research-integration.md) | **Joining the research agent to `main`:** where it sits, decisions made, person 1's prep, steps for person 3 |
 | [docs/whatsapp-pipe.md](../docs/whatsapp-pipe.md) | WhatsApp side: what works, how to plug in (`send_template`, `messages` fields), concerns |
 | [docs/whatsapp-AGENTS.md](../docs/whatsapp-AGENTS.md) | Reviewing the WhatsApp side: every file person 2 built, deliberate choices, what to check |
 | [mock_agency/README.md](../mock_agency/README.md) | The mock USCIS phone line the agent calls: menu tree, hold, officer |
@@ -42,7 +43,7 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | `relay/` | WhatsApp webhook, Twilio send/download, templates (`send_template`); ask_user relay | 2 | Webhook, sending, templates, ask_user (`relay.ask_user.ask_user(request)`, P1) done |
 | `orchestrator/`, `translation/`, `memory/` | WhatsApp agent, translation, memory writer | 2 | Pipe (language pick, photo grouping), call-status messages (C36, `orchestrator/call_status.py`), letter → `research_fast` with a job watcher (`orchestrator/letters.py`, `job_watch.py`), and the Claude turn with five tools plus translation at the edges (`orchestrator/turn.py`, `translation/translate.py`) done; reacting to results, consent and calls, glossary grounding, memory not started. Interfaces and decisions: [docs/whatsapp-pipe.md](../docs/whatsapp-pipe.md) |
 | `dev/` | Dev-only stand-ins: `POST /dev/fake-call` (a scripted call without the phone agent), `POST /dev/fake-research` (finishes research jobs from the contract fixtures). Off unless `DEV_ENDPOINTS=true`; local requests only | 2 | Done |
-| `research/`, `glossary/` | Letter reading, verification, case brief; glossary | 3 | Work is on branch `research_agent` (top-level `research/`, own models) |
+| `research/`, `glossary/` | Letter reading, verification, case brief; glossary | 3 | Work is on branch `research_agent` (top-level `research/`, own models); integration plan in [docs/research-integration.md](../docs/research-integration.md) |
 | `phone/` | Call state machine, hold/human detection, bridge, call report | 4 | State machine (`state.py`), menu decider (`menu.py`), ports and fakes (`ports.py`, `fakes.py`; see [docs/specs/phone-ports.md](../docs/specs/phone-ports.md)) done; phase classifier, runner, real audio next |
 
 Tests live in `backend/tests/`. Contract fixtures in `backend/tests/fixtures/contracts/` double as fake inputs for any component.
