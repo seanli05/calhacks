@@ -8,7 +8,8 @@ so the one fact that must survive is never left to a model. If translation fails
 the user gets the templates and an offer to explain, never English.
 
 Once it's sent, the case's deep pass is watched for the verdict (verdicts.py), so the
-verdict never overtakes the explanation.
+verdict never overtakes the explanation. It's built and sent while holding the user's
+conversation lock, so it never crosses a turn's reply (conversation.py).
 """
 
 import asyncio
@@ -20,6 +21,7 @@ from pydantic import ValidationError
 from app.contracts import ChecklistKind, FastResult, FastResultStatus, ResearchFastJob
 from app.contracts.common import CaseId, DocumentId, LanguageCode, UserId
 from app.db import jobs, reads, tables
+from app.orchestrator.conversation import Conversation
 from app.orchestrator.dates import format_date, format_time
 from app.orchestrator.verdicts import Verdicts
 from app.relay.outbound import send_template, send_text
@@ -78,11 +80,17 @@ class LetterQuestion:
 
 class LetterResults:
     def __init__(
-        self, whatsapp: WhatsApp, translator: Translator | None, verdicts: Verdicts
+        self,
+        whatsapp: WhatsApp,
+        translator: Translator | None,
+        verdicts: Verdicts,
+        *,
+        conversation: Conversation,
     ) -> None:
         self._whatsapp = whatsapp
         self._translator = translator
         self._verdicts = verdicts
+        self._conversation = conversation
         # One open question per user; in memory, like the photo batcher.
         self._questions: dict[UserId, LetterQuestion] = {}
 
@@ -91,6 +99,9 @@ class LetterResults:
 
     def take_question(self, user_id: UserId) -> LetterQuestion | None:
         return self._questions.pop(user_id, None)
+
+    def verdict_pending(self, user_id: UserId) -> bool:
+        return self._verdicts.watching_for(user_id)
 
     async def fast_done(self, job: tables.Job) -> None:
         """React to a finished fast pass (the latest one for its case)."""
@@ -102,6 +113,12 @@ class LetterResults:
         user = await reads.get_user(job.user_id)
         if user is None:
             return
+        async with self._conversation.speaking(user.id):
+            await self._react(user, result, job)
+
+    async def _react(
+        self, user: tables.User, result: FastResult, job: tables.Job
+    ) -> None:
         if result.status == FastResultStatus.NEEDS_USER_INPUT:
             await self._ask(user, result, job)
             return

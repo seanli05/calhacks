@@ -4,13 +4,16 @@ Order per message: user row → media saved → inbound logged → routed. Routi
 a reply to an ask_user question (the call is waiting), then the language pick, photo
 grouping, a "same letter or new?" answer, an answer to research's question about the
 letter (C39), an answer to a consent request, an answer to "may I save this?" (C15),
-or an orchestrator turn. After a turn, if no other numbered question is open, the
-user is asked about facts waiting for their OK.
+or an orchestrator turn. After a turn, the user is asked about facts waiting for their
+OK, but only at a quiet moment: no other numbered question open or waiting, research
+done with their letters, and no call running.
 
 One number's messages are routed one at a time, under a per-number lock. An
-orchestrator turn (slow: a Claude call) runs after that lock is released, under a
-second per-number lock, so a reply to an open ask_user question never waits behind it
-(whatsapp-pipe.md, concern 8).
+orchestrator turn (slow: a Claude call) runs after that lock is released, under the
+user's conversation lock, which proactive messages share (conversation.py), so a reply
+to an open ask_user question never waits behind it (whatsapp-pipe.md, concern 8).
+After each message, a question that waited for the user's answer goes out if no other
+is open now.
 """
 
 import asyncio
@@ -30,6 +33,7 @@ from app.db.messages import append_message
 from app.db.writes import orchestrator as writes
 from app.orchestrator.call_status import get_call_status
 from app.orchestrator.consent import ConsentGate
+from app.orchestrator.conversation import Conversation
 from app.orchestrator.fact_consent import FactConsent
 from app.orchestrator.job_watch import get_job_watcher
 from app.orchestrator.language import (
@@ -91,11 +95,13 @@ class InboundPipe:
         turn: TurnRunner | None = None,
         consent: ConsentGate | None = None,
         fact_consent: FactConsent | None = None,
+        conversation: Conversation | None = None,
     ) -> None:
         """Without `to_english`, non-English messages are logged with no `body_en`;
         without `turn`, free text is echoed (no Anthropic key); without `consent`,
         nothing is routed to a consent request; without `fact_consent`, pending
-        facts are never asked about."""
+        facts are never asked about. `conversation` must be the one the consent
+        gate and the letter results share."""
         self._whatsapp = whatsapp
         self._detect = detect
         self._ask_user = ask_user
@@ -105,8 +111,9 @@ class InboundPipe:
         self._consent = consent
         self._fact_consent = fact_consent
         self.photos = PhotoBatcher(self._letter_ready, quiet_window_s)
+        self.conversation = conversation or Conversation()
+        self.conversation.bind(self.question_open)
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
-        self._turn_locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
     async def handle(self, message: InboundMessage) -> None:
         """Runs as a background task per webhook. One number's messages are routed
@@ -114,10 +121,26 @@ class InboundPipe:
         orchestrator turn runs after the routing lock is released."""
         number = message.whatsapp_number
         async with self._locks[number]:
-            turn = await self._guarded(message, self._handle(message))
+            routed = await self._guarded(message, self._handle(message))
+        if routed is None:
+            return
+        user_id, turn = routed
         if turn is not None:
-            async with self._turn_locks[number]:
-                await self._guarded(message, turn())
+            await self._guarded(message, turn())
+        await self._guarded(message, self.conversation.flush(user_id))
+
+    async def question_open(self, user_id: UserId) -> bool:
+        """A numbered question (or research's question about a letter) is waiting
+        for the user's answer: another one now would make a "1" ambiguous."""
+        consent = self._consent
+        facts = self._fact_consent
+        return (
+            (consent is not None and consent.pending(user_id) is not None)
+            or (facts is not None and facts.pending(user_id) is not None)
+            or self.photos.pending(user_id) is not None
+            or self.letters.question_pending(user_id)
+            or await self._ask_user.question_for_reply(user_id) is not None
+        )
 
     async def _guarded[T](
         self, message: InboundMessage, work: Awaitable[T]
@@ -130,8 +153,9 @@ class InboundPipe:
             logger.exception("Handling sid=%s failed", message.message_sid)
         return None
 
-    async def _handle(self, message: InboundMessage) -> Turn | None:
-        """Route the message; returns the orchestrator turn to run, if any."""
+    async def _handle(self, message: InboundMessage) -> tuple[UserId, Turn | None]:
+        """Route the message; returns the user and the orchestrator turn to run, if
+        any."""
         user = await writes.get_or_create_user(message.whatsapp_number)
         saved, failed = await self._save_media(user.id, message)
 
@@ -159,24 +183,25 @@ class InboundPipe:
         if question is not None and await self._ask_user.handle_reply(
             user, question, message.text
         ):
-            return None
+            return user.id, None
 
         pages = [media_id for media_id, item in saved if item.is_letter_page]
+        turn = None
         if step is not None:
             await self._apply_language_step(user, step, pages)
         elif pages:
             await self._letter_pages(user, pages)
         elif (pending := self.photos.pending(user.id)) is not None:
-            return await self._same_or_new_answer(user, message, inbound, pending)
+            turn = await self._same_or_new_answer(user, message, inbound, pending)
         elif message.text and self.letters.question_pending(user.id):
             await self._letter_answer(user, message, inbound)
         elif self._consent is not None and self._consent.pending(user.id) is not None:
-            return await self._consent_answer(user, message, inbound)
+            turn = await self._consent_answer(user, message, inbound)
         elif self._fact_consent is not None and self._fact_consent.pending(user.id):
-            return await self._fact_consent_answer(user, message, inbound)
+            turn = await self._fact_consent_answer(user, message, inbound)
         else:
-            return partial(self._orchestrator_turn, user, message, inbound.id)
-        return None
+            turn = partial(self._orchestrator_turn, user, message, inbound.id)
+        return user.id, turn
 
     async def _english(
         self,
@@ -350,15 +375,17 @@ class InboundPipe:
         return partial(self._orchestrator_turn, user, message, inbound.id)
 
     async def _ask_about_facts(self, user_id: UserId) -> None:
-        """C15: after a turn, ask about facts waiting for the user's OK, unless
-        another numbered question is open (its "1" must not be read as this one's)."""
+        """C15: after a turn, ask about facts waiting for the user's OK, at a quiet
+        moment only. Not while another numbered question is open or waiting (its
+        "1" must not be read as this one's), and not while research or a call will
+        soon send the user something else: the question would get lost among it."""
         if self._fact_consent is None:
             return
         if (
-            (self._consent is not None and self._consent.pending(user_id) is not None)
-            or self.photos.pending(user_id) is not None
-            or self.letters.question_pending(user_id)
-            or await self._ask_user.question_for_reply(user_id) is not None
+            await self.question_open(user_id)
+            or self.conversation.is_waiting(user_id)
+            or self.letters.researching(user_id)
+            or (self._consent is not None and self._consent.calling(user_id))
         ):
             return
         # Re-read: the turn may have switched the user's language.
@@ -386,13 +413,14 @@ class InboundPipe:
         consent_pending: bool = False,
     ) -> None:
         if self._turn is not None:
-            await self._turn(
-                user,
-                message_id,
-                same_or_new_pending=same_or_new_pending,
-                consent_pending=consent_pending,
-            )
-            await self._ask_about_facts(user.id)
+            async with self.conversation.speaking(user.id):
+                await self._turn(
+                    user,
+                    message_id,
+                    same_or_new_pending=same_or_new_pending,
+                    consent_pending=consent_pending,
+                )
+                await self._ask_about_facts(user.id)
         elif message.text:
             # No Anthropic key: echo, so the pipe can still be tried on a phone.
             await send_text(self._whatsapp, user, f"Echo: {message.text}")
@@ -407,14 +435,20 @@ def get_pipe() -> InboundPipe:
     settings = get_settings()
     whatsapp = get_whatsapp()
     translator = get_translator()
-    consent, letters = _results_path(whatsapp, translator)
+    conversation = Conversation()
+    consent, letters = _results_path(whatsapp, translator, conversation)
     if translator is None:
         logger.warning(
             "ANTHROPIC_API_KEY not set: first contact always gets the menu, nothing "
             "is translated, and free text is echoed"
         )
         return InboundPipe(
-            whatsapp, _no_detection, get_ask_user(), letters, consent=consent
+            whatsapp,
+            _no_detection,
+            get_ask_user(),
+            letters,
+            consent=consent,
+            conversation=conversation,
         )
     client = AsyncAnthropic(api_key=settings.anthropic_api_key)
     turn = OrchestratorTurn(
@@ -423,7 +457,9 @@ def get_pipe() -> InboundPipe:
         whatsapp,
         translator,
         consent,
-        research_questions=ResearchQuestions(whatsapp, translator, get_job_watcher()),
+        research_questions=ResearchQuestions(
+            whatsapp, translator, get_job_watcher(), conversation=conversation
+        ),
     )
     return InboundPipe(
         whatsapp,
@@ -434,15 +470,18 @@ def get_pipe() -> InboundPipe:
         turn=turn.run,
         consent=consent,
         fact_consent=FactConsent(whatsapp, translator),
+        conversation=conversation,
     )
 
 
 def _results_path(
-    whatsapp: WhatsApp, translator: Translator | None
+    whatsapp: WhatsApp, translator: Translator | None, conversation: Conversation
 ) -> tuple[ConsentGate, Letters]:
     """Letter → explanation → verdict → consent → call → summary."""
     job_watcher = get_job_watcher()
-    consent = ConsentGate(whatsapp, translator, job_watcher, get_call_status())
-    verdicts = Verdicts(whatsapp, translator, consent)
-    results = LetterResults(whatsapp, translator, verdicts)
+    consent = ConsentGate(
+        whatsapp, translator, job_watcher, get_call_status(), conversation=conversation
+    )
+    verdicts = Verdicts(whatsapp, translator, consent, conversation=conversation)
+    results = LetterResults(whatsapp, translator, verdicts, conversation=conversation)
     return consent, Letters(whatsapp, job_watcher, results)

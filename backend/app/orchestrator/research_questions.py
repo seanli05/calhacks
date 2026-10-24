@@ -4,7 +4,9 @@ The Claude turn queues a `research_question` job through a tool and tells the us
 it's looking; the answer comes back here and goes out on its own. An answer is
 translated free text with its official sources (the orchestrator may write free
 text, rule 1). A decline gets a fixed template, so "no legal advice" and "we don't
-discuss the claim" never depend on a model or a translation (C33, C34).
+discuss the claim" never depend on a model or a translation (C33, C34). The answer
+is sent under the user's conversation lock, so it never crosses a turn's reply
+(conversation.py).
 """
 
 import logging
@@ -20,6 +22,7 @@ from app.contracts import (
 )
 from app.contracts.common import CaseId
 from app.db import jobs, reads, tables
+from app.orchestrator.conversation import Conversation
 from app.orchestrator.job_watch import JobWatcher
 from app.relay.outbound import send_template, send_text
 from app.relay.whatsapp import WhatsApp, WhatsAppSendError
@@ -39,11 +42,17 @@ _DECLINE_TEMPLATES = {
 
 class ResearchQuestions:
     def __init__(
-        self, whatsapp: WhatsApp, translator: Translator | None, watcher: JobWatcher
+        self,
+        whatsapp: WhatsApp,
+        translator: Translator | None,
+        watcher: JobWatcher,
+        *,
+        conversation: Conversation,
     ) -> None:
         self._whatsapp = whatsapp
         self._translator = translator
         self._watcher = watcher
+        self._conversation = conversation
 
     async def ask(
         self, user: tables.User, question_en: str, case_id: CaseId | None
@@ -70,10 +79,11 @@ class ResearchQuestions:
         user = await reads.get_user(job.user_id)
         if user is None:
             return
-        try:
-            await self._send(user, job)
-        except WhatsAppSendError as exc:
-            logger.error("Research answer not sent job_id=%s: %s", job.id, exc)
+        async with self._conversation.speaking(user.id):
+            try:
+                await self._send(user, job)
+            except WhatsAppSendError as exc:
+                logger.error("Research answer not sent job_id=%s: %s", job.id, exc)
 
     async def _send(self, user: tables.User, job: tables.Job) -> None:
         if job.status == JobStatus.FAILED:

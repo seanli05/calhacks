@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 from app.contracts import JobType, QuestionAnswer, ResearchQuestionJob
+from app.orchestrator.conversation import Conversation
 from app.orchestrator.job_watch import JobWatcher
 from app.orchestrator.research_questions import ResearchQuestions
 from app.orchestrator.tools import CaseTools
@@ -17,10 +18,13 @@ SOURCE = "https://www.uscis.gov/humanitarian/refugees-and-asylum/asylum"
 
 @pytest.fixture
 def questions(
-    whatsapp: FakeWhatsApp, translator: FakeTranslator, job_watcher: JobWatcher
+    whatsapp: FakeWhatsApp,
+    translator: FakeTranslator,
+    job_watcher: JobWatcher,
+    conversation: Conversation,
 ) -> ResearchQuestions:
     fake: Any = translator
-    return ResearchQuestions(whatsapp, fake, job_watcher)
+    return ResearchQuestions(whatsapp, fake, job_watcher, conversation=conversation)
 
 
 async def settle() -> None:
@@ -111,10 +115,15 @@ async def test_failed_job_says_try_again(
 
 
 async def test_untranslated_answer_still_gives_the_sources(
-    db: FakeDB, whatsapp: FakeWhatsApp, job_watcher: JobWatcher
+    db: FakeDB,
+    whatsapp: FakeWhatsApp,
+    job_watcher: JobWatcher,
+    conversation: Conversation,
 ) -> None:
     fake: Any = FakeTranslator(fail=True)
-    questions = ResearchQuestions(whatsapp, fake, job_watcher)
+    questions = ResearchQuestions(
+        whatsapp, fake, job_watcher, conversation=conversation
+    )
     job_id = await ask(db, questions, whatsapp)
     db.finish_job(
         job_id,

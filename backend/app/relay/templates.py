@@ -16,6 +16,24 @@ _MENU = (
     "2 English"
 )
 
+# The end of every consent request: how the call works, then the choice.
+_CALL_ASK = {
+    "es": (
+        "Yo espero en la línea y le llamo cuando conteste una persona. No daré sus "
+        "números de caso ni su fecha de nacimiento.\n"
+        "1 Sí, llame\n2 No, gracias"
+    ),
+    "en": (
+        "I'll wait on hold and call you when a person answers. I won't share your "
+        "case numbers or date of birth.\n"
+        "1 Yes, call\n2 No, thanks"
+    ),
+}
+_VERIFIED = {
+    "es": "✅ Su carta es auténtica: la revisé con la información oficial de uscis.gov.",
+    "en": "✅ Your letter is genuine: I checked it against official information on uscis.gov.",
+}
+
 TEMPLATES: dict[str, dict[LanguageCode, str]] = {
     "language.confirm": {
         "es": "Parece que habla español. ¿Seguimos en español?\n1 Sí\n2 Otro idioma",
@@ -37,17 +55,18 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
     },
     "language.set_letter": {
         "es": (
-            "Perfecto, seguimos en español. Recibí su carta. ¿Tiene más páginas? "
-            "Envíelas ahora y las junto con la misma carta."
+            "Perfecto, seguimos en español. Recibí su carta. Si tiene más páginas, "
+            "envíelas ahora."
         ),
         "en": (
-            "Great, we'll continue in English. I got your letter. Are there more "
-            "pages? Send them now and I'll keep them with the same letter."
+            "Great, we'll continue in English. I got your letter. If it has more "
+            "pages, send them now."
         ),
     },
+    # No question mark: a question invites a "no, that's it" that needs a turn.
     "letter.received": {
-        "es": "Recibido. ¿Tiene más páginas? Envíelas ahora y las junto con la misma carta.",
-        "en": "Got it. Are there more pages? Send them now and I'll keep them with the same letter.",
+        "es": "Recibido. Si tiene más páginas, envíelas ahora.",
+        "en": "Got it. If there are more pages, send them now.",
     },
     "letter.same_or_new": {
         "es": "¿Es otra página de la misma carta, o una carta nueva?\n1 Misma carta\n2 Carta nueva",
@@ -222,10 +241,7 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         "en": "I couldn't read the photo well. {tip} Could you send another one?",
     },
     # R2 (Goal 6.2).
-    "verification.verified": {
-        "es": "Revisé su carta con la información oficial de uscis.gov: es auténtica. ✅",
-        "en": "I checked your letter against official information on uscis.gov: it's genuine. ✅",
-    },
+    "verification.verified": _VERIFIED,
     "verification.verified_no_call": {
         "es": (
             "Revisé su carta con la información oficial de uscis.gov: es auténtica. ✅ "
@@ -276,35 +292,41 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
     },
     # Consent (Goal 6.3, C21). A YES covers one call; every call asks again.
     "consent.request": {
-        "es": (
-            "¿Quiere que llame a USCIS por usted?\nPara qué: {goal}\n"
-            "Yo espero en la línea. Cuando conteste una persona, le llamo a este "
-            "número para que hable usted. No daré sus números de caso ni su fecha de "
-            "nacimiento. Le pido permiso para cada llamada.\n"
-            "1 Sí, llame\n2 No, gracias"
-        ),
-        "en": (
-            "Would you like me to call USCIS for you?\nWhat for: {goal}\n"
-            "I'll wait on the line. When a person answers, I'll call you at this "
-            "number so you can talk to them. I won't give out your case numbers or "
-            "your date of birth. I ask your permission for every call.\n"
-            "1 Yes, call\n2 No, thanks"
-        ),
+        "es": "¿Quiere que llame a USCIS por usted?\nPara qué: {goal}\n"
+        + _CALL_ASK["es"],
+        "en": "Would you like me to call USCIS for you?\nWhat for: {goal}\n"
+        + _CALL_ASK["en"],
     },
     "consent.request_generic": {
+        "es": "¿Quiere que llame a USCIS por usted sobre esta carta?\n"
+        + _CALL_ASK["es"],
+        "en": "Would you like me to call USCIS for you about this letter?\n"
+        + _CALL_ASK["en"],
+    },
+    # The verdict and the consent request in one message, so the user has one thing
+    # to answer (conversation.py).
+    "verification.verified_call": {
         "es": (
-            "¿Quiere que llame a USCIS por usted sobre esta carta?\n"
-            "Yo espero en la línea. Cuando conteste una persona, le llamo a este "
-            "número para que hable usted. No daré sus números de caso ni su fecha de "
-            "nacimiento. Le pido permiso para cada llamada.\n"
-            "1 Sí, llame\n2 No, gracias"
+            _VERIFIED["es"]
+            + "\n¿Quiere que llame a USCIS por usted?\nPara qué: {goal}\n"
+            + _CALL_ASK["es"]
         ),
         "en": (
-            "Would you like me to call USCIS for you about this letter?\n"
-            "I'll wait on the line. When a person answers, I'll call you at this "
-            "number so you can talk to them. I won't give out your case numbers or "
-            "your date of birth. I ask your permission for every call.\n"
-            "1 Yes, call\n2 No, thanks"
+            _VERIFIED["en"]
+            + "\nWould you like me to call USCIS for you?\nWhat for: {goal}\n"
+            + _CALL_ASK["en"]
+        ),
+    },
+    "verification.verified_call_generic": {
+        "es": (
+            _VERIFIED["es"]
+            + "\n¿Quiere que llame a USCIS por usted sobre esta carta?\n"
+            + _CALL_ASK["es"]
+        ),
+        "en": (
+            _VERIFIED["en"]
+            + "\nWould you like me to call USCIS for you about this letter?\n"
+            + _CALL_ASK["en"]
         ),
     },
     "consent.reprompt": {

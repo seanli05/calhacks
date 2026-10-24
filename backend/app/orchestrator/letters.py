@@ -78,6 +78,11 @@ class Letters:
                 return
         await self._queue_fast(user, _Letter(document_id, case_id))
 
+    def researching(self, user_id: UserId) -> bool:
+        """Research is still reading or checking one of the user's letters: a
+        message about it is on its way."""
+        return user_id in self._reading or self._results.verdict_pending(user_id)
+
     def question_pending(self, user_id: UserId) -> bool:
         """Research asked something about the user's letter (C39)."""
         return self._results.question(user_id) is not None

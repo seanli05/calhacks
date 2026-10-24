@@ -28,12 +28,16 @@ from app.db.ids import new_id
 from app.db.tables import utcnow
 from app.orchestrator.call_status import CallStatusWatcher
 from app.orchestrator.consent import ConsentGate
+from app.orchestrator.conversation import Conversation
 from app.orchestrator.dates import format_date, format_time
 from app.orchestrator.job_watch import JobWatcher
 from app.orchestrator.letter_result import LetterResults, date_line
+from app.orchestrator.letters import Letters
 from app.orchestrator.pipe import InboundPipe
 from app.orchestrator.tools import CaseTools
 from app.orchestrator.verdicts import Verdicts
+from app.relay.ask_user import AskUser
+from app.relay.outbound import send_text
 from app.relay.templates import render
 from whatsapp_fakes import FakeDB, FakeTranslator, FakeWhatsApp, inbound, use_spanish
 
@@ -153,15 +157,15 @@ async def test_explanation_carries_the_date_checklist_and_closing(
 
 
 async def test_untranslated_explanation_falls_back_to_templates_never_english(
-    db: FakeDB, whatsapp: FakeWhatsApp, verdicts: Verdicts
+    db: FakeDB, whatsapp: FakeWhatsApp, verdicts: Verdicts, conversation: Conversation
 ) -> None:
     user = await use_spanish(db)
     result = FastResult.model_validate(fixture("fast_result.json", case_id="case_1"))
     failing: Any = FakeTranslator(fail=True)
 
-    await LetterResults(whatsapp, failing, verdicts).fast_done(
-        await finished_fast_job(db, user, "case_1", result)
-    )
+    await LetterResults(
+        whatsapp, failing, verdicts, conversation=conversation
+    ).fast_done(await finished_fast_job(db, user, "case_1", result))
 
     [message] = db.messages
     assert message.body_original.startswith(render("letter.explain_failed", "es"))
@@ -236,7 +240,7 @@ async def test_research_question_survives_a_payload_that_no_longer_validates(
 # R2 (6.2)
 
 
-async def test_verified_letter_gets_the_verdict_then_a_consent_request(
+async def test_verified_letter_gets_the_verdict_and_consent_request_in_one_message(
     db: FakeDB, verdicts: Verdicts, consent: ConsentGate
 ) -> None:
     user = await use_spanish(db)
@@ -248,12 +252,76 @@ async def test_verified_letter_gets_the_verdict_then_a_consent_request(
     )
     await until(lambda: consent.pending(user.id) is not None)
 
-    assert db.outbound_templates() == ["verification.verified", "consent.request"]
+    assert db.outbound_templates() == ["verification.verified_call"]
     asked = db.messages[-1]
+    assert asked.body_original.startswith(render("verification.verified", "es"))
     assert "[es] Confirm the interview is still scheduled" in asked.body_original
     assert asked.body_en is not None and "Confirm the interview" in asked.body_en
     [requested] = [e for e in db.events if e.type == EventType.CONSENT_REQUESTED]
     assert requested.data == {"agency": "USCIS"}
+
+
+async def test_consent_request_waits_while_another_question_is_open(
+    db: FakeDB, pipe: InboundPipe, verdicts: Verdicts, consent: ConsentGate
+) -> None:
+    """One numbered question at a time: a "1" must answer exactly one."""
+    user = await use_spanish(db)
+    case = db.add_verified_case(user)
+    letter = await db.create_document(user.id, ["media_old"])
+    case.document_ids = [letter.id]
+    await pipe.handle(inbound(photos=1))  # "same letter or new?"
+
+    refusal = await consent.request(user, case.id)  # the turn's tool
+    assert refusal is not None and "Another numbered question" in refusal
+
+    await verdicts.react(user, deep_result(case.id, VerificationStatus.VERIFIED))
+    assert db.outbound_templates() == ["letter.same_or_new", "verification.verified"]
+    assert consent.pending(user.id) is None
+
+    await pipe.handle(inbound("1"))  # answers the photo question, not the call
+
+    assert db.outbound_templates()[-2:] == ["letter.pages_added", "consent.request"]
+    assert consent.pending(user.id) is not None
+    assert db.jobs_of(JobType.CALL) == []
+
+
+async def test_explanation_waits_for_a_turn_in_progress(
+    db: FakeDB,
+    whatsapp: FakeWhatsApp,
+    ask_user: AskUser,
+    letters: Letters,
+    letter_results: LetterResults,
+    conversation: Conversation,
+) -> None:
+    """A turn's reply and the explanation never cross: whichever starts second is
+    written after the first has gone out."""
+    user = await use_spanish(db)
+    release = asyncio.Event()
+
+    async def turn(user: tables.User, message_id: str, **_: bool) -> None:
+        await release.wait()
+        await send_text(whatsapp, user, "turn reply")
+
+    async def detect(text: str) -> None:
+        return None
+
+    pipe = InboundPipe(
+        whatsapp, detect, ask_user, letters, turn=turn, conversation=conversation
+    )
+    handling = asyncio.create_task(pipe.handle(inbound("ya está")))
+    await until(lambda: conversation.speaking(user.id).locked())
+    result = FastResult.model_validate(fixture("fast_result.json", case_id="case_1"))
+    job = await finished_fast_job(db, user, "case_1", result)
+    explaining = asyncio.create_task(letter_results.fast_done(job))
+    await asyncio.sleep(0.05)
+    assert [m.direction for m in db.messages] == ["in"]
+
+    release.set()
+    await asyncio.gather(handling, explaining)
+
+    first, second = [m.body_original for m in db.messages if m.direction == "out"]
+    assert first == "turn reply"
+    assert second.startswith("[es] This is a notice from USCIS")
 
 
 @pytest.mark.parametrize(

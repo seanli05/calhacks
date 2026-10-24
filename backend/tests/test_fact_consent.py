@@ -1,22 +1,37 @@
 """Asking before saving (C15, Goal 7.5) on fakes: the orchestrator asks about
 pending facts after a turn; the memory writer acts on the answer."""
 
+import json
+from pathlib import Path
 from typing import Any
 
 import pytest
 from app.contracts import (
     AskUserRequest,
+    DeepResult,
     EventType,
     FactSource,
     FactStatus,
+    JobType,
     Sensitivity,
 )
 from app.db import tables
+from app.db.tables import utcnow
 from app.orchestrator.consent import ConsentGate
+from app.orchestrator.conversation import Conversation
 from app.orchestrator.fact_consent import FactConsent
 from app.orchestrator.pipe import InboundPipe
+from app.orchestrator.verdicts import Verdicts
 from app.relay.ask_user import AskUser
 from whatsapp_fakes import FakeDB, FakeTranslator, FakeWhatsApp, inbound, use_spanish
+
+FIXTURES = Path(__file__).parent / "fixtures" / "contracts"
+
+
+def verified_deep(case_id: str) -> DeepResult:
+    """R2 for a verified letter with a call recommended."""
+    data = json.loads((FIXTURES / "deep_result.json").read_text(encoding="utf-8"))
+    return DeepResult.model_validate({**data, "case_id": case_id})
 
 
 @pytest.fixture
@@ -38,6 +53,7 @@ def memory_pipe(
     consent: ConsentGate,
     fact_consent: FactConsent,
     turns: list[str],
+    conversation: Conversation,
 ) -> InboundPipe:
     async def turn(user: tables.User, message_id: str, **_: bool) -> None:
         turns.append(message_id)
@@ -55,6 +71,7 @@ def memory_pipe(
         turn=turn,
         consent=consent,
         fact_consent=fact_consent,
+        conversation=conversation,
     )
 
 
@@ -186,3 +203,59 @@ async def test_a_fact_deleted_meanwhile_is_left_alone(
     saved = [e.data for e in db.events if e.type == EventType.MEMORY_FACT_SAVED]
     assert saved == [{"fact_id": kept.id}]
     assert fact_consent.pending(user.id) is None
+
+
+# Pacing: the question waits for a quiet moment (conversation.py)
+
+
+async def test_a_one_for_the_save_question_never_starts_a_call(
+    db: FakeDB, memory_pipe: InboundPipe, verdicts: Verdicts, consent: ConsentGate
+) -> None:
+    """The verdict lands while "may I save this?" is open: the call question
+    waits, so the user's "1" saves the facts and starts nothing (rule 4)."""
+    user = await use_spanish(db)
+    case = db.add_verified_case(user)
+    await pending_fact(db, user, "Has an asylum interview scheduled")
+    await memory_pipe.handle(inbound("hola"))
+    assert db.outbound_templates() == ["memory.ask_save"]
+
+    await verdicts.react(user, verified_deep(case.id))
+    assert db.outbound_templates()[-1] == "verification.verified"
+    assert consent.pending(user.id) is None
+
+    await memory_pipe.handle(inbound("1"))
+
+    assert db.outbound_templates()[-2:] == ["memory.saved", "consent.request"]
+    assert db.jobs_of(JobType.CALL) == []
+
+    await memory_pipe.handle(inbound("1"))
+    assert len(db.jobs_of(JobType.CALL)) == 1
+
+
+async def test_facts_wait_while_research_is_still_checking_the_letter(
+    db: FakeDB, memory_pipe: InboundPipe, verdicts: Verdicts, turns: list[str]
+) -> None:
+    user = await use_spanish(db)
+    case = db.add_verified_case(user)
+    await pending_fact(db, user, "Has an asylum interview scheduled")
+    verdicts.watch(user.id, case.id, since=utcnow())  # the deep pass is running
+
+    await memory_pipe.handle(inbound("ya está"))
+
+    assert len(turns) == 1
+    assert "memory.ask_save" not in db.outbound_templates()
+
+
+async def test_facts_wait_while_a_call_is_running(
+    db: FakeDB, memory_pipe: InboundPipe, consent: ConsentGate, turns: list[str]
+) -> None:
+    user = await use_spanish(db)
+    case = db.add_verified_case(user)
+    assert await consent.request(user, case.id) is None
+    await memory_pipe.handle(inbound("1"))  # the call starts
+    await pending_fact(db, user, "Has an asylum interview scheduled")
+
+    await memory_pipe.handle(inbound("¿cuánto tarda?"))
+
+    assert len(turns) == 1
+    assert "memory.ask_save" not in db.outbound_templates()

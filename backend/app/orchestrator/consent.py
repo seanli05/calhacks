@@ -7,7 +7,9 @@ number, and one YES covers one call. The model can ask for consent (the turn's
 `answer`.
 
 The open request lives in memory, one per user. A restart forgets it, and a "1" sent
-then goes to the orchestrator turn, which can ask again.
+then goes to the orchestrator turn, which can ask again. No request goes out while
+another numbered question is open (conversation.py), so a "1" never answers the
+wrong question.
 
 When the call job finishes, the user gets the summary, then either a new consent
 request (failed, unreachable: C21) or a suggestion to close the case (resolved with no
@@ -42,6 +44,7 @@ from app.db.ids import new_id
 from app.db.tables import utcnow
 from app.orchestrator.call_status import CallStatusWatcher
 from app.orchestrator.call_summary import send_call_summary
+from app.orchestrator.conversation import Conversation
 from app.orchestrator.job_watch import JobWatcher
 from app.relay.outbound import send_template
 from app.relay.whatsapp import WhatsApp, WhatsAppSendError
@@ -67,47 +70,70 @@ class ConsentGate:
         translator: Translator | None,
         job_watcher: JobWatcher,
         call_status: CallStatusWatcher,
+        *,
+        conversation: Conversation,
     ) -> None:
         self._whatsapp = whatsapp
         self._translator = translator
         self._job_watcher = job_watcher
         self._call_status = call_status
+        self._conversation = conversation
         self._pending: dict[UserId, PendingConsent] = {}
-        # Cases with a call job queued or running: no second request until it ends.
-        self._calling: set[CaseId] = set()
+        # Cases with a call job queued or running, and whose they are: no second
+        # request until it ends.
+        self._calling: dict[CaseId, UserId] = {}
 
     def pending(self, user_id: UserId) -> PendingConsent | None:
         return self._pending.get(user_id)
 
+    def calling(self, user_id: UserId) -> bool:
+        """A call job is queued or running for one of the user's cases."""
+        return user_id in self._calling.values()
+
     async def request(
-        self, user: tables.User, case_id: CaseId, *, goal_en: str | None = None
+        self,
+        user: tables.User,
+        case_id: CaseId,
+        *,
+        goal_en: str | None = None,
+        verified: bool = False,
     ) -> str | None:
-        """Ask the user whether to call about this case. Returns None once asked, or
-        the reason (English, for the model) the call can't be offered."""
+        """Ask the user whether to call about this case. With `verified`, the same
+        message leads with "it's genuine" (one message for the verdict and the
+        question, Verdicts). Returns None once asked, or the reason (English, for
+        the model) the call can't be offered."""
         case = await reads.get_case(case_id)
         if case is None or case.user_id != user.id:
             return f"No case {case_id} for this user."
         refusal = await self._refusal(case_id)
         if refusal is not None:
             return refusal
+        if user.id not in self._pending and await self._conversation.question_open(
+            user.id
+        ):
+            return (
+                "Another numbered question is waiting for the user's answer. Ask "
+                "about the call after they answer it."
+            )
         brief = await reads.latest_brief(case_id)
         if brief is None:
             return "The call plan isn't ready yet."
         goal_en = goal_en or _call_goal_en(brief)
         language = user.language or "en"
         goal = await localize(self._translator, goal_en, language) if goal_en else None
+        template = "verification.verified_call" if verified else "consent.request"
         if goal is not None and goal_en is not None:
             asked = await send_template(
                 self._whatsapp,
                 user,
-                "consent.request",
+                template,
                 {"goal": goal},
                 values_en={"goal": goal_en},
                 case_id=case_id,
             )
         else:
             asked = await send_template(
-                self._whatsapp, user, "consent.request_generic", case_id=case_id
+                self._whatsapp, user, f"{template}_generic", case_id=case_id
             )
         self._pending[user.id] = PendingConsent(case_id, asked.created_at)
         await _event(
@@ -187,7 +213,7 @@ class ConsentGate:
             user.id,
             case_id,
         )
-        self._calling.add(case_id)
+        self._calling[case_id] = user.id
         logger.info(
             "Call queued user_id=%s case_id=%s job_id=%s", user.id, case_id, job.id
         )
@@ -214,7 +240,7 @@ class ConsentGate:
     async def _call_finished(self, job: tables.Job) -> None:
         case_id = job.case_id
         assert case_id is not None
-        self._calling.discard(case_id)
+        self._calling.pop(case_id, None)
         report = None
         if job.status == JobStatus.DONE:
             try:
@@ -226,13 +252,14 @@ class ConsentGate:
         user = await reads.get_user(job.user_id)
         if user is None:
             return
-        try:
-            await send_call_summary(
-                self._whatsapp, self._translator, user, report, case_id
-            )
-            await self._after_call(user, case_id, report)
-        except WhatsAppSendError as exc:
-            logger.error("Post-call message not sent case_id=%s: %s", case_id, exc)
+        async with self._conversation.speaking(user.id):
+            try:
+                await send_call_summary(
+                    self._whatsapp, self._translator, user, report, case_id
+                )
+                await self._after_call(user, case_id, report)
+            except WhatsAppSendError as exc:
+                logger.error("Post-call message not sent case_id=%s: %s", case_id, exc)
 
     async def _after_call(
         self, user: tables.User, case_id: CaseId, report: CallReport | None

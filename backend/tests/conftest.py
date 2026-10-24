@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 from app.orchestrator.call_status import CallStatusWatcher
 from app.orchestrator.consent import ConsentGate
+from app.orchestrator.conversation import Conversation
 from app.orchestrator.job_watch import JobWatcher
 from app.orchestrator.letter_result import LetterResults
 from app.orchestrator.letters import Letters
@@ -115,30 +116,46 @@ def call_status(whatsapp: FakeWhatsApp) -> CallStatusWatcher:
 
 
 @pytest.fixture
+def conversation() -> Conversation:
+    return Conversation()
+
+
+@pytest.fixture
 def consent(
     whatsapp: FakeWhatsApp,
     translator: FakeTranslator,
     job_watcher: JobWatcher,
     call_status: CallStatusWatcher,
+    conversation: Conversation,
 ) -> ConsentGate:
     fake: Any = translator
-    return ConsentGate(whatsapp, fake, job_watcher, call_status)
+    return ConsentGate(
+        whatsapp, fake, job_watcher, call_status, conversation=conversation
+    )
 
 
 @pytest.fixture
 def verdicts(
-    whatsapp: FakeWhatsApp, translator: FakeTranslator, consent: ConsentGate
+    whatsapp: FakeWhatsApp,
+    translator: FakeTranslator,
+    consent: ConsentGate,
+    conversation: Conversation,
 ) -> Verdicts:
     fake: Any = translator
-    return Verdicts(whatsapp, fake, consent, poll_interval_s=0.01)
+    return Verdicts(
+        whatsapp, fake, consent, poll_interval_s=0.01, conversation=conversation
+    )
 
 
 @pytest.fixture
 def letter_results(
-    whatsapp: FakeWhatsApp, translator: FakeTranslator, verdicts: Verdicts
+    whatsapp: FakeWhatsApp,
+    translator: FakeTranslator,
+    verdicts: Verdicts,
+    conversation: Conversation,
 ) -> LetterResults:
     fake: Any = translator
-    return LetterResults(whatsapp, fake, verdicts)
+    return LetterResults(whatsapp, fake, verdicts, conversation=conversation)
 
 
 @pytest.fixture
@@ -155,10 +172,17 @@ def pipe(
     ask_user: AskUser,
     letters: Letters,
     consent: ConsentGate,
+    conversation: Conversation,
 ) -> InboundPipe:
     async def detect(text: str) -> str | None:
         return detected.get(text)
 
     return InboundPipe(
-        whatsapp, detect, ask_user, letters, quiet_window_s=QUIET_S, consent=consent
+        whatsapp,
+        detect,
+        ask_user,
+        letters,
+        quiet_window_s=QUIET_S,
+        consent=consent,
+        conversation=conversation,
     )
