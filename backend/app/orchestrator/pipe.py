@@ -43,7 +43,7 @@ from app.relay.replies import parse_choice
 from app.relay.whatsapp import WhatsApp, WhatsAppSendError, get_whatsapp
 from app.settings import get_settings
 from app.translation.detect import detect_language
-from app.translation.translate import Translator
+from app.translation.translate import get_translator
 
 logger = logging.getLogger(__name__)
 
@@ -303,14 +303,14 @@ def get_pipe() -> InboundPipe:
     settings = get_settings()
     whatsapp = get_whatsapp()
     letters = Letters(whatsapp, get_job_watcher())
-    if not settings.anthropic_api_key:
+    translator = get_translator()
+    if translator is None:
         logger.warning(
             "ANTHROPIC_API_KEY not set: first contact always gets the menu, nothing "
             "is translated, and free text is echoed"
         )
         return InboundPipe(whatsapp, _no_detection, get_ask_user(), letters)
     client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-    translator = Translator(client, settings.model_fast)
     turn = OrchestratorTurn(client, settings.model_default, whatsapp, translator)
     return InboundPipe(
         whatsapp,

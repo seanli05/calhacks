@@ -1,6 +1,6 @@
 # WhatsApp side: status, interfaces, and decisions
 
-Owner: person 2 (Lauren). Last updated 2026-10-24, branch `lauren-goal4-claude-turn`.
+Owner: person 2 (Lauren). Last updated 2026-10-24, branch `lauren-goal5-option-labels`.
 
 This page is the record for the WhatsApp side (relay, orchestrator pipe, call status). Other components should build against the interfaces and decisions here. If something here conflicts with Plan.md, Plan.md wins; tell person 2.
 
@@ -27,7 +27,7 @@ This page is the record for the WhatsApp side (relay, orchestrator pipe, call st
 - **Finished jobs.** One watcher per queued job polls `get_job` until it's done or failed. After 45 s on the fast pass, the user gets "taking longer" (Plan.md failure rules). The R1 reaction itself is Goal 6.1; for now a finished fast pass is only logged.
 - **Turns outside the lock.** The orchestrator turn runs after the per-number routing lock is released, so an ask_user reply never waits behind it (concern 8 fixed).
 - **The Claude turn (4.1, 4.5).** Free text gets a reply from `MODEL_DEFAULT` with five tools: `list_active_cases`, `get_case_status`, `get_profile`, `close_case`, `set_language`. It answers questions about a letter from the stored R1 (explanation, appointment, checklist) and the verdict. It refuses legal advice and interview interpreting per C33. It never sees a resolved ref. Text that isn't `1`/`2` while "same letter or new?" is open goes to the turn, which answers and reminds the user to pick.
-- **Translation at the edges (5.1).** Inbound text is translated to English for `messages.body_en` (`MODEL_FAST`), except replies to an open ask_user question. The turn thinks and writes in English, and its reply is translated into the user's language (Spanish register: warm, simple, *usted*). If the model or the translation fails, the user gets the `orchestrator.unavailable` template, never untranslated English.
+- **Translation at the edges (5.1).** Inbound text is translated to English for `messages.body_en` (`MODEL_FAST`), except replies to an open ask_user question. The turn thinks and writes in English, and its reply is translated into the user's language (Spanish register: warm, simple, *usted*). If the model or the translation fails, the user gets the `orchestrator.unavailable` template, never untranslated English. ask_user option labels are translated too (concern 7).
 - **Fake research agent.** `POST /dev/fake-research` claims research jobs and finishes them from the contract fixtures, so the path can be tried before the research agent is on `main`.
 
 `pytest` covers every routing path on fakes, with no network.
@@ -160,7 +160,7 @@ Made to unblock the build; each follows Plan.md where Plan.md speaks. Raise any 
 4. **The sandbox is slow.** Twilio takes 5–9 s to forward each message to us (photos are the slow end). Our reply goes out 1–2 s after that.
 5. **The Spanish template text needs a native speaker's check**, using USCIS's official Spanish terms where they apply. That includes the new `research.slow` and `orchestrator.unavailable` templates, and a sample of translated turn replies.
 6. **The sandbox delay eats into ask_user's timeout.** The user has about 30 s of real time out of 45 s. Don't go below 45.
-7. **ask_user options are in English for now.** The question text is Spanish, but the option labels go out as given until translation lands (Goal 5).
+7. ~~ask_user options are in English.~~ Fixed: the labels are translated as the question goes out (`MODEL_FAST`, 3 s cap). If that fails or is slow, they go out in English rather than delay the question. `body_en`, the `call.ask_user` event and the `questions` row keep the English labels. The late-reply message names the default as the user saw it.
 8. ~~Goal 4 must not hold up ask_user replies.~~ Fixed: the orchestrator turn runs after the routing lock is released, under a separate per-number turn lock. Job reactions run in their watcher's task, outside both.
 9. **Two registers in one demo (person 1).** The dashboard feed says *tú* ("Elegiste la opción"); Plan.md and every WhatsApp template use formal *usted*. Pick one, presumably *usted*.
 10. **`.env.example` fix.** It used to pre-fill `DATABASE_URL_UNPOOLED` with localhost, which silently overrode `DATABASE_URL`. It's blank now. Delete that line from your own `.env` if you have it.

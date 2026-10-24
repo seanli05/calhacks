@@ -34,3 +34,12 @@ with immigration letters, from English into {language}. {register}
 """
     + _PASS_THROUGH
 )
+
+LABELS_FROM_ENGLISH_SYSTEM = (
+    """You translate the option labels of an automated phone menu, from English into {language}, for a user who must pick one. {register} Keep each label short and keep the meaning exact: the user's choice decides which menu option is pressed.
+
+The input is JSON with a "labels" list. Return the same number of labels, in the same order, one translation per label.
+
+"""
+    + _PASS_THROUGH
+)

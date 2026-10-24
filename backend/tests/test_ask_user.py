@@ -205,3 +205,69 @@ async def test_unknown_question_kind_fails_before_asking(
     with pytest.raises(ValueError, match="no_such_kind"):
         await ask_user.ask(req)
     assert db.questions == {}
+
+
+# Option labels in the user's language (concern 7)
+
+SPANISH = ["Hablar con un representante sobre una cita", "Estado del caso"]
+
+
+def translating(
+    whatsapp: FakeWhatsApp, labels: list[str] | None = SPANISH, delay_s: float = 0
+) -> AskUser:
+    async def translate(options_en: list[str], language: str) -> list[str] | None:
+        assert (options_en, language) == (OPTIONS, "es")
+        await asyncio.sleep(delay_s)
+        return labels
+
+    return AskUser(whatsapp, translate_labels=translate, labels_timeout_s=0.2)
+
+
+async def test_options_go_out_translated_and_are_logged_in_english(
+    db: FakeDB, whatsapp: FakeWhatsApp
+) -> None:
+    _, call = await on_call(db)
+
+    await translating(whatsapp).ask(request(call, timeout_s=1))
+
+    question_out = next(m for m in db.messages if m.template == "ask_user.menu_choice")
+    assert "1 Hablar con un representante sobre una cita" in question_out.body_original
+    assert "Speak to a representative" not in question_out.body_original
+    assert question_out.body_en is not None
+    assert "1 Speak to a representative about an appointment" in question_out.body_en
+    assert db.events[0].data["options_en"] == OPTIONS
+
+
+@pytest.mark.parametrize(("labels", "delay_s"), [(None, 0), (SPANISH, 1)])
+async def test_options_fall_back_to_english_rather_than_wait(
+    db: FakeDB, whatsapp: FakeWhatsApp, labels: list[str] | None, delay_s: float
+) -> None:
+    """A failed or slow translation never holds up the call's question."""
+    _, call = await on_call(db)
+    ask_user = translating(whatsapp, labels, delay_s)
+
+    task = await start_asking(ask_user, request(call, timeout_s=5), db)
+
+    assert not task.done()
+    assert "1 Speak to a representative" in whatsapp.sent[-1]
+    task.cancel()
+
+
+async def test_late_reply_names_the_default_as_the_user_saw_it(
+    pipe: InboundPipe, db: FakeDB, whatsapp: FakeWhatsApp
+) -> None:
+    _, call = await on_call(db)
+    ask_user = translating(whatsapp)
+    pipe._ask_user = ask_user
+    await ask_user.ask(request(call, timeout_s=1))
+
+    await pipe.handle(inbound("2"))
+
+    late = db.messages[-1]
+    assert late.template == "ask_user.late_reply"
+    assert late.body_original == render(
+        "ask_user.late_reply", "es", default=1, default_option=SPANISH[0]
+    )
+    assert late.body_en == render(
+        "ask_user.late_reply", "en", default=1, default_option=OPTIONS[0]
+    )

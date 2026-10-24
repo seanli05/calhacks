@@ -10,11 +10,16 @@ A reply that loses to the timeout, or arrives within LATE_REPLY_WINDOW_S after i
 gets a message saying which option the agent already took (C24). Recently timed-out
 questions are remembered in memory (one process serves every webhook); a restart
 forgets them, and a late reply then goes to the orchestrator like any other text.
+
+Option labels come in English and are translated as the question goes out, under a
+short timeout: if that fails or is slow, they go out in English rather than delay
+the question (whatsapp-pipe.md, concern 7).
 """
 
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
@@ -27,7 +32,7 @@ from app.contracts import (
     EventType,
     QuestionStatus,
 )
-from app.contracts.common import QuestionId, UserId
+from app.contracts.common import LanguageCode, QuestionId, UserId
 from app.db import reads, tables
 from app.db.errors import NotFound
 from app.db.events import append_event
@@ -38,6 +43,7 @@ from app.relay.outbound import send_template
 from app.relay.replies import parse_choice
 from app.relay.templates import TEMPLATES
 from app.relay.whatsapp import WhatsApp, WhatsAppSendError, get_whatsapp
+from app.translation.translate import get_translator
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +51,18 @@ LATE_REPLY_WINDOW_S = 600.0
 # How long `ask` waits for the reply handler after losing the race to it: the handler
 # resolves the future right after its answer commits, so this is a safety net.
 _RACE_GRACE_S = 5.0
+# The question is waiting on the call; past this, its options go out in English.
+LABELS_TIMEOUT_S = 3.0
+
+LabelTranslator = Callable[[list[str], LanguageCode], Awaitable[list[str] | None]]
 
 
 @dataclass
 class _TimedOut:
     question: tables.Question
     at: float
+    # The option labels as the user saw them.
+    labels: list[str]
 
 
 def template_id(request_template: str) -> str:
@@ -60,10 +72,18 @@ def template_id(request_template: str) -> str:
 
 class AskUser:
     def __init__(
-        self, whatsapp: WhatsApp, late_reply_window_s: float = LATE_REPLY_WINDOW_S
+        self,
+        whatsapp: WhatsApp,
+        late_reply_window_s: float = LATE_REPLY_WINDOW_S,
+        *,
+        translate_labels: LabelTranslator | None = None,
+        labels_timeout_s: float = LABELS_TIMEOUT_S,
     ) -> None:
+        """Without `translate_labels`, option labels go out in English."""
         self._whatsapp = whatsapp
         self._late_reply_window_s = late_reply_window_s
+        self._translate_labels = translate_labels
+        self._labels_timeout_s = labels_timeout_s
         self._waiting: dict[QuestionId, asyncio.Future[int]] = {}
         self._timed_out: dict[UserId, _TimedOut] = {}
         self._late_replied: set[QuestionId] = set()
@@ -76,6 +96,7 @@ class AskUser:
             raise ValueError(f"No template for ask_user kind {request.template!r}")
         user, case_id = await _user_for_call(request.call_id)
         question = await writes.create_question(request, user.id)
+        labels = await self._labels(question, user.language)
         future: asyncio.Future[int] = asyncio.get_running_loop().create_future()
         self._waiting[question.id] = future
         try:
@@ -85,6 +106,11 @@ class AskUser:
                     user,
                     template_id(request.template),
                     {
+                        "options": _numbered(labels),
+                        "default": request.default_option,
+                        "seconds": request.timeout_s,
+                    },
+                    values_en={
                         "options": _numbered(request.options_en),
                         "default": request.default_option,
                         "seconds": request.timeout_s,
@@ -94,7 +120,7 @@ class AskUser:
                 )
             except WhatsAppSendError as exc:
                 logger.error("ask_user %s not sent: %s", question.id, exc)
-                return await self._time_out(question, case_id, future)
+                return await self._time_out(question, case_id, future, labels)
             await self._event(
                 EventType.CALL_ASK_USER,
                 question,
@@ -109,7 +135,7 @@ class AskUser:
                     asyncio.shield(future), request.timeout_s
                 )
             except TimeoutError:
-                return await self._time_out(question, case_id, future)
+                return await self._time_out(question, case_id, future, labels)
         finally:
             self._waiting.pop(question.id, None)
         return await self._answered(question, case_id, choice)
@@ -169,7 +195,11 @@ class AskUser:
         return AskUserReply(question_id=question.id, choice=choice)
 
     async def _time_out(
-        self, question: tables.Question, case_id: str, future: asyncio.Future[int]
+        self,
+        question: tables.Question,
+        case_id: str,
+        future: asyncio.Future[int],
+        labels: list[str],
     ) -> AskUserReply:
         if await writes.time_out_question(question.id) is None:
             # The user answered first; the reply handler is about to resolve us.
@@ -183,7 +213,9 @@ class AskUser:
             else:
                 return await self._answered(question, case_id, choice)
         if question.id not in self._late_replied:
-            self._timed_out[question.user_id] = _TimedOut(question, time.monotonic())
+            self._timed_out[question.user_id] = _TimedOut(
+                question, time.monotonic(), labels
+            )
         await self._event(
             EventType.CALL_ASK_USER_TIMEOUT,
             question,
@@ -198,14 +230,21 @@ class AskUser:
     ) -> None:
         """C24: say what the agent already chose and why, once per question."""
         self._late_replied.add(question.id)
-        self._timed_out.pop(user.id, None)
+        timed_out = self._timed_out.pop(user.id, None)
+        labels = question.options_en
+        if timed_out is not None and timed_out.question.id == question.id:
+            labels = timed_out.labels
         await writes.record_late_reply(question.id)
         default = question.default_option
         await send_template(
             self._whatsapp,
             user,
             "ask_user.late_reply",
-            {"default": default, "default_option": question.options_en[default - 1]},
+            {"default": default, "default_option": labels[default - 1]},
+            values_en={
+                "default": default,
+                "default_option": question.options_en[default - 1],
+            },
             question_id=question.id,
         )
         call = await reads.get_call(question.call_id)
@@ -218,6 +257,23 @@ class AskUser:
             choice=choice,
             default_option=default,
         )
+
+    async def _labels(
+        self, question: tables.Question, language: LanguageCode | None
+    ) -> list[str]:
+        """The option labels in the user's language, or in English if translation
+        isn't set up, fails, or takes longer than `labels_timeout_s`."""
+        if self._translate_labels is None or language in (None, "en"):
+            return question.options_en
+        try:
+            labels = await asyncio.wait_for(
+                self._translate_labels(question.options_en, language),
+                self._labels_timeout_s,
+            )
+        except TimeoutError:
+            logger.warning("ask_user %s options not translated in time", question.id)
+            return question.options_en
+        return labels if labels is not None else question.options_en
 
     async def _event(
         self,
@@ -243,7 +299,6 @@ class AskUser:
 
 
 def _numbered(options: list[str]) -> str:
-    # Goal 5: translate the option labels into the user's language.
     return "\n".join(f"{i} {option}" for i, option in enumerate(options, start=1))
 
 
@@ -263,7 +318,11 @@ async def _user_for_call(call_id: str) -> tuple[tables.User, str]:
 @lru_cache
 def get_ask_user() -> AskUser:
     """The one instance the phone agent and the inbound pipe share."""
-    return AskUser(get_whatsapp())
+    translator = get_translator()
+    return AskUser(
+        get_whatsapp(),
+        translate_labels=translator.labels_from_english if translator else None,
+    )
 
 
 async def ask_user(request: AskUserRequest) -> AskUserReply:

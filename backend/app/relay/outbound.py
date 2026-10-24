@@ -18,12 +18,15 @@ async def send_template(
     template_id: str,
     values: Mapping[str, object] | None = None,
     *,
+    values_en: Mapping[str, object] | None = None,
     language: LanguageCode | None = None,
     case_id: CaseId | None = None,
     question_id: QuestionId | None = None,
 ) -> tables.Message:
     """Send a pre-translated template in `language` (default: the user's). Before
-    the user has picked a language, it goes out in every supported language."""
+    the user has picked a language, it goes out in every supported language.
+    `values_en` replaces `values` in the logged English when a value was translated
+    (rule 6)."""
     values = values or {}
     language = language or user.language
     body = render(template_id, language, **values)
@@ -34,7 +37,7 @@ async def send_template(
         MessageSender.RELAY,
         body,
         language or LANGUAGES[0],
-        body_en=render(template_id, "en", **values),
+        body_en=render(template_id, "en", **(values_en or values)),
         case_id=case_id,
         template=template_id,
         question_id=question_id,
