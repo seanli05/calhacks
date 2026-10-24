@@ -1,10 +1,12 @@
 import base64
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import Callable, Iterator
 
 import httpx
 import pytest
 from app.main import app
-from app.relay.media import get_media_client
+from app.orchestrator.pipe import get_pipe
+from app.relay.inbound import InboundMessage
+from app.relay.media import MediaDownloadError, download_media
 from app.settings import Settings, get_settings
 from fastapi.testclient import TestClient
 from twilio.request_validator import RequestValidator
@@ -15,43 +17,34 @@ AUTH_TOKEN = "test-token"
 MEDIA_URL = "https://api.twilio.com/2010-04-01/Accounts/ACtest/Messages/MM1/Media/ME1"
 CDN_URL = "https://cdn.example.com/signed-object"
 
-Handler = Callable[[httpx.Request], httpx.Response]
+SETTINGS = Settings(
+    _env_file=None,
+    twilio_account_sid=ACCOUNT_SID,
+    twilio_auth_token=AUTH_TOKEN,
+    public_base_url=PUBLIC_BASE_URL,
+)
+
+
+class RecordingPipe:
+    def __init__(self) -> None:
+        self.handled: list[InboundMessage] = []
+
+    async def handle(self, message: InboundMessage) -> None:
+        self.handled.append(message)
 
 
 @pytest.fixture
-def make_client() -> Iterator[Callable[[Handler], TestClient]]:
-    settings = Settings(
-        _env_file=None,
-        twilio_account_sid=ACCOUNT_SID,
-        twilio_auth_token=AUTH_TOKEN,
-        public_base_url=PUBLIC_BASE_URL,
-    )
-
-    def _make(handler: Handler) -> TestClient:
-        async def fake_media_client() -> AsyncIterator[httpx.AsyncClient]:
-            async with httpx.AsyncClient(
-                transport=httpx.MockTransport(handler)
-            ) as client:
-                yield client
-
-        app.dependency_overrides[get_settings] = lambda: settings
-        app.dependency_overrides[get_media_client] = fake_media_client
-        return TestClient(app)
-
-    yield _make
+def pipe() -> Iterator[RecordingPipe]:
+    recording = RecordingPipe()
+    app.dependency_overrides[get_settings] = lambda: SETTINGS
+    app.dependency_overrides[get_pipe] = lambda: recording
+    yield recording
     app.dependency_overrides.clear()
 
 
-def no_network(request: httpx.Request) -> httpx.Response:
-    raise AssertionError(f"unexpected request to {request.url}")
-
-
-def not_found(request: httpx.Request) -> httpx.Response:
-    return httpx.Response(404)
-
-
-def timeout(request: httpx.Request) -> httpx.Response:
-    raise httpx.ReadTimeout("slow", request=request)
+@pytest.fixture
+def client(pipe: RecordingPipe) -> TestClient:
+    return TestClient(app)
 
 
 def twilio_form(**overrides: str) -> dict[str, str]:
@@ -73,21 +66,42 @@ def sign(form: dict[str, str]) -> dict[str, str]:
     return {"X-Twilio-Signature": signature}
 
 
-def test_text_message_is_echoed(make_client: Callable[[Handler], TestClient]) -> None:
-    client = make_client(no_network)
+def test_message_is_acked_with_empty_twiml_and_queued(
+    client: TestClient, pipe: RecordingPipe
+) -> None:
     form = twilio_form()
 
     response = client.post("/whatsapp", data=form, headers=sign(form))
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/xml")
-    assert "<Message>Echo: hola</Message>" in response.text
+    assert "<Message>" not in response.text
+    [message] = pipe.handled
+    assert message.text == "hola"
+    assert message.whatsapp_number == "+15105550123"
 
 
-def test_bad_signature_is_rejected(
-    make_client: Callable[[Handler], TestClient],
-) -> None:
-    client = make_client(no_network)
+def test_every_media_item_is_parsed(client: TestClient, pipe: RecordingPipe) -> None:
+    form = twilio_form(
+        Body="",
+        NumMedia="2",
+        MediaUrl0=MEDIA_URL,
+        MediaContentType0="image/jpeg",
+        MediaUrl1=MEDIA_URL + "2",
+        MediaContentType1="application/pdf",
+    )
+
+    assert client.post("/whatsapp", data=form, headers=sign(form)).status_code == 200
+
+    [message] = pipe.handled
+    assert [item.content_type for item in message.media] == [
+        "image/jpeg",
+        "application/pdf",
+    ]
+    assert all(item.is_letter_page for item in message.media)
+
+
+def test_bad_signature_is_rejected(client: TestClient, pipe: RecordingPipe) -> None:
     form = twilio_form()
 
     assert client.post("/whatsapp", data=form).status_code == 403
@@ -95,29 +109,29 @@ def test_bad_signature_is_rejected(
     assert (
         client.post("/whatsapp", data=tampered, headers=sign(form)).status_code == 403
     )
+    assert pipe.handled == []
 
 
-def test_photo_is_downloaded_with_twilio_auth(
-    make_client: Callable[[Handler], TestClient],
-) -> None:
+def test_malformed_form_is_rejected(client: TestClient, pipe: RecordingPipe) -> None:
+    form = twilio_form(NumMedia="lots")
+
+    assert client.post("/whatsapp", data=form, headers=sign(form)).status_code == 400
+    assert pipe.handled == []
+
+
+async def test_media_is_downloaded_with_twilio_auth_only_to_twilio() -> None:
     seen: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
         if str(request.url) == MEDIA_URL:
             return httpx.Response(307, headers={"Location": CDN_URL})
-        return httpx.Response(200, content=b"\xff\xd8fakejpeg" * 300)
+        return httpx.Response(200, content=b"\xff\xd8fakejpeg")
 
-    client = make_client(handler)
-    form = twilio_form(
-        Body="", NumMedia="1", MediaUrl0=MEDIA_URL, MediaContentType0="image/jpeg"
-    )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        media = await download_media(http, MEDIA_URL, "image/jpeg", "SM1", SETTINGS)
 
-    response = client.post("/whatsapp", data=form, headers=sign(form))
-
-    assert response.status_code == 200
-    assert "Got your image/jpeg (3 KB)" in response.text
-
+    assert media.data == b"\xff\xd8fakejpeg"
     expected_auth = (
         "Basic " + base64.b64encode(f"{ACCOUNT_SID}:{AUTH_TOKEN}".encode()).decode()
     )
@@ -126,16 +140,20 @@ def test_photo_is_downloaded_with_twilio_auth(
     assert "Authorization" not in cdn_request.headers
 
 
-@pytest.mark.parametrize("failure", [not_found, timeout])
-def test_media_failure_gets_friendly_reply(
-    make_client: Callable[[Handler], TestClient], failure: Handler
+def _not_found(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(404)
+
+
+def _timeout(request: httpx.Request) -> httpx.Response:
+    raise httpx.ReadTimeout("slow", request=request)
+
+
+@pytest.mark.parametrize("failure", [_not_found, _timeout])
+async def test_media_failure_raises_without_the_url(
+    failure: Callable[[httpx.Request], httpx.Response],
 ) -> None:
-    client = make_client(failure)
-    form = twilio_form(
-        NumMedia="1", MediaUrl0=MEDIA_URL, MediaContentType0="image/jpeg"
-    )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(failure)) as http:
+        with pytest.raises(MediaDownloadError) as caught:
+            await download_media(http, MEDIA_URL, "image/jpeg", "SM1", SETTINGS)
 
-    response = client.post("/whatsapp", data=form, headers=sign(form))
-
-    assert response.status_code == 200
-    assert "download that" in response.text
+    assert MEDIA_URL not in str(caught.value)
