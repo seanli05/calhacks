@@ -238,7 +238,7 @@ export function caseDetail(caseId: string, lang: string): CaseDetail {
     ],
     refs: [
       { name: "receipt_number", masked: "•••• 2345" },
-      { name: "a_number", masked: "••• ••• 678" },
+      { name: "a_number", masked: "•••• 5678" },
     ],
     verification: { status: "verified", evidence: ["https://www.uscis.gov/contactcenter"], red_flags: [] },
     brief: {
@@ -355,10 +355,10 @@ export function suggestions(_userId: string, lang: string): Suggestion[] {
       id: "sug_checklist",
       kind: "checklist",
       case_id: FIXTURE_CASE_ID,
-      title: L(lang, "Falta: intérprete", "Still need: an interpreter"),
-      detail: L(lang, "Te ayudamos a encontrar uno", "We can help you find one"),
+      title: L(lang, "No olvides: un intérprete", "Don't forget: an interpreter"),
+      detail: L(lang, "Te ayudamos", "We can help"),
       action: L(lang, "Preguntar", "Ask"),
-      prefill: "¿Cómo encuentro un intérprete para mi entrevista?",
+      prefill: "¿Cómo consigo un intérprete calificado?",
     },
   ];
 }

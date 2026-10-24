@@ -53,6 +53,14 @@ Startup creates any missing tables. To rebuild the database and seed the demo ca
 cd backend && python -m app.db.reset --yes           # add --empty to skip the seed
 ```
 
+Run the dashboard (Node 20, from the repo root):
+
+```bash
+cd dashboard && npm install
+npm run dev     # http://localhost:3000, on fake data (fixtures) by default
+NEXT_PUBLIC_DATA=live npm run dev   # against the backend on :8000
+```
+
 ### Using the database
 
 Import only your own writer module, plus the shared ones. That's how "one writer per table" is enforced.
@@ -91,7 +99,7 @@ Full guide, with per-component recipes: [docs/data-layer-guide.md](docs/data-lay
 | `backend/app/research/`, `glossary/` | Letter → case brief | 3 |
 | `backend/app/phone/` | The call | 4 |
 | `backend/tests/` | Backend tests | Everyone |
-| `dashboard/` | Next.js dashboard (coming) | 1 |
+| `dashboard/` | Next.js dashboard ([build guide](docs/specs/dashboard-build.md)) | 1 |
 | `mock_agency/` | Mock USCIS line on Cartesia; deploys on its own | 3 |
 | `docs/specs/` | Build specs that implement Plan.md | Spec owner |
 

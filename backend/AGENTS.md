@@ -20,7 +20,9 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | [docs/specs/data-layer-schema.md](../docs/specs/data-layer-schema.md) | Every table and column, and which component writes it (locked) |
 | [docs/specs/task-a-db.md](../docs/specs/task-a-db.md) | How the data layer was specified (done) |
 | [docs/specs/task-b-contracts.md](../docs/specs/task-b-contracts.md) | How the contracts were specified (done) |
-| [docs/specs/task-c-dashboard.md](../docs/specs/task-c-dashboard.md) | Next up: dashboard API + Next.js app. Starts with a design gate |
+| [docs/specs/task-c-dashboard.md](../docs/specs/task-c-dashboard.md) | Dashboard task: steps and the approved design |
+| [docs/specs/dashboard-api.md](../docs/specs/dashboard-api.md) | Dashboard API routes, feed templates, masking, seed |
+| [docs/specs/dashboard-build.md](../docs/specs/dashboard-build.md) | Building dashboard pages: conventions, work split, start prompts |
 | [mock_agency/README.md](../mock_agency/README.md) | The mock USCIS phone line the agent calls: menu tree, hold, officer |
 
 ## Backend layout (`backend/app/`)
@@ -30,7 +32,7 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | `main.py`, `settings.py` | FastAPI app (creates tables on startup); the single settings object | 1 | Done |
 | `contracts/` | Shared Pydantic payloads; import from `app.contracts` | Team | Done (`CaseBrief` provisional) |
 | `db/` | Tables, reads, per-writer write modules, jobs, events, deletes, reset/seed | 1 | Done |
-| `api/` | Dashboard API | 1 | Not started (task C) |
+| `api/` | Dashboard API | 1 | Not started; spec in `docs/specs/dashboard-api.md` |
 | `relay/` | WhatsApp webhook (signature check, media download); ask_user relay | 2 | Echo bot only |
 | `orchestrator/`, `translation/`, `memory/` | WhatsApp agent, translation, memory writer | 2 | Not started |
 | `research/`, `glossary/` | Letter reading, verification, case brief; glossary | 3 | Work is on branch `research_agent` (top-level `research/`, own models) |
