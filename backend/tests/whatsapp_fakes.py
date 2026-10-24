@@ -422,9 +422,13 @@ class FakeTranslator:
     def __init__(self, fail: bool = False) -> None:
         self.fail = fail
         self.calls: list[str] = []
+        self.contexts: list[str | None] = []
 
-    async def from_english(self, text_en: str, language: str) -> str | None:
+    async def from_english(
+        self, text_en: str, language: str, *, context: str | None = None
+    ) -> str | None:
         self.calls.append(text_en)
+        self.contexts.append(context)
         return None if self.fail else f"[{language}] {text_en}"
 
     async def to_english(self, text: str, language: str) -> str | None:

@@ -4,8 +4,11 @@ the way USCIS does instead of picking its own words.
 
 Only the terms found in the text go into the prompt; the whole glossary would bury
 the few that matter. Matching ignores case, accents and a plural ending, since users
-write "interprete" and "solicitantes". If the glossary can't be read, translation
-goes ahead without it rather than wait.
+write "interprete" and "solicitantes"; in Dari it also ignores the zero-width
+non-joiner, Arabic letter forms (ي, ك) and the plural endings ها and ان
+("متقاضیان", "نامه‌ها"). English terms also match their verb forms: "dismissed"
+brings in "dismissal", whose Dari must not become the word for a denial. If the
+glossary can't be read, translation goes ahead without it rather than wait.
 """
 
 import asyncio
@@ -51,7 +54,7 @@ class Term:
         return cls(
             english=row.term,
             translation=row.translation,
-            english_pattern=_phrase_pattern(row.term),
+            english_pattern=_phrase_pattern(row.term, english=True),
             translation_pattern=_phrase_pattern(row.translation),
         )
 
@@ -132,15 +135,33 @@ def find_terms(
     return found[:MAX_TERMS]
 
 
+_PERSIAN_LETTERS = str.maketrans(
+    {"ي": "ی", "ى": "ی", "ك": "ک", "ـ": None, "\u200c": " "}
+)
+
+
 def _normalize(text: str) -> str:
-    """Lowercase with accents stripped: "Intérprete" and "interprete" match."""
+    """Lowercase with accents stripped: "Intérprete" and "interprete" match. Persian
+    script: one letter form, and a zero-width non-joiner read as a space."""
     decomposed = unicodedata.normalize("NFKD", text.casefold())
-    return "".join(c for c in decomposed if not unicodedata.combining(c))
+    stripped = "".join(c for c in decomposed if not unicodedata.combining(c))
+    return stripped.translate(_PERSIAN_LETTERS)
 
 
-def _phrase_pattern(phrase: str) -> re.Pattern[str]:
-    """Whole words, any spacing, an optional plural "s"/"es". A `<ref:receipt_number>`
-    placeholder doesn't match "receipt number": the underscore isn't a space."""
-    words = _normalize(phrase).split()
-    body = r"\s+".join(re.escape(word) for word in words)
-    return re.compile(rf"(?<!\w){body}(?:e?s)?(?!\w)")
+def _phrase_pattern(phrase: str, *, english: bool = False) -> re.Pattern[str]:
+    """Whole words, any spacing, an optional plural "s"/"es" (or Dari "ها"/"ان"). A
+    `<ref:receipt_number>` placeholder doesn't match "receipt number": the underscore
+    isn't a space."""
+    *head, last = _normalize(phrase).split()
+    body = r"\s+".join([*(re.escape(word) for word in head), _last_word(last, english)])
+    return re.compile(rf"(?<!\w){body}(?!\w)")
+
+
+def _last_word(word: str, english: bool) -> str:
+    """The phrase's last word with its endings. English: also the verb forms of a
+    noun in -al or a verb in -e ("dismissal": "dismissed"; "denial": "denied";
+    "reschedule": "rescheduling")."""
+    if not english:
+        return rf"{re.escape(word)}(?:e?s|\s?ها|ان)?"
+    stem = word[:-2] if word.endswith("al") else word.removesuffix("e")
+    return rf"(?:{re.escape(word)}(?:e?s)?|{re.escape(stem)}(?:ed|ing|es))"

@@ -46,6 +46,7 @@ from app.relay.outbound import send_template
 from app.relay.replies import parse_choice
 from app.relay.templates import TEMPLATES
 from app.relay.whatsapp import WhatsApp, WhatsAppSendError, get_whatsapp
+from app.translation.script import local_digits
 from app.translation.translate import get_translator
 
 logger = logging.getLogger(__name__)
@@ -124,12 +125,12 @@ class AskUser:
                     user,
                     template_id(request.template),
                     {
-                        "options": _numbered(labels),
+                        "options": _numbered(labels, user.language or "en"),
                         "default": request.default_option,
                         "seconds": request.timeout_s,
                     },
                     values_en={
-                        "options": _numbered(request.options_en),
+                        "options": _numbered(request.options_en, "en"),
                         "default": request.default_option,
                         "seconds": request.timeout_s,
                     },
@@ -338,8 +339,12 @@ class AskUser:
         )
 
 
-def _numbered(options: list[str]) -> str:
-    return "\n".join(f"{i} {option}" for i, option in enumerate(options, start=1))
+def _numbered(options: list[str], language: LanguageCode) -> str:
+    """One option per line, numbered in the language's digits."""
+    return "\n".join(
+        f"{local_digits(str(i), language)} {option}"
+        for i, option in enumerate(options, start=1)
+    )
 
 
 async def _user_for_call(call_id: str) -> tuple[tables.User, str]:

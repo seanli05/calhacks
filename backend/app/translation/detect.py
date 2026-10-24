@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 DETECT_TIMEOUT_S = 5.0
 _ISO_639_1 = re.compile(r"^[a-z]{2}$")
+# Three-letter codes the model may give for Persian: Dari ("prs") and Persian
+# ("fas", "per") are all "fa" here, the code the templates use for Dari.
+_ALIASES: dict[str, LanguageCode] = {"prs": "fa", "fas": "fa", "per": "fa"}
 
 
 class _Detected(BaseModel):
@@ -42,4 +45,5 @@ async def detect_language(
     if detected is None or detected.language is None:
         return None
     code = detected.language.strip().lower()
+    code = _ALIASES.get(code, code)
     return code if _ISO_639_1.match(code) else None

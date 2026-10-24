@@ -83,7 +83,7 @@ def test_nothing_in_the_app_imports_the_smoke_test() -> None:
     for path in APP.rglob("*.py"):
         if path.name == "smoke.py":
             continue
-        for node in ast.walk(ast.parse(path.read_text())):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             names = (
                 [node.module or ""]
                 if isinstance(node, ast.ImportFrom)
@@ -131,7 +131,9 @@ def test_a_run_is_printed_in_full_and_saved_as_json_lines(
     printed = capsys.readouterr().out
     for shown in ("menu 0.93 (model)", "Fits", "speech: two", "decide 910 ms", "held"):
         assert shown in printed
-    rows = [json.loads(row) for row in run_file.read_text().splitlines()]
+    rows = [
+        json.loads(row) for row in run_file.read_text(encoding="utf-8").splitlines()
+    ]
     assert [row["kind"] for row in rows] == ["line_event", "step"]
     assert rows[0]["event"] == {"kind": "heard", "text": "Please hold."}
     assert rows[1]["record"]["sent"] == ["speech: two"]

@@ -1,19 +1,26 @@
 """Pre-translated WhatsApp templates: `template_id -> {language: text}`.
 
-Spanish uses formal usted. Every template must exist in every language in
-LANGUAGES (a test checks). Placeholders use str.format: `{name}`.
+Spanish uses formal usted. Dari is Afghan Dari, not Iranian Farsi, with the polite
+شما; its words follow the glossary (`glossary/terms.csv`) and USCIS's Dari pages
+(ادارهٔ USCIS, معلومات, دوسیه, مشورهٔ حقوقی, نمایندهٔ معتبر), and it writes numbers in
+Persian digits. Every template must exist in every language in LANGUAGES (a test
+checks). Placeholders use str.format: `{name}`. `render` adds the direction isolates
+right-to-left text needs (`translation/script.py`), so the texts here have none.
 """
 
 from app.contracts.common import LanguageCode
+from app.translation.script import for_display, local_digits
 
-LANGUAGES: tuple[LanguageCode, ...] = ("es", "en")
+LANGUAGES: tuple[LanguageCode, ...] = ("es", "en", "fa")
 """Supported languages, in the order the language menu lists them."""
 
 _MENU = (
-    "Hola 👋 Hello\n"
+    "Hola 👋 Hello 👋 سلام\n"
     "¿En qué idioma prefiere que le escriba? / Which language would you like?\n"
+    "به کدام زبان برایتان بنویسم؟\n"
     "1 Español\n"
-    "2 English"
+    "2 English\n"
+    "3 دری"
 )
 
 # The end of every consent request: how the call works, then the choice.
@@ -28,11 +35,29 @@ _CALL_ASK = {
         "case numbers or date of birth.\n"
         "1 Yes, call\n2 No, thanks"
     ),
+    "fa": (
+        "من پشت خط منتظر می‌مانم و وقتی یک شخص جواب داد، به شما زنگ می‌زنم. "
+        "شماره‌های دوسیه و تاریخ تولد شما را به کسی نمی‌گویم.\n"
+        "۱ بلی، تماس بگیرید\n۲ نخیر، تشکر"
+    ),
 }
 _VERIFIED = {
     "es": "✅ Su carta es auténtica: la revisé con la información oficial de uscis.gov.",
     "en": "✅ Your letter is genuine: I checked it against official information on uscis.gov.",
+    "fa": "✅ نامهٔ شما اصلی است: آن را با معلومات رسمی ویب سایت uscis.gov بررسی کردم.",
 }
+_WANT_CALL = {
+    "es": "¿Quiere que llame a USCIS por usted?\nPara qué: {goal}\n",
+    "en": "Would you like me to call USCIS for you?\nWhat for: {goal}\n",
+    "fa": "می‌خواهید از طرف شما با ادارهٔ USCIS تماس بگیرم؟\nبرای چه: {goal}\n",
+}
+_WANT_CALL_GENERIC = {
+    "es": "¿Quiere que llame a USCIS por usted sobre esta carta?\n",
+    "en": "Would you like me to call USCIS for you about this letter?\n",
+    "fa": "می‌خواهید دربارهٔ این نامه از طرف شما با ادارهٔ USCIS تماس بگیرم؟\n",
+}
+# Who to ask for legal help (C33): a lawyer or a DOJ-accredited representative.
+_LEGAL_HELP_FA = "یک وکیل یا یک نمایندهٔ معتبر وزارت عدلیهٔ امریکا (DOJ)"
 
 TEMPLATES: dict[str, dict[LanguageCode, str]] = {
     "language.confirm": {
@@ -41,8 +66,12 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "It looks like you're writing in English. Shall we continue in English?\n"
             "1 Yes\n2 Another language"
         ),
+        "fa": (
+            "معلوم می‌شود که شما به دری می‌نویسید. به دری ادامه بدهیم؟\n"
+            "۱ بلی\n۲ زبان دیگر"
+        ),
     },
-    "language.menu": {"es": _MENU, "en": _MENU},
+    "language.menu": {"es": _MENU, "en": _MENU, "fa": _MENU},
     "language.set": {
         "es": (
             "Perfecto, seguimos en español. Envíeme una foto de su carta, "
@@ -51,6 +80,10 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         "en": (
             "Great, we'll continue in English. Send me a photo of your letter, "
             "or write me your question."
+        ),
+        "fa": (
+            "خوب، به دری ادامه می‌دهیم. یک عکس از نامهٔ خود را برایم بفرستید، "
+            "یا سوال خود را برایم بنویسید."
         ),
     },
     "language.set_letter": {
@@ -62,19 +95,28 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "Great, we'll continue in English. I got your letter. If it has more "
             "pages, send them now."
         ),
+        "fa": (
+            "خوب، به دری ادامه می‌دهیم. نامهٔ شما را گرفتم. اگر صفحه‌های بیشتر دارد، "
+            "حالا بفرستید."
+        ),
     },
     # No question mark: a question invites a "no, that's it" that needs a turn.
     "letter.received": {
         "es": "Recibido. Si tiene más páginas, envíelas ahora.",
         "en": "Got it. If there are more pages, send them now.",
+        "fa": "گرفتم. اگر صفحه‌های بیشتر دارد، حالا بفرستید.",
     },
     "letter.same_or_new": {
         "es": "¿Es otra página de la misma carta, o una carta nueva?\n1 Misma carta\n2 Carta nueva",
         "en": "Is this another page of the same letter, or a new letter?\n1 Same letter\n2 New letter",
+        "fa": (
+            "آیا این یک صفحهٔ دیگر همان نامه است، یا یک نامهٔ نو؟\n۱ همان نامه\n۲ نامهٔ نو"
+        ),
     },
     "letter.pages_added": {
         "es": "Gracias, agregué la página a su carta.",
         "en": "Thanks, I added the page to your letter.",
+        "fa": "تشکر، صفحه را به نامهٔ شما اضافه کردم.",
     },
     # Plan.md → Failure rules: the fast pass is past 45 s.
     "research.slow": {
@@ -86,6 +128,10 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "I'm still reading your letter. It's taking a little longer than usual; "
             "I'll write as soon as I'm done."
         ),
+        "fa": (
+            "هنوز نامهٔ شما را می‌خوانم. کمی بیشتر از معمول وقت می‌گیرد؛ "
+            "وقتی تمام شد، برایتان می‌نویسم."
+        ),
     },
     # The orchestrator's turn failed (model or translation); never English instead.
     "orchestrator.unavailable": {
@@ -94,10 +140,15 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "en unos minutos."
         ),
         "en": "Sorry, I couldn't answer just now. Please write to me again in a few minutes.",
+        "fa": (
+            "معذرت می‌خواهم، حالا نتوانستم جواب بدهم. لطفاً چند دقیقه بعد دوباره "
+            "برایم بنویسید."
+        ),
     },
     "media.download_failed": {
         "es": "Lo siento, no pude descargar ese archivo. ¿Me lo puede enviar otra vez?",
         "en": "Sorry, I couldn't download that file. Could you send it again?",
+        "fa": "معذرت می‌خواهم، نتوانستم آن فایل را باز کنم. می‌توانید دوباره بفرستید؟",
     },
     # ask_user (P1). `options` is the numbered list; `default` is the option the
     # agent takes on timeout, always the safest (C5).
@@ -114,10 +165,17 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "Reply with the number. If I don't hear back in {seconds} seconds, "
             "I'll pick option {default}, the safest one."
         ),
+        "fa": (
+            "من در تماس با ادارهٔ USCIS هستم و سیستم تیلفونی این گزینه‌ها را می‌دهد. "
+            "کدام را انتخاب کنم؟\n{options}\n"
+            "با شمارهٔ گزینه جواب بدهید. اگر تا {seconds} ثانیه جوابی نگیرم، "
+            "گزینهٔ {default} را انتخاب می‌کنم، که مطمئن‌ترین گزینه است."
+        ),
     },
     "ask_user.reprompt": {
         "es": "Por favor responda solo con un número del 1 al {count}.",
         "en": "Please reply with just a number from 1 to {count}.",
+        "fa": "لطفاً فقط با یک شماره از ۱ تا {count} جواب بدهید.",
     },
     "ask_user.late_reply": {
         "es": (
@@ -130,20 +188,28 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "{default}: {default_option}. It was the safest choice, and the call "
             "went on with it."
         ),
+        "fa": (
+            "تشکر. چون به وقت جواب نگرفتم، گزینهٔ {default} را انتخاب کردم: "
+            "{default_option}. این مطمئن‌ترین گزینه بود و تماس با همین گزینه "
+            "ادامه پیدا کرد."
+        ),
     },
     # R1 (Goal 6.1). The explanation and checklist are translated free text; these
     # lines carry what must never be garbled, with dates formatted in code.
     "letter.appointment": {
         "es": "📅 Su entrevista: {date}, a las {time}. La dirección está en su carta.",
         "en": "📅 Your interview: {date}, at {time}. The address is on your letter.",
+        "fa": "📅 مصاحبهٔ شما: {date}، ساعت {time}. آدرس در نامهٔ شما نوشته شده است.",
     },
     "letter.appointment_date": {
         "es": "📅 Su entrevista: {date}. Los detalles están en su carta.",
         "en": "📅 Your interview: {date}. The details are on your letter.",
+        "fa": "📅 مصاحبهٔ شما: {date}. جزئیات در نامهٔ شما نوشته شده است.",
     },
     "letter.deadline": {
         "es": "📅 Fecha límite: {date}.",
         "en": "📅 Deadline: {date}.",
+        "fa": "📅 مهلت: {date}.",
     },
     "letter.checking": {
         "es": (
@@ -154,6 +220,10 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "I'm now checking that this letter is legitimate. "
             "I'll write again in a few minutes."
         ),
+        "fa": (
+            "حالا بررسی می‌کنم که این نامه اصلی باشد. "
+            "چند دقیقه بعد دوباره برایتان می‌نویسم."
+        ),
     },
     "letter.explain_failed": {
         "es": (
@@ -163,6 +233,10 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         "en": (
             "I read your letter, but I couldn't write up the explanation just now. "
             'Write me "what does my letter say?" and I\'ll explain it.'
+        ),
+        "fa": (
+            "نامهٔ شما را خواندم، اما حالا نتوانستم توضیح آن را بنویسم. "
+            "برایم بنویسید «نامهٔ من چه می‌گوید؟» تا برایتان توضیح بدهم."
         ),
     },
     # Plan.md → Failure rules: unreadable photo (C9).
@@ -176,10 +250,15 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "from different letters. Which letter should I read first? Reply in a few "
             "words."
         ),
+        "fa": (
+            "پیش از توضیح، به یک جواب ضرورت دارم: معلوم می‌شود که این عکس‌ها از "
+            "نامه‌های مختلف هستند. اول کدام نامه را بخوانم؟ در چند کلمه جواب بدهید."
+        ),
     },
     "letter.reading_again": {
         "es": "Gracias. Ahora leo esa carta y le escribo en cuanto termine.",
         "en": "Thanks. I'm reading that letter now and will write as soon as I'm done.",
+        "fa": "تشکر. حالا همان نامه را می‌خوانم و وقتی تمام شد، برایتان می‌نویسم.",
     },
     "research_question.not_found": {
         "es": (
@@ -189,6 +268,11 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         "en": (
             "I couldn't find an answer to your question in an official source. "
             "A lawyer or a DOJ-accredited representative can help."
+        ),
+        "fa": (
+            "برای سوال شما در یک منبع رسمی جوابی پیدا نکردم. "
+            + _LEGAL_HELP_FA
+            + " می‌تواند کمک کند."
         ),
     },
     "research_question.legal_advice": {
@@ -200,6 +284,11 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "I can't give legal advice about your case. A lawyer or a DOJ-accredited "
             "representative can help, often for free."
         ),
+        "fa": (
+            "من نمی‌توانم دربارهٔ دوسیهٔ شما مشورهٔ حقوقی بدهم. "
+            + _LEGAL_HELP_FA
+            + " می‌تواند کمک کند، اکثراً به شکل رایگان."
+        ),
     },
     "research_question.asylum_claim": {
         "es": (
@@ -209,6 +298,11 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         "en": (
             "I don't discuss the details of your asylum claim. A lawyer or a "
             "DOJ-accredited representative can help with that."
+        ),
+        "fa": (
+            "من دربارهٔ جزئیات درخواست پناهندگی شما صحبت نمی‌کنم. "
+            + _LEGAL_HELP_FA
+            + " می‌تواند در این مورد کمک کند."
         ),
     },
     "research_question.untranslated": {
@@ -220,10 +314,15 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "I found an answer in an official source but couldn't translate it. "
             "You can read it here:\n{sources}"
         ),
+        "fa": (
+            "در یک منبع رسمی جوابی پیدا کردم، اما نتوانستم آن را ترجمه کنم. "
+            "می‌توانید آن را اینجا بخوانید:\n{sources}"
+        ),
     },
     "research_question.failed": {
         "es": "No pude buscar la respuesta ahora. Pregúnteme de nuevo en un rato.",
         "en": "I couldn't look that up right now. Ask me again in a little while.",
+        "fa": "حالا نتوانستم جواب را پیدا کنم. کمی بعد دوباره از من بپرسید.",
     },
     "letter.retake": {
         "es": (
@@ -235,10 +334,16 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "letter on a table in good light, with the whole page in the photo and "
             "no shadows."
         ),
+        "fa": (
+            "نتوانستم عکس را خوب بخوانم. می‌توانید یک عکس دیگر بفرستید؟ نامه را در "
+            "روشنی خوب روی یک میز بگذارید، طوری که تمام صفحه در عکس باشد و سایه "
+            "نداشته باشد."
+        ),
     },
     "letter.retake_tip": {
         "es": "No pude leer bien la foto. {tip} ¿Me puede enviar otra?",
         "en": "I couldn't read the photo well. {tip} Could you send another one?",
+        "fa": "نتوانستم عکس را خوب بخوانم. {tip} می‌توانید یک عکس دیگر بفرستید؟",
     },
     # R2 (Goal 6.2).
     "verification.verified": _VERIFIED,
@@ -251,6 +356,11 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "I checked your letter against official information on uscis.gov: it's "
             "genuine. ✅ There's no need to call USCIS for now. Write to me if you "
             "have questions."
+        ),
+        "fa": (
+            "نامهٔ شما را با معلومات رسمی ویب سایت uscis.gov بررسی کردم: نامه اصلی "
+            "است. ✅ فعلاً ضرورت به تماس با ادارهٔ USCIS نیست. اگر سوالی دارید، "
+            "برایم بنویسید."
         ),
     },
     # Plan.md → Failure rules: a letter that looks like a scam. Never offers a call.
@@ -265,6 +375,11 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "Don't call the numbers on the letter, don't pay anything, and don't give "
             "out your details. Write to me if you have questions."
         ),
+        "fa": (
+            "⚠️ احتیاط: این نامه نشانه‌های کلاهبرداری دارد:\n{red_flags}\n"
+            "به شماره‌های داخل نامه زنگ نزنید، هیچ پولی پرداخت نکنید و معلومات "
+            "شخصی خود را به کسی ندهید. اگر سوالی دارید، برایم بنویسید."
+        ),
     },
     "verification.suspicious_generic": {
         "es": (
@@ -275,6 +390,11 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "⚠️ Careful: this letter has signs of a scam. Don't call the numbers on "
             "the letter, don't pay anything, and don't give out your details. Write "
             "to me if you have questions."
+        ),
+        "fa": (
+            "⚠️ احتیاط: این نامه نشانه‌های کلاهبرداری دارد. به شماره‌های داخل نامه "
+            "زنگ نزنید، هیچ پولی پرداخت نکنید و معلومات شخصی خود را به کسی ندهید. "
+            "اگر سوالی دارید، برایم بنویسید."
         ),
     },
     # Plan.md → Failure rules: verification unknown. No call offer; explain and ask.
@@ -289,57 +409,44 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "to call USCIS yet. I can explain what the letter says, or you can check "
             "your case on uscis.gov. What would you like to do?"
         ),
+        "fa": (
+            "نتوانستم تأیید کنم که این نامه اصلی است، به همین خاطر هنوز پیشنهاد "
+            "نمی‌کنم که با ادارهٔ USCIS تماس بگیرم. می‌توانم توضیح بدهم که نامه چه "
+            "می‌گوید، یا خود شما می‌توانید دوسیهٔ خود را در ویب سایت uscis.gov بررسی "
+            "کنید. کدام را می‌خواهید؟"
+        ),
     },
     # Consent (Goal 6.3, C21). A YES covers one call; every call asks again.
-    "consent.request": {
-        "es": "¿Quiere que llame a USCIS por usted?\nPara qué: {goal}\n"
-        + _CALL_ASK["es"],
-        "en": "Would you like me to call USCIS for you?\nWhat for: {goal}\n"
-        + _CALL_ASK["en"],
-    },
+    "consent.request": {lang: _WANT_CALL[lang] + _CALL_ASK[lang] for lang in _CALL_ASK},
     "consent.request_generic": {
-        "es": "¿Quiere que llame a USCIS por usted sobre esta carta?\n"
-        + _CALL_ASK["es"],
-        "en": "Would you like me to call USCIS for you about this letter?\n"
-        + _CALL_ASK["en"],
+        lang: _WANT_CALL_GENERIC[lang] + _CALL_ASK[lang] for lang in _CALL_ASK
     },
     # The verdict and the consent request in one message, so the user has one thing
     # to answer (conversation.py).
     "verification.verified_call": {
-        "es": (
-            _VERIFIED["es"]
-            + "\n¿Quiere que llame a USCIS por usted?\nPara qué: {goal}\n"
-            + _CALL_ASK["es"]
-        ),
-        "en": (
-            _VERIFIED["en"]
-            + "\nWould you like me to call USCIS for you?\nWhat for: {goal}\n"
-            + _CALL_ASK["en"]
-        ),
+        lang: _VERIFIED[lang] + "\n" + _WANT_CALL[lang] + _CALL_ASK[lang]
+        for lang in _CALL_ASK
     },
     "verification.verified_call_generic": {
-        "es": (
-            _VERIFIED["es"]
-            + "\n¿Quiere que llame a USCIS por usted sobre esta carta?\n"
-            + _CALL_ASK["es"]
-        ),
-        "en": (
-            _VERIFIED["en"]
-            + "\nWould you like me to call USCIS for you about this letter?\n"
-            + _CALL_ASK["en"]
-        ),
+        lang: _VERIFIED[lang] + "\n" + _WANT_CALL_GENERIC[lang] + _CALL_ASK[lang]
+        for lang in _CALL_ASK
     },
     "consent.reprompt": {
         "es": "Por favor responda 1 si quiere que llame a USCIS, o 2 si no.",
         "en": "Please reply 1 if you'd like me to call USCIS, or 2 if not.",
+        "fa": (
+            "لطفاً اگر می‌خواهید با ادارهٔ USCIS تماس بگیرم، ۱ را بفرستید، و اگر نه، ۲ را."
+        ),
     },
     "consent.given": {
         "es": "Gracias. Preparo la llamada y le aviso cuando esté marcando.",
         "en": "Thank you. I'm setting up the call and will let you know when I'm dialing.",
+        "fa": "تشکر. تماس را آماده می‌کنم و وقتی شماره را گرفتم، به شما خبر می‌دهم.",
     },
     "consent.declined": {
         "es": "De acuerdo, no voy a llamar. Si cambia de opinión, escríbame.",
         "en": "All right, I won't call. If you change your mind, write to me.",
+        "fa": "خوب، تماس نمی‌گیرم. اگر نظر شما تغییر کرد، برایم بنویسید.",
     },
     "consent.unavailable": {
         "es": (
@@ -347,15 +454,21 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "lo intente más tarde."
         ),
         "en": "Sorry, I can't make that call right now. Write to me if you'd like me to try later.",
+        "fa": (
+            "معذرت می‌خواهم، حالا نمی‌توانم این تماس را بگیرم. اگر می‌خواهید بعداً "
+            "دوباره کوشش کنم، برایم بنویسید."
+        ),
     },
     # Post-call summary (Goal 6.4). The next steps are translated free text.
     "summary.reference": {
         "es": "Número de referencia de la llamada: {reference}",
         "en": "Reference number for the call: {reference}",
+        "fa": "شمارهٔ مرجع این تماس: {reference}",
     },
     "summary.deadlines": {
         "es": "📅 Fechas importantes: {dates}",
         "en": "📅 Important dates: {dates}",
+        "fa": "📅 تاریخ‌های مهم: {dates}",
     },
     "summary.unavailable": {
         "es": (
@@ -365,6 +478,10 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         "en": (
             "The call with USCIS is over. I couldn't write up the summary just now; "
             "write to me and I'll explain it."
+        ),
+        "fa": (
+            "تماس با ادارهٔ USCIS تمام شد. حالا نتوانستم خلاصهٔ آن را بنویسم؛ "
+            "برایم بنویسید تا برایتان توضیح بدهم."
         ),
     },
     # Plan.md → Failure rules: hold exceeded max. A retry asks for consent again (C21).
@@ -377,6 +494,10 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "I couldn't complete the call with USCIS: the wait was too long or the "
             "call dropped."
         ),
+        "fa": (
+            "نتوانستم تماس با ادارهٔ USCIS را تمام کنم: انتظار خیلی طولانی شد "
+            "یا تماس قطع شد."
+        ),
     },
     "summary.unreachable_followup": {
         "es": (
@@ -384,6 +505,10 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "una persona."
         ),
         "en": "If you'd like, I can call USCIS again and let you know when a person answers.",
+        "fa": (
+            "اگر بخواهید، می‌توانم دوباره با ادارهٔ USCIS تماس بگیرم و وقتی یک شخص "
+            "جواب داد، به شما خبر بدهم."
+        ),
     },
     # C22: suggest closing; the user decides (the turn's close_case tool).
     "summary.suggest_close": {
@@ -395,6 +520,10 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "It looks like this letter is taken care of. If you don't need more help "
             'with it, write "close" and I\'ll close it.'
         ),
+        "fa": (
+            "معلوم می‌شود که کار این نامه تمام شده است. اگر دیگر در مورد آن به کمک "
+            "ضرورت ندارید، «بستن» بنویسید تا آن را ببندم."
+        ),
     },
     # Call status (P2). The orchestrator picks which call events become these (C36).
     # Exactly the four in USER_MESSAGING_EVENTS; after the call, the user gets the
@@ -402,14 +531,20 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
     "call.dialing": {
         "es": "Estoy llamando a USCIS ahora.",
         "en": "Calling USCIS now.",
+        "fa": "حالا با ادارهٔ USCIS تماس می‌گیرم.",
     },
     "call.on_hold": {
         "es": "Sigo en espera con USCIS. Le aviso cuando conteste una persona.",
         "en": "Still on hold with USCIS. I'll let you know when a person answers.",
+        "fa": (
+            "هنوز پشت خط ادارهٔ USCIS منتظر هستم. وقتی یک شخص جواب داد، "
+            "به شما خبر می‌دهم."
+        ),
     },
     "call.human_detected": {
         "es": "Contestó una persona. Le estoy llamando ahora; por favor conteste.",
         "en": "Someone picked up. I'm calling you now; please answer.",
+        "fa": "یک شخص جواب داد. حالا به شما زنگ می‌زنم؛ لطفاً تیلفون را جواب بدهید.",
     },
     "call.user_unreachable": {
         "es": (
@@ -418,6 +553,10 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         ),
         "en": (
             "I couldn't reach you, so I told USCIS you'd call back and ended the call."
+        ),
+        "fa": (
+            "نتوانستم با شما تماس بگیرم، به همین خاطر به ادارهٔ USCIS گفتم که خود "
+            "شما دوباره زنگ می‌زنید و تماس را ختم کردم."
         ),
     },
     # C15: facts the memory writer is holding until the user says it's OK. {facts}
@@ -435,23 +574,46 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "I only use it to help you, and you can delete it any time.\n"
             "1 Yes, save it\n2 No, don't save it"
         ),
+        "fa": (
+            "اجازه می‌دهید این را نگه دارم، تا دوباره از شما نپرسم؟\n"
+            "{facts}\n"
+            "فقط برای کمک به شما از آن استفاده می‌کنم، و هر وقت بخواهید، "
+            "می‌توانید آن را پاک کنید.\n"
+            "۱ بلی، نگه دارید\n۲ نخیر، نگه ندارید"
+        ),
     },
     "memory.saved": {
         "es": "Listo, lo guardé.",
         "en": "Done, I saved it.",
+        "fa": "خوب، نگه داشتم.",
     },
     "memory.not_saved": {
         "es": "De acuerdo, no lo guardé.",
         "en": "All right, I didn't save it.",
+        "fa": "خوب، نگه نداشتم.",
     },
 }
 
 
 def render(template_id: str, language: LanguageCode | None, **values: object) -> str:
-    """The template in `language`. With no language yet (before the user picks one),
-    every supported language, one after the other."""
+    """The template in `language`, ready to send. With no language yet (before the
+    user picks one), every supported language, one after the other."""
     texts = TEMPLATES[template_id]
     if language is None:
-        unique = dict.fromkeys(texts[lang] for lang in LANGUAGES)
-        return "\n\n".join(text.format(**values) for text in unique)
-    return texts[language].format(**values)
+        # A text shared by several languages (the menu) goes out once, as written.
+        first_language: dict[str, LanguageCode] = {}
+        for lang in LANGUAGES:
+            first_language.setdefault(texts[lang], lang)
+        return "\n\n".join(
+            _render(text, lang, values) for text, lang in first_language.items()
+        )
+    return _render(texts[language], language, values)
+
+
+def _render(text: str, language: LanguageCode, values: dict[str, object]) -> str:
+    """Numbers in the language's digits; direction isolates for right-to-left."""
+    local = {
+        name: local_digits(str(value), language) if isinstance(value, int) else value
+        for name, value in values.items()
+    }
+    return for_display(text.format(**local), language)

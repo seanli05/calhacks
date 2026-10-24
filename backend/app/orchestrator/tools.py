@@ -250,7 +250,8 @@ def build_tools(tools: CaseTools) -> list[BetaAsyncFunctionTool[Any]]:
         """Switch the language the user is written to in, when they ask for it.
 
         Args:
-            language: ISO 639-1 code, e.g. "es" or "en".
+            language: ISO 639-1 code: "es" (Spanish), "en" (English), or "fa"
+                (Dari; also for Farsi or Persian).
         """
         return await tools.set_language(language)
 

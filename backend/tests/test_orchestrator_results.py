@@ -27,7 +27,7 @@ from app.db import tables
 from app.db.ids import new_id
 from app.db.tables import utcnow
 from app.orchestrator.call_status import CallStatusWatcher
-from app.orchestrator.consent import ConsentGate
+from app.orchestrator.consent import GOAL_CONTEXT, ConsentGate
 from app.orchestrator.conversation import Conversation
 from app.orchestrator.dates import format_date, format_time
 from app.orchestrator.job_watch import JobWatcher
@@ -38,8 +38,15 @@ from app.orchestrator.tools import CaseTools
 from app.orchestrator.verdicts import Verdicts
 from app.relay.ask_user import AskUser
 from app.relay.outbound import send_text
-from app.relay.templates import render
-from whatsapp_fakes import FakeDB, FakeTranslator, FakeWhatsApp, inbound, use_spanish
+from app.relay.templates import LANGUAGES, render
+from whatsapp_fakes import (
+    NUMBER,
+    FakeDB,
+    FakeTranslator,
+    FakeWhatsApp,
+    inbound,
+    use_spanish,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "contracts"
 
@@ -113,10 +120,31 @@ def test_dates_are_written_the_way_the_user_reads_them() -> None:
     interview = dt.date(2026, 11, 18)
     assert format_date(interview, "es") == "miércoles 18 de noviembre de 2026"
     assert format_date(interview, "en") == "Wednesday, November 18, 2026"
-    assert format_date(interview, "fa") == "2026-11-18"  # no wrong month names
+    assert format_date(interview, "fa") == "چهارشنبه ۱۸ نومبر ۲۰۲۶"
+    assert format_date(interview, "ht") == "2026-11-18"  # no wrong month names
     assert format_time("08:30", "es") == "8:30 a. m."
     assert format_time("13:05", "en") == "1:05 PM"
     assert format_time("00:15", "en") == "12:15 AM"
+
+
+@pytest.mark.parametrize(
+    ("hh_mm", "expected"),
+    [
+        ("08:30", "۸:۳۰ صبح"),
+        ("11:59", "۱۱:۵۹ صبح"),
+        ("12:00", "۱۲:۰۰ بعد از ظهر"),
+        ("16:30", "۴:۳۰ بعد از ظهر"),
+        ("20:00", "۸:۰۰ شب"),
+    ],
+)
+def test_dari_times_read_morning_afternoon_and_night(hh_mm: str, expected: str) -> None:
+    assert format_time(hh_mm, "fa") == expected
+
+
+def test_no_supported_language_gets_an_iso_date() -> None:
+    """An ISO date inside Dari (or any template language) would read as noise."""
+    for language in LANGUAGES:
+        assert "-" not in format_date(dt.date(2026, 1, 5), language), language
 
 
 # R1 (6.1)
@@ -191,6 +219,24 @@ async def test_untranslated_explanation_falls_back_to_templates_never_english(
     assert "This is a notice" not in message.body_original
 
 
+async def test_dari_explanation_dates_the_interview_in_dari(
+    db: FakeDB, letter_results: LetterResults
+) -> None:
+    user = await db.get_or_create_user(NUMBER)
+    user.language = "fa"
+    result = FastResult.model_validate(fixture("fast_result.json", case_id="case_1"))
+
+    await letter_results.fast_done(await finished_fast_job(db, user, "case_1", result))
+
+    [message] = db.messages
+    body = message.body_original
+    assert body.startswith(f"[fa] {result.summary_en}")
+    assert "مصاحبهٔ شما: چهارشنبه ۱۸ نومبر ۲۰۲۶، ساعت ۸:۳۰ صبح" in body
+    assert "2026-11-18" not in body and "8:30" not in body
+    assert body.endswith(render("letter.checking", "fa"))
+    assert "Wednesday, November 18, 2026, at 8:30 AM" in (message.body_en or "")
+
+
 async def test_unreadable_photo_asks_for_a_retake_with_the_tip(
     db: FakeDB, letter_results: LetterResults, verdicts: Verdicts
 ) -> None:
@@ -259,7 +305,7 @@ async def test_research_question_survives_a_payload_that_no_longer_validates(
 
 
 async def test_verified_letter_gets_the_verdict_and_consent_request_in_one_message(
-    db: FakeDB, verdicts: Verdicts, consent: ConsentGate
+    db: FakeDB, verdicts: Verdicts, consent: ConsentGate, translator: FakeTranslator
 ) -> None:
     user = await use_spanish(db)
     case = db.add_verified_case(user)
@@ -275,6 +321,8 @@ async def test_verified_letter_gets_the_verdict_and_consent_request_in_one_messa
     assert asked.body_original.startswith(render("verification.verified", "es"))
     assert "[es] Confirm the interview is still scheduled" in asked.body_original
     assert asked.body_en is not None and "Confirm the interview" in asked.body_en
+    # Rule 4: the goal reads as what the call is for, not as a request to the user.
+    assert translator.contexts[-1] == GOAL_CONTEXT
     [requested] = [e for e in db.events if e.type == EventType.CONSENT_REQUESTED]
     assert requested.data == {"agency": "USCIS"}
 

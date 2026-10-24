@@ -55,6 +55,14 @@ logger = logging.getLogger(__name__)
 # H2's example value; Plan.md → Failure rules: past this, hang up and report failed.
 MAX_HOLD_MINUTES = 60
 DEFAULT_AGENCY = "USCIS"
+# Rule 4: the user must read the goal as what the call is for. Alone, "Confirm the
+# interview is still scheduled" translates as a request to the user ("تأیید کنید",
+# "please confirm"); with this, as the task ("تأیید اینکه …").
+GOAL_CONTEXT = (
+    "what the assistant would do on a phone call to USCIS for the user, shown after "
+    '"What for:". Write it as a short phrase naming that task (a verbal noun, such '
+    "as Dari «تأیید اینکه …» or «پرسیدن …»), never as an instruction to the user."
+)
 
 
 @dataclass(frozen=True)
@@ -120,7 +128,11 @@ class ConsentGate:
             return "The call plan isn't ready yet."
         goal_en = goal_en or _call_goal_en(brief)
         language = user.language or "en"
-        goal = await localize(self._translator, goal_en, language) if goal_en else None
+        goal = (
+            await localize(self._translator, goal_en, language, context=GOAL_CONTEXT)
+            if goal_en
+            else None
+        )
         template = "verification.verified_call" if verified else "consent.request"
         if goal is not None and goal_en is not None:
             asked = await send_template(
