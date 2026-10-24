@@ -8,28 +8,18 @@ The pending prompt is read back from the message log (the user's last outbound
 language template), so it survives a restart.
 """
 
-import re
 from dataclasses import dataclass
 
 from app.contracts import MessageDirection
 from app.contracts.common import LanguageCode, UserId
 from app.db import reads, tables
+from app.relay.replies import parse_choice
 from app.relay.templates import LANGUAGES
 
 CONFIRM = "language.confirm"
 MENU = "language.menu"
 _PROMPTS = {CONFIRM, MENU}
 _YES = {"si", "sí", "yes"}
-_CHOICE = re.compile(r"^(\d{1,2})[.)]?$")
-
-
-def parse_choice(text: str, n_options: int) -> int | None:
-    """A numbered reply ("2", "2.", " 2 ") within 1..n_options, else None."""
-    match = _CHOICE.match(text.strip())
-    if match is None:
-        return None
-    choice = int(match.group(1))
-    return choice if 1 <= choice <= n_options else None
 
 
 @dataclass(frozen=True)

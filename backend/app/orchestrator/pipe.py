@@ -1,7 +1,8 @@
 """The WhatsApp pipe: what happens to each inbound message after the webhook acks.
 
-Order per message: user row → media saved → inbound logged → routed (language pick,
-photo grouping, "same letter or new?" answer, or an orchestrator turn).
+Order per message: user row → media saved → inbound logged → routed. Routing order:
+a reply to an ask_user question (the call is waiting), then the language pick, photo
+grouping, a "same letter or new?" answer, or an orchestrator turn.
 """
 
 import asyncio
@@ -22,13 +23,14 @@ from app.orchestrator.language import (
     LanguageStep,
     answer_to_prompt,
     last_language_prompt,
-    parse_choice,
     prompt_for,
 )
 from app.orchestrator.photos import PHOTO_QUIET_WINDOW_S, PendingPages, PhotoBatcher
+from app.relay.ask_user import AskUser, get_ask_user
 from app.relay.inbound import InboundMedia, InboundMessage
 from app.relay.media import MediaDownloadError
 from app.relay.outbound import send_template, send_text
+from app.relay.replies import parse_choice
 from app.relay.whatsapp import WhatsApp, WhatsAppSendError, get_whatsapp
 from app.settings import get_settings
 from app.translation.detect import detect_language
@@ -46,10 +48,12 @@ class InboundPipe:
         self,
         whatsapp: WhatsApp,
         detect: LanguageDetector,
+        ask_user: AskUser,
         quiet_window_s: float = PHOTO_QUIET_WINDOW_S,
     ) -> None:
         self._whatsapp = whatsapp
         self._detect = detect
+        self._ask_user = ask_user
         self.photos = PhotoBatcher(self._letter_ready, quiet_window_s)
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
@@ -69,9 +73,12 @@ class InboundPipe:
         saved, failed = await self._save_media(user.id, message)
 
         step = None
+        question = None
         language = user.language
         if language is None:
             step, language = await self._language_step(user.id, message)
+        elif message.text:
+            question = await self._ask_user.question_for_reply(user.id)
 
         await append_message(
             user.id,
@@ -82,10 +89,15 @@ class InboundPipe:
             # Goal 5: translate into English here, before the row is written.
             body_en=message.body if language == "en" else None,
             media_ids=[media_id for media_id, _ in saved],
+            question_id=question.id if question else None,
             twilio_sid=message.message_sid,
         )
         if failed:
             await send_template(self._whatsapp, user, "media.download_failed")
+        if question is not None and await self._ask_user.handle_reply(
+            user, question, message.text
+        ):
+            return
 
         pages = [media_id for media_id, item in saved if item.is_letter_page]
         if step is not None:
@@ -233,4 +245,4 @@ def get_pipe() -> InboundPipe:
         detect = partial(detect_language, client, settings.model_fast)
     else:
         logger.warning("ANTHROPIC_API_KEY not set: first contact always gets the menu")
-    return InboundPipe(get_whatsapp(), detect)
+    return InboundPipe(get_whatsapp(), detect, get_ask_user())

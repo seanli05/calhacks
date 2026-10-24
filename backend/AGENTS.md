@@ -25,6 +25,7 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | [docs/specs/dashboard-build.md](../docs/specs/dashboard-build.md) | Building dashboard pages: conventions, work split, start prompts |
 | [docs/specs/dashboard-done.md](../docs/specs/dashboard-done.md) | Dashboard: what's left before it's done |
 | [docs/whatsapp-pipe.md](../docs/whatsapp-pipe.md) | WhatsApp side: what works, how to plug in (`send_template`, `messages` fields), concerns |
+| [docs/whatsapp-AGENTS.md](../docs/whatsapp-AGENTS.md) | Reviewing the WhatsApp side: every file person 2 built, deliberate choices, what to check |
 | [mock_agency/README.md](../mock_agency/README.md) | The mock USCIS phone line the agent calls: menu tree, hold, officer |
 
 ## Backend layout (`backend/app/`)
@@ -35,8 +36,9 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | `contracts/` | Shared Pydantic payloads; import from `app.contracts` | Team | Done (`CaseBrief` provisional) |
 | `db/` | Tables, reads, per-writer write modules, jobs, events, deletes, reset/seed (`seed_story.py`: messages, memory, events, `--after-call`) | 1 | Done |
 | `api/` | Dashboard API: routes, feed and suggestion templates (`feed_templates.py` lists the event `data` fields it expects; `stand_in_es.py` is a temporary Spanish table for the seed's strings, to delete once `translation/` lands) | 1 | Done; spec in `docs/specs/dashboard-api.md` |
-| `relay/` | WhatsApp webhook, Twilio send/download, templates (`send_template`); ask_user relay | 2 | Webhook, sending, and templates done; ask_user next (Goal 3) |
-| `orchestrator/`, `translation/`, `memory/` | WhatsApp agent, translation, memory writer | 2 | Pipe done (language pick, photo grouping); Claude turn, translation, memory not started. See [docs/whatsapp-pipe.md](../docs/whatsapp-pipe.md) |
+| `relay/` | WhatsApp webhook, Twilio send/download, templates (`send_template`); ask_user relay | 2 | Webhook, sending, templates, ask_user (`relay.ask_user.ask_user(request)`, P1) done |
+| `orchestrator/`, `translation/`, `memory/` | WhatsApp agent, translation, memory writer | 2 | Pipe (language pick, photo grouping) and call-status messages (C36, `orchestrator/call_status.py`) done; Claude turn, translation, memory not started. Interfaces and decisions: [docs/whatsapp-pipe.md](../docs/whatsapp-pipe.md) |
+| `dev/` | Dev-only stand-ins, e.g. `POST /dev/fake-call` (a scripted call without the phone agent). Off unless `DEV_ENDPOINTS=true`; local requests only | 2 | Done |
 | `research/`, `glossary/` | Letter reading, verification, case brief; glossary | 3 | Work is on branch `research_agent` (top-level `research/`, own models) |
 | `phone/` | Call state machine, hold/human detection, bridge, call report | 4 | Not on `main` yet |
 
