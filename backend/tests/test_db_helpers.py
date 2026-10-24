@@ -2,7 +2,6 @@
 set, and it must not be the shared database: the tables are dropped and rebuilt."""
 
 import asyncio
-import os
 import secrets
 from collections.abc import AsyncIterator
 from urllib.parse import urlsplit
@@ -24,7 +23,7 @@ from app.contracts import (
     Sensitivity,
     Verification,
 )
-from app.db import deletes, jobs, reads, tables
+from app.db import deletes, jobs, reads, reset, tables
 from app.db.engine import get_engine, session
 from app.db.errors import UnverifiedNumber
 from app.db.events import append_event
@@ -36,7 +35,7 @@ from app.db.tables import utcnow
 from app.db.writes import memory, orchestrator, phone, research
 from app.settings import Settings, get_settings, to_asyncpg_url
 
-TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "")
+TEST_DATABASE_URL = Settings().test_database_url
 
 pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL, reason="TEST_DATABASE_URL not set"
@@ -243,3 +242,9 @@ async def test_resolve_ref_accepts_placeholder() -> None:
     assert await reads.resolve_ref(case.id, "<ref:receipt_number>") == "ZLA2690012345"
     async with session() as db:
         assert await db.get(tables.CaseRef, (case.id, "receipt_number")) is not None
+
+
+async def test_seed_builds_a_case_awaiting_consent() -> None:
+    case_id = await reset.seed()
+    assert await reads.case_progress(case_id) == CaseStage.AWAITING_CONSENT
+    assert await reads.resolve_ref(case_id, "a_number") == "A212345678"

@@ -100,7 +100,7 @@ ruff format . && ruff check --fix .   # format + lint
 pytest                                # tests
 ```
 
-DB helper tests (`backend/tests/test_db_helpers.py`) are skipped unless `TEST_DATABASE_URL` is set. Point it at a separate Neon branch (`neon branch create --name test`), never the shared database: the tests drop and rebuild every table.
+DB helper tests (`backend/tests/test_db_helpers.py`) are skipped unless `TEST_DATABASE_URL` is set (env or `.env.local`; person 1 has the URL). Point it at a separate Neon branch (`neon branch create --name test`), never the shared database: the tests drop and rebuild every table.
 
 - Work on a branch, open small PRs, and merge to `main` often.
 - Read [CLAUDE.md](CLAUDE.md) before writing code. It has the product rules that can't be broken and the team's engineering conventions.

@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     # asyncpg's prepared statements don't survive Neon's transaction pooler.
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/calhacks"
     database_url_unpooled: str = ""
+    # A separate Neon branch for DB tests; they drop every table. Never the shared one.
+    test_database_url: str = ""
 
     # Public URL from ngrok, used for Twilio webhooks
     public_base_url: str = ""
