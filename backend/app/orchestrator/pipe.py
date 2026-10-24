@@ -38,6 +38,7 @@ from app.orchestrator.language import (
 from app.orchestrator.letter_result import LetterResults
 from app.orchestrator.letters import Letters
 from app.orchestrator.photos import PHOTO_QUIET_WINDOW_S, PendingPages, PhotoBatcher
+from app.orchestrator.research_questions import ResearchQuestions
 from app.orchestrator.turn import OrchestratorTurn
 from app.orchestrator.verdicts import Verdicts
 from app.relay.ask_user import AskUser, get_ask_user
@@ -378,7 +379,12 @@ def get_pipe() -> InboundPipe:
         )
     client = AsyncAnthropic(api_key=settings.anthropic_api_key)
     turn = OrchestratorTurn(
-        client, settings.model_default, whatsapp, translator, consent
+        client,
+        settings.model_default,
+        whatsapp,
+        translator,
+        consent,
+        research_questions=ResearchQuestions(whatsapp, translator, get_job_watcher()),
     )
     return InboundPipe(
         whatsapp,
