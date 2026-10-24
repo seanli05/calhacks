@@ -9,7 +9,11 @@ from typing import Any
 
 from app.contracts import (
     AskUserRequest,
+    Component,
     Event,
+    JobPayload,
+    JobStatus,
+    JobType,
     MessageDirection,
     MessageSender,
     QuestionStatus,
@@ -19,6 +23,7 @@ from app.db.tables import utcnow
 from app.relay.inbound import InboundMedia, InboundMessage
 from app.relay.media import DownloadedMedia, MediaDownloadError
 from app.relay.whatsapp import WhatsAppSendError
+from pydantic import BaseModel
 
 NUMBER = "+15105550123"
 QUIET_S = 0.05
@@ -38,6 +43,7 @@ class FakeDB:
         self.calls: dict[str, tables.Call] = {}
         self.questions: dict[str, tables.Question] = {}
         self.events: list[Event] = []
+        self.jobs: dict[str, tables.Job] = {}
 
     # Relay: questions (race-safe like the real helpers: only an open row closes)
 
@@ -125,6 +131,55 @@ class FakeDB:
         )
         self.calls[call.id] = call
         return call
+
+    # Jobs
+
+    async def enqueue(
+        self,
+        payload: JobPayload,
+        created_by: Component,
+        user_id: str,
+        case_id: str | None = None,
+    ) -> tables.Job:
+        job = tables.Job(
+            type=JobType(payload.job),
+            created_by=created_by,
+            user_id=user_id,
+            case_id=case_id,
+            payload=payload.model_dump(mode="json"),
+        )
+        self.jobs[job.id] = job
+        return job
+
+    async def get_job(self, job_id: str) -> tables.Job | None:
+        job = self.jobs.get(job_id)
+        return tables.Job(**job.model_dump()) if job else None
+
+    async def claim_next(self, job_type: JobType) -> tables.Job | None:
+        for job in self.jobs.values():
+            if job.type == job_type and job.status == JobStatus.QUEUED:
+                job.status = JobStatus.RUNNING
+                return tables.Job(**job.model_dump())
+        return None
+
+    async def finish(self, job_id: str, result: BaseModel) -> None:
+        self.finish_job(job_id, result)
+
+    async def fail(self, job_id: str, error: str) -> None:
+        self.fail_job(job_id, error)
+
+    def jobs_of(self, job_type: JobType) -> list[tables.Job]:
+        return [j for j in self.jobs.values() if j.type == job_type]
+
+    def finish_job(self, job_id: str, result: BaseModel | None = None) -> None:
+        job = self.jobs[job_id]
+        job.status = JobStatus.DONE
+        job.result = result.model_dump(mode="json") if result else {}
+
+    def fail_job(self, job_id: str, error: str) -> None:
+        job = self.jobs[job_id]
+        job.status = JobStatus.FAILED
+        job.error = error
 
     # Orchestrator: users, media, letters
 

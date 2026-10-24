@@ -57,6 +57,17 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         "es": "Gracias, agregué la página a su carta.",
         "en": "Thanks, I added the page to your letter.",
     },
+    # Plan.md → Failure rules: the fast pass is past 45 s.
+    "research.slow": {
+        "es": (
+            "Sigo leyendo su carta. Está tardando un poco más de lo normal; "
+            "le escribo en cuanto termine."
+        ),
+        "en": (
+            "I'm still reading your letter. It's taking a little longer than usual; "
+            "I'll write as soon as I'm done."
+        ),
+    },
     "media.download_failed": {
         "es": "Lo siento, no pude descargar ese archivo. ¿Me lo puede enviar otra vez?",
         "en": "Sorry, I couldn't download that file. Could you send it again?",
