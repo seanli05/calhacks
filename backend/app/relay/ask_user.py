@@ -11,6 +11,9 @@ gets a message saying which option the agent already took (C24). Recently timed-
 questions are remembered in memory (one process serves every webhook); a restart
 forgets them, and a late reply then goes to the orchestrator like any other text.
 
+Cancelling `ask` (the phone agent moved on: a new menu prompt, hold, a person) closes
+the question quietly, so the user's next reply goes to normal routing.
+
 Option labels come in English and are translated as the question goes out, under a
 short timeout: if that fails or is slow, they go out in English rather than delay
 the question (whatsapp-pipe.md, concern 7).
@@ -96,6 +99,21 @@ class AskUser:
             raise ValueError(f"No template for ask_user kind {request.template!r}")
         user, case_id = await _user_for_call(request.call_id)
         question = await writes.create_question(request, user.id)
+        # A newer question supersedes an older one's late-reply window.
+        self._timed_out.pop(user.id, None)
+        try:
+            return await self._ask(request, question, user, case_id)
+        except asyncio.CancelledError:
+            await self._cancelled(question)
+            raise
+
+    async def _ask(
+        self,
+        request: AskUserRequest,
+        question: tables.Question,
+        user: tables.User,
+        case_id: str,
+    ) -> AskUserReply:
         labels = await self._labels(question, user.language)
         future: asyncio.Future[int] = asyncio.get_running_loop().create_future()
         self._waiting[question.id] = future
@@ -224,6 +242,28 @@ class AskUser:
             default_option=question.default_option,
         )
         return AskUserReply(question_id=question.id, choice=question.default_option)
+
+    async def _cancelled(self, question: tables.Question) -> None:
+        """The phone agent stopped waiting (a new menu prompt, hold, a person, or a
+        hang-up). Close the row so the user's next reply goes to normal routing. No
+        message, no timeout event, no late-reply window: nothing was decided for
+        the user."""
+        try:
+            closed = await writes.time_out_question(question.id)
+        except Exception:
+            # Any failure: the caller's cancellation must still propagate.
+            logger.exception(
+                "ask_user %s cancelled but not closed call_id=%s",
+                question.id,
+                question.call_id,
+            )
+            return
+        if closed is not None:
+            logger.info(
+                "ask_user %s cancelled; question closed call_id=%s",
+                question.id,
+                question.call_id,
+            )
 
     async def _late_reply(
         self, user: tables.User, question: tables.Question, choice: int

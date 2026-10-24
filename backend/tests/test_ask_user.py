@@ -1,11 +1,18 @@
 """ask_user (P1) on fakes: answer, timeout, the race between them, late replies
-(C24), re-prompts, and routing priority in the pipe."""
+(C24), re-prompts, cancellation, and routing priority in the pipe."""
 
 import asyncio
 
 import pytest
-from app.contracts import AskUserReply, AskUserRequest, EventType, QuestionStatus
+from app.contracts import (
+    AskUserReply,
+    AskUserRequest,
+    EventType,
+    JobType,
+    QuestionStatus,
+)
 from app.db import tables
+from app.orchestrator.consent import ConsentGate
 from app.orchestrator.pipe import InboundPipe
 from app.relay.ask_user import AskUser
 from app.relay.templates import render
@@ -180,6 +187,69 @@ async def test_ask_user_reply_comes_before_same_or_new(
 
     assert (await task).choice == 1
     assert pipe.photos.pending(user.id) is not None
+
+
+# Cancelling: the phone agent moved on (a new menu prompt, hold, a person)
+
+
+async def cancel(task: asyncio.Task[AskUserReply]) -> None:
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+
+async def test_cancelled_ask_closes_the_question_quietly(
+    ask_user: AskUser, db: FakeDB, whatsapp: FakeWhatsApp
+) -> None:
+    user, call = await on_call(db)
+    req = request(call, timeout_s=5)
+    task = await start_asking(ask_user, req, db)
+    sent = len(whatsapp.sent)
+
+    await cancel(task)
+
+    assert db.questions[req.question_id].status == QuestionStatus.TIMED_OUT
+    assert await ask_user.question_for_reply(user.id) is None  # no late-reply window
+    assert len(whatsapp.sent) == sent
+    assert db.event_types() == [EventType.CALL_ASK_USER]
+
+
+async def test_cancel_propagates_even_if_the_question_cant_be_closed(
+    ask_user: AskUser,
+    db: FakeDB,
+    whatsapp: FakeWhatsApp,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, call = await on_call(db)
+    task = await start_asking(ask_user, request(call, timeout_s=5), db)
+
+    async def broken(question_id: str) -> None:
+        raise ConnectionError("database unreachable")
+
+    monkeypatch.setattr("app.db.writes.relay.time_out_question", broken)
+
+    await cancel(task)
+
+
+async def test_yes_after_a_cancelled_ask_reaches_the_consent_request(
+    pipe: InboundPipe, ask_user: AskUser, consent: ConsentGate, db: FakeDB
+) -> None:
+    """The call failed while the menu question was open; the retry consent YES
+    must start a call, not answer the dead question."""
+    user, call = await on_call(db)
+    req = request(call, timeout_s=5)
+    await cancel(await start_asking(ask_user, req, db))
+    case = db.add_verified_case(user)
+    assert await consent.request(user, case.id) is None
+
+    await pipe.handle(inbound("1"))
+
+    assert db.questions[req.question_id].choice is None
+    assert consent.pending(user.id) is None
+    [job] = db.jobs_of(JobType.CALL)
+    assert job.payload["case_id"] == case.id
+    assert EventType.CONSENT_GIVEN in db.event_types()
+    assert "ask_user.reprompt" not in db.outbound_templates()
 
 
 async def test_unsent_question_takes_the_default_at_once(
