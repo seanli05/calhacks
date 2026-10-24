@@ -10,6 +10,8 @@ from app.api.router import router as api_router
 from app.db.engine import ping
 from app.db.schema import create_all
 from app.dev.router import router as dev_router
+from app.memory.worker import MemoryWorker
+from app.memory.worker import real_deps as memory_deps
 from app.phone.routes import router as phone_router
 from app.relay.webhook import router as whatsapp_router
 from app.research.worker import ResearchWorker, close_deps, real_deps
@@ -28,12 +30,20 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         worker.start()
     elif settings.research_worker:
         logger.warning("Research worker not started: ANTHROPIC_API_KEY is not set")
+    memory: MemoryWorker | None = None
+    if settings.memory_worker and settings.anthropic_api_key:
+        memory = MemoryWorker(memory_deps(settings))
+        memory.start()
+    elif settings.memory_worker:
+        logger.warning("Memory worker not started: ANTHROPIC_API_KEY is not set")
     try:
         yield
     finally:
         if worker is not None:
             await worker.stop()
             await close_deps(worker.deps)
+        if memory is not None:
+            await memory.stop()
 
 
 app = FastAPI(title="calhacks", lifespan=lifespan)

@@ -25,6 +25,7 @@ _ORCHESTRATOR_WRITES = (
     "create_document",
     "add_pages",
 )
+_MEMORY_WRITES = ("add_fact", "set_fact_status", "delete_fact", "upsert_profile")
 _RELAY_WRITES = (
     "create_question",
     "answer_question",
@@ -57,6 +58,8 @@ def db(monkeypatch: pytest.MonkeyPatch) -> FakeDB:
         monkeypatch.setattr(f"app.db.writes.orchestrator.{name}", getattr(fake, name))
     for name in _RELAY_WRITES:
         monkeypatch.setattr(f"app.db.writes.relay.{name}", getattr(fake, name))
+    for name in _MEMORY_WRITES:
+        monkeypatch.setattr(f"app.db.writes.memory.{name}", getattr(fake, name))
     for name in _READS:
         monkeypatch.setattr(f"app.db.reads.{name}", getattr(fake, name))
     monkeypatch.setattr("app.db.jobs.enqueue", fake.enqueue)
@@ -65,6 +68,7 @@ def db(monkeypatch: pytest.MonkeyPatch) -> FakeDB:
     monkeypatch.setattr("app.relay.ask_user.append_event", fake.append_event)
     monkeypatch.setattr("app.orchestrator.tools.append_event", fake.append_event)
     monkeypatch.setattr("app.orchestrator.consent.append_event", fake.append_event)
+    monkeypatch.setattr("app.memory.events.append_event", fake.append_event)
     return fake
 
 

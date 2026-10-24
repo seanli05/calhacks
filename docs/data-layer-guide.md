@@ -15,7 +15,7 @@ Owner: person 1. Ask before changing the schema, the contracts, or another write
 | Helpers (reads, writes, jobs, events, messages, deletes) | `backend/app/db/` | Done; tested against Postgres |
 | Reset and demo seed | `python -m app.db.reset` | Done (`--after-call` adds a finished call) |
 | WhatsApp pipe, relay, ask_user, call-status messages | `backend/app/relay/`, `orchestrator/` | On `main`; writes `users`, `media`, `documents`, `messages`, `questions`, events. Status: [whatsapp-pipe.md](whatsapp-pipe.md) |
-| Orchestrator's Claude turn, translation, memory writer | their packages | Not on `main` yet |
+| Orchestrator's Claude turn, translation, memory writer | their packages | Done. The memory worker starts with the app (`MEMORY_WORKER`) |
 | Phone agent | `backend/app/phone/` | State machine and menu decider on `main`; the call runner (dial, hold, bridge, report) not yet |
 | Research agent | `backend/app/research/` | Done; on the shared contracts. Its worker starts with the app (`RESEARCH_WORKER`). `app/dev/fake_research.py` still stands in when the worker is off |
 | Dashboard and its API | `dashboard/`, `backend/app/api/` | Done. What components must write to show up: [dashboard-AGENTS.md](dashboard-AGENTS.md) |
@@ -26,7 +26,7 @@ Owner: person 1. Ask before changing the schema, the contracts, or another write
 - Startup (`uvicorn app.main:app --app-dir backend`) creates any missing tables. It never alters existing ones; a column change needs a reset.
 - `cd backend && python -m app.db.reset --yes` drops every table, recreates them, and seeds the demo case; `--empty` skips the seed. **It wipes the shared database for everyone**, so ask the team first. Without `--yes` it only prints the target host.
 - DB tests use `TEST_DATABASE_URL`, your own Neon branch (ask person 1). Never point it at the shared database (the tests check this and refuse).
-- Only the deployed backend claims jobs on the shared database. Against it locally, set `RESEARCH_WORKER=false` and keep `DEV_ENDPOINTS` off.
+- Only the deployed backend claims jobs on the shared database. Against it locally, set `RESEARCH_WORKER=false` and `MEMORY_WORKER=false`, and keep `DEV_ENDPOINTS` off.
 
 ## The import rule (one writer per table)
 
@@ -170,7 +170,7 @@ if job:
 ### Memory writer
 
 - `writes.memory.add_fact(user_id, fact, category, source, sensitivity, status, source_ref=…)`. Immigration facts are always `FactStatus.PENDING_CONSENT` (C15, C25). Applying that rule is your job; the helper doesn't check it.
-- On the user's yes: `set_fact_status(fact_id, FactStatus.ACTIVE)`.
+- On the user's yes: `set_fact_status(fact_id, FactStatus.ACTIVE)`. On their no: `delete_fact(fact_id)`, which logs no event (draft, pending person 1's OK).
 - `upsert_profile(user_id, {...})` merges keys into the profile.
 - Agents read facts with `reads.list_facts(user_id, [FactStatus.ACTIVE])`.
 
@@ -230,4 +230,4 @@ Rules 1, 3, and 6 (only the orchestrator talks free-form, never impersonate the 
 Open as of this writing; ask person 1 for the latest.
 
 - **Demo seed** uses a fake WhatsApp number, so the real demo phone won't match the seeded user yet, and `TWILIO_MOCK_AGENCY_NUMBER` as the verified "official" number (unset means nothing to dial).
-- **Declined sensitive facts:** C15 says the memory writer deletes a fact the user says no to. There's no memory-writer delete helper yet. Ask person 1 before deleting through `app.db.deletes` (that path logs a user-facing `fact.deleted` event).
+- **Declined sensitive facts:** C15 says the memory writer deletes a fact the user says no to. `writes.memory.delete_fact` is drafted for this (no `fact.deleted` event, which would say the user deleted it) and needs person 1's OK.

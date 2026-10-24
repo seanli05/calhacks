@@ -58,3 +58,12 @@ async def set_fact_status(fact_id: FactId, status: FactStatus) -> tables.Fact:
         fact.status = status
         await db.commit()
         return fact
+
+
+async def delete_fact(fact_id: FactId) -> None:
+    """A pending fact the user said no to (C15). Unlike `deletes.delete_fact`, it
+    logs no `fact.deleted` event: the user declined a save, they didn't delete."""
+    async with session() as db:
+        fact = await must_get(db, tables.Fact, fact_id)
+        await db.delete(fact)
+        await db.commit()

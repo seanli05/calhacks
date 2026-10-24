@@ -70,7 +70,7 @@ NEXT_PUBLIC_DATA=fixtures npm run dev   # on fake data, no backend needed
 
 **Which database.** The deployed backend, the dashboard, live run-throughs and the demo all use the shared database (`DATABASE_URL`). Tests and `app.dev.rehearsal` use your own Neon branch (`TEST_DATABASE_URL`), never the shared one, because they drop every table. Ask person 1 for a branch; the URLs go in your `.env`/`.env.local`, never in git.
 
-**One job worker on the shared database.** Only the deployed backend claims jobs there. A laptop backend on the shared database, with `RESEARCH_WORKER=true` and a key, would race it for research jobs, possibly running older code. So locally, against the shared database, set `RESEARCH_WORKER=false` and leave `DEV_ENDPOINTS` off (the fake research and fake call write rows and send WhatsApp messages). To run the workers yourself, point the backend at your own branch.
+**One job worker on the shared database.** Only the deployed backend claims jobs there. A laptop backend on the shared database, with `RESEARCH_WORKER=true` or `MEMORY_WORKER=true` and a key, would race it for jobs, possibly running older code. So locally, against the shared database, set `RESEARCH_WORKER=false` and `MEMORY_WORKER=false`, and leave `DEV_ENDPOINTS` off (the fake research and fake call write rows and send WhatsApp messages). To run the workers yourself, point the backend at your own branch.
 
 Import only your own writer module, plus the shared ones. That's how "one writer per table" is enforced.
 
@@ -137,6 +137,10 @@ The smoke test dials only the mock agency line (it refuses any other number a ca
 
 Research runs inside the backend: a worker started with the app claims `research_fast`, `research_deep` and `research_question` jobs from Postgres. It starts when `RESEARCH_WORKER=true` (the default) and `ANTHROPIC_API_KEY` is set; set `RESEARCH_WORKER=false` to run the backend without it. Don't call `POST /dev/fake-research` while the worker runs: both claim the same jobs.
 
+### The memory writer
+
+The memory writer also runs inside the backend: a worker started with the app claims `memory_write` jobs one at a time and saves facts and profile fields (Plan.md → Memory; details in [docs/whatsapp-pipe.md](docs/whatsapp-pipe.md) → Goal 7). It starts when `MEMORY_WORKER=true` (the default) and `ANTHROPIC_API_KEY` is set; set `MEMORY_WORKER=false` to run the backend without it.
+
 `DEMO_DIAL_NUMBER` (in `.env.example`, the mock agency line) makes `official_dial_number` return that number instead of the verified one, still only for a verified case (Plan.md C40). Leave it set for every rehearsal and the demo.
 
 Dev tools, from `backend/` (`--help` on each):
@@ -164,7 +168,7 @@ Step by step, with what it checks and what to do if it fails: [docs/research-liv
 For screenshots, serve the test branch on the side (headless Edge is used; `--browser` or `REHEARSAL_BROWSER` points elsewhere, `--no-screens` skips them):
 
 ```bash
-DATABASE_URL_UNPOOLED=<TEST_DATABASE_URL> RESEARCH_WORKER=false uvicorn app.main:app --app-dir backend --port 8001
+DATABASE_URL_UNPOOLED=<TEST_DATABASE_URL> RESEARCH_WORKER=false MEMORY_WORKER=false uvicorn app.main:app --app-dir backend --port 8001
 cd dashboard && BACKEND_URL=http://localhost:8001 npx next dev -p 3001
 cd backend && python -m app.dev.rehearsal --out ../rehearsal
 ```
