@@ -42,7 +42,7 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | `orchestrator/`, `translation/`, `memory/` | WhatsApp agent, translation, memory writer | 2 | Pipe (language pick, photo grouping), call-status messages (C36, `orchestrator/call_status.py`), and letter → `research_fast` with a job watcher (`orchestrator/letters.py`, `job_watch.py`) done; Claude turn, reacting to results, translation, memory not started. Interfaces and decisions: [docs/whatsapp-pipe.md](../docs/whatsapp-pipe.md) |
 | `dev/` | Dev-only stand-ins: `POST /dev/fake-call` (a scripted call without the phone agent), `POST /dev/fake-research` (finishes research jobs from the contract fixtures). Off unless `DEV_ENDPOINTS=true`; local requests only | 2 | Done |
 | `research/`, `glossary/` | Letter reading, verification, case brief; glossary | 3 | Work is on branch `research_agent` (top-level `research/`, own models) |
-| `phone/` | Call state machine, hold/human detection, bridge, call report | 4 | State machine (`state.py`), menu decider (`menu.py`), ports and fakes (`ports.py`, `fakes.py`; see [docs/specs/phone-ports.md](../docs/specs/phone-ports.md)) done; phase classifier, runner, real audio next |
+| `phone/` | Call state machine, hold/human detection, bridge, call report | 4 | State machine (`state.py`), menu decider (`menu.py`), phase classifier (`phase.py`), ports and fakes (`ports.py`, `fakes.py`; see [docs/specs/phone-ports.md](../docs/specs/phone-ports.md)) done; runner, real audio next |
 
 Tests live in `backend/tests/`. Contract fixtures in `backend/tests/fixtures/contracts/` double as fake inputs for any component.
 
