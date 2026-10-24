@@ -186,8 +186,10 @@ Letter types and who vouches for the official number (config in `research/hints.
 | Trust model | Letter types | Number accepted when |
 |---|---|---|
 | `gov_issuer` | USCIS, immigration court, Medicare, SSA, county benefits (anchored on the CDSS county-office list), eviction court | Found on a fetched page of the issuer's own .gov site, or its official directory/list entry when allowed |
-| `registry_linked` | Housing authority (HUD PHA list PDF), hospital/clinic (CMS NPI Registry API) | Found in the org's own entry in the registry, or on a site that entry links to |
-| `unverifiable_private` | Property manager | Never; only .gov alternatives (court self-help, tenant office) keep a number |
+| `registry_linked` | Housing authority (HUD PHA list PDF), medical providers: hospital, clinic, medical group, dental office, pharmacy (CMS NPI Registry API) | Found in the org's own entry in the registry, or on a site that entry links to (often .org or .com) |
+| `unverifiable_private` | Property manager, health insurer | Never; property managers get .gov alternatives (court self-help, tenant office), insurers get the member-services number on the user's card |
+
+Senders matching no type (e.g. a debt collector) stay `unknown`: their own website can't vouch for itself, since a scam letter's site would vouch for the scam.
 
 The dev page takes a photo or PDF upload and shows the explanation, checklist, verdict, official phone with its trust chain, and the event log. Tick "fake passes" to run without an API key, or "skip deep" for extraction only. For redacted test copies, "simulate redacted fields" assumes a blacked-out case number has the issuer's expected shape; the verdict is then labeled SIMULATED (dev page only, never the real flow). Nothing is saved.
 

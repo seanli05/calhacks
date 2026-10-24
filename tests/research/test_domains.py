@@ -939,3 +939,82 @@ async def test_individual_landlord_is_unknown_with_alternatives(
         "Local tenant rights organization",
         "City or county housing department",
     ]
+
+
+# --- non-.gov medical senders ---
+
+
+@pytest.mark.parametrize(
+    ("doc_type", "key"),
+    [
+        ("dental_office_bill", "hospital_provider"),
+        ("pharmacy_notice", "hospital_provider"),
+        ("medical_group_statement", "hospital_provider"),
+        ("health_plan_coverage_denial", "health_insurer"),
+        ("explanation_of_benefits", "health_insurer"),
+        ("medicare_summary_notice", "medicare"),
+    ],
+)
+def test_medical_doc_types_route_to_a_trust_model(doc_type: str, key: str) -> None:
+    assert hint_key(doc_type) == key
+
+
+@pytest.mark.parametrize(
+    ("letterhead", "key"),
+    [
+        ("Sunrise Dental Group", "hospital_provider"),
+        ("Valley Family Clinic", "hospital_provider"),
+        ("Example Community Health Plan", "health_insurer"),
+        # A federal marketplace is not a private insurer.
+        ("Health Insurance Marketplace", None),
+    ],
+)
+def test_medical_letterheads_route_to_a_trust_model(
+    letterhead: str, key: str | None
+) -> None:
+    from research.hints import guess_doc_type
+
+    assert guess_doc_type(LegitimacySignals(letterhead=letterhead)) == key
+
+
+@pytest.mark.asyncio
+async def test_health_insurer_never_dials_and_points_to_the_card() -> None:
+    from research.deep_pass import run_deep_pass
+
+    def no_network(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"unexpected fetch {request.url}")
+
+    signals = LegitimacySignals(
+        letterhead="Example Community Health Plan",
+        urls=["www.examplehealthplan.com"],
+        phones=[
+            {"number": "+12025550150", "label": "Member Services", "quote": "Call"}
+        ],
+    )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(no_network)) as http:
+        findings = await run_deep_pass(
+            signals,
+            "Ask why the claim was denied",
+            None,
+            client=FakeClient([]),
+            model="m",
+            http=http,
+            doc_type="health_plan_claim_denial",
+        )
+    v = findings.verification
+    assert v.status == "unknown"
+    assert v.official_phone is None
+    assert findings.alternative_contacts[0].name == (
+        "Member services number on your insurance card"
+    )
+
+
+def test_unknown_sender_evidence_does_not_demand_a_gov_site() -> None:
+    signals = LegitimacySignals(letterhead="Example Collections LLC")
+    findings, _, _ = verify(
+        signals, where_to_look(None), None, [], Discovery(failures=[])
+    )
+    issuer = findings.verification.signals[0]
+    assert issuer.state == "not_found"
+    assert ".gov" not in issuer.evidence[0]
+    assert "can't vouch for itself" in issuer.evidence[0]

@@ -664,6 +664,10 @@ def verify(
         )
         issuer_missing = (
             "The letterhead agency was not confirmed on an official .gov page"
+            if hint.issuer_domains or hint.registries or hint.issuer_domain_named
+            # An unknown sender: say what's missing without implying it must be .gov.
+            else "No official government source confirmed this organization; "
+            "a letter's own website can't vouch for itself"
         )
     elif hint.trust_model == "registry_linked":
         # The org's own entry in a government registry vouches for it.

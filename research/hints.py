@@ -353,7 +353,18 @@ HINTS: dict[str, Hint] = {
             ),
         },
         default_purpose="billing",
-        letterhead_keywords=["hospital", "medical center", "health system"],
+        # Any provider organization has an NPI entry, not just hospitals.
+        letterhead_keywords=[
+            "hospital",
+            "medical center",
+            "health system",
+            "medical group",
+            "health center",
+            "clinic",
+            "dental",
+            "pharmacy",
+            "urgent care",
+        ],
         alternatives=[
             (
                 "The hospital's financial assistance (charity care) office",
@@ -381,6 +392,24 @@ HINTS: dict[str, Hint] = {
             (
                 "City or county tenant / housing office",
                 "Questions about tenant rights and rent rules",
+            ),
+        ],
+    ),
+    "health_insurer": Hint(
+        # No public registry entry ties an insurer to its phone line, but the
+        # member already holds a number they can trust: the one on their card.
+        depth="unverifiable",
+        category="medical",
+        trust_model="unverifiable_private",
+        letterhead_keywords=["health plan", "health insurance company"],
+        alternatives=[
+            (
+                "Member services number on your insurance card",
+                "The plan's own line for questions about coverage, claims or bills",
+            ),
+            (
+                "State health plan help center (DMHC in California)",
+                "Free help if the plan won't resolve a problem",
             ),
         ],
     ),
@@ -480,6 +509,19 @@ _PREFIXES: tuple[tuple[str, str], ...] = (
     ("hospital", "hospital_provider"),
     ("clinic", "hospital_provider"),
     ("medical_bill", "hospital_provider"),
+    ("medical_group", "hospital_provider"),
+    ("doctor", "hospital_provider"),
+    ("physician", "hospital_provider"),
+    ("dental", "hospital_provider"),
+    ("dentist", "hospital_provider"),
+    ("pharmacy", "hospital_provider"),
+    ("urgent_care", "hospital_provider"),
+    ("health_center", "hospital_provider"),
+    ("health_insurance", "health_insurer"),
+    ("health_plan", "health_insurer"),
+    ("insurance_", "health_insurer"),
+    ("explanation_of_benefits", "health_insurer"),
+    ("eob", "health_insurer"),
     ("property_manager", "property_manager"),
     ("property_management", "property_manager"),
     ("medicare", "medicare"),
