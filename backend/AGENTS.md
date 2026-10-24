@@ -23,6 +23,7 @@ If two docs disagree, Plan.md wins, then the code. Fix the doc that's wrong.
 | [docs/specs/task-c-dashboard.md](../docs/specs/task-c-dashboard.md) | Dashboard task: steps and the approved design |
 | [docs/specs/dashboard-api.md](../docs/specs/dashboard-api.md) | Dashboard API routes, feed templates, masking, seed |
 | [docs/specs/dashboard-build.md](../docs/specs/dashboard-build.md) | Building dashboard pages: conventions, work split, start prompts |
+| [docs/specs/dashboard-done.md](../docs/specs/dashboard-done.md) | Dashboard: what's left before it's done |
 | [docs/whatsapp-pipe.md](../docs/whatsapp-pipe.md) | WhatsApp side: what works, how to plug in (`send_template`, `messages` fields), concerns |
 | [mock_agency/README.md](../mock_agency/README.md) | The mock USCIS phone line the agent calls: menu tree, hold, officer |
 
