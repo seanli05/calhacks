@@ -13,6 +13,7 @@ from app.contracts import (
     AskUserRequest,
     EventType,
     FactStatus,
+    JobType,
     Sensitivity,
     VerificationStatus,
 )
@@ -214,7 +215,7 @@ async def test_turn_replies_in_the_users_language_with_english_logged(
     case = await letter_case(db, user)
     client = FakeRunnerClient(tool_calls=[("get_case_status", {"case_id": case.id})])
 
-    await make_turn(client, whatsapp).run(user)
+    await make_turn(client, whatsapp).run(user, "msg_1")
 
     reply = db.messages[-1]
     assert (reply.sender, reply.language) == ("orchestrator", "es")
@@ -231,8 +232,13 @@ async def test_turn_replies_in_the_users_language_with_english_logged(
         "get_case_status",
         "get_profile",
         "close_case",
+        "request_consent",
         "set_language",
-    }
+    }  # no start_call: only the user's numbered YES starts one (rule 4)
+    # Goal 6.5: the memory writer runs on the user's message after each reply.
+    [memory] = db.jobs_of(JobType.MEMORY_WRITE)
+    assert memory.payload["source_ref"] == "msg_1"
+    assert memory.payload["source"] == "user_said"
 
 
 async def test_context_is_english_and_never_resolves_refs(
@@ -250,7 +256,7 @@ async def test_context_is_english_and_never_resolves_refs(
     case = db.cases[0]
     client = FakeRunnerClient(tool_calls=[("get_case_status", {"case_id": case.id})])
 
-    await make_turn(client, whatsapp).run(user)
+    await make_turn(client, whatsapp).run(user, "msg_1")
 
     assert "<ref:interview_location>" in client.tool_results[0]
     context = client.requests[0]["messages"][0]["content"]
@@ -277,7 +283,7 @@ async def test_failures_send_the_unavailable_template_never_english(
 ) -> None:
     user = await use_spanish(db)
 
-    await make_turn(client, whatsapp, translator).run(user)
+    await make_turn(client, whatsapp, translator).run(user, "msg_1")
 
     assert db.outbound_templates() == [UNAVAILABLE]
     assert whatsapp.sent == [render(UNAVAILABLE, "es")]
@@ -289,7 +295,7 @@ async def test_language_switch_sends_only_the_template(
     user = await use_spanish(db)
     client = FakeRunnerClient(tool_calls=[("set_language", {"language": "en"})])
 
-    await make_turn(client, whatsapp).run(user)
+    await make_turn(client, whatsapp).run(user, "msg_1")
 
     assert db.outbound_templates() == ["language.set"]
     assert whatsapp.sent == [render("language.set", "en")]
@@ -306,7 +312,13 @@ def wired_pipe(
 ) -> tuple[InboundPipe, list[dict[str, Any]]]:
     turns: list[dict[str, Any]] = []
 
-    async def turn(user: tables.User, *, same_or_new_pending: bool = False) -> None:
+    async def turn(
+        user: tables.User,
+        message_id: str,
+        *,
+        same_or_new_pending: bool = False,
+        consent_pending: bool = False,
+    ) -> None:
         turns.append({"user": user.id, "pending": same_or_new_pending})
 
     async def detect(text: str) -> None:
@@ -358,7 +370,7 @@ async def test_reply_to_an_open_question_is_not_translated(
 
     await pipe.handle(inbound("2"))
 
-    assert db.messages[0].body_en is None
+    assert db.messages[0].body_en == "2"  # a bare number needs no model call
     assert turns == []
 
 

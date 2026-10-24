@@ -1,5 +1,5 @@
 """Starting research on a letter (Plan.md → H1, C20) and noticing when the fast pass
-finishes.
+finishes (the reaction is letter_result.py).
 
 The orchestrator mints the `case_id` and queues `research_fast`; research creates the
 `cases` row only when its fast pass finishes, and not at all for an unreadable photo.
@@ -16,6 +16,7 @@ from app.contracts.common import CaseId, DocumentId, JobId, UserId
 from app.db import jobs, reads, tables
 from app.db.ids import new_id
 from app.orchestrator.job_watch import JobWatcher
+from app.orchestrator.letter_result import LetterResults
 from app.relay.outbound import send_template
 from app.relay.whatsapp import WhatsApp, WhatsAppSendError
 
@@ -36,10 +37,12 @@ class Letters:
         self,
         whatsapp: WhatsApp,
         watcher: JobWatcher,
+        results: LetterResults,
         slow_after_s: float = FAST_SLOW_AFTER_S,
     ) -> None:
         self._whatsapp = whatsapp
         self._watcher = watcher
+        self._results = results
         self._slow_after_s = slow_after_s
         # The letter each user is waiting on a fast pass for.
         self._reading: dict[UserId, _Letter] = {}
@@ -162,5 +165,5 @@ class Letters:
                 job.error,
             )
             return
-        # Goal 6.1: send the explanation (R1 is `job.result`).
         logger.info("Fast pass done case_id=%s job_id=%s", job.case_id, job.id)
+        await self._results.fast_done(job)

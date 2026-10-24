@@ -106,7 +106,7 @@ The webhook returns empty TwiML at once and handles the message in a background 
 - **Photos:** photos sent within 6 s of each other become one letter (`documents` row), and the orchestrator queues the research fast pass for it. Once research has started, a new photo gets "same letter or new?".
 - **Other text:** answered by the orchestrator's Claude turn (it explains letters, never gives legal advice). Replies are written in English and translated into the user's language. Without `ANTHROPIC_API_KEY`, text is echoed back instead.
 
-Reply templates live in `relay/templates.py` (`en` and `es`). Status, interfaces (ask_user, call status), decisions, and open concerns for the WhatsApp side: [docs/whatsapp-pipe.md](docs/whatsapp-pipe.md). To see ask_user and the call-status messages on your phone without the phone agent, set `DEV_ENDPOINTS=true` and use `POST /dev/fake-call` (local only; steps in that doc). `POST /dev/fake-research` stands in for the research agent the same way.
+Reply templates live in `relay/templates.py` (`en` and `es`). Status, interfaces (ask_user, call status), decisions, and open concerns for the WhatsApp side: [docs/whatsapp-pipe.md](docs/whatsapp-pipe.md). To see ask_user and the call-status messages on your phone without the phone agent, set `DEV_ENDPOINTS=true` and use `POST /dev/fake-call` (local only; steps in that doc). `POST /dev/fake-research` stands in for the research agent the same way, and `POST /dev/fake-phone` for the phone agent's job loop, so the whole path (photo → explanation → verdict → consent → call → summary) runs on a phone.
 
 ### Deploying for the demo
 

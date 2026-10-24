@@ -14,6 +14,7 @@ from app.contracts import (
 )
 from app.db import tables
 from app.orchestrator.job_watch import JobWatcher
+from app.orchestrator.letter_result import LetterResults
 from app.orchestrator.letters import Letters
 from app.orchestrator.pipe import InboundPipe
 from app.relay.ask_user import AskUser
@@ -140,10 +141,13 @@ async def test_photo_after_an_unreadable_letter_starts_a_new_letter(
 
 
 async def test_slow_fast_pass_says_its_taking_longer_once(
-    whatsapp: FakeWhatsApp, job_watcher: JobWatcher, db: FakeDB
+    whatsapp: FakeWhatsApp,
+    job_watcher: JobWatcher,
+    letter_results: LetterResults,
+    db: FakeDB,
 ) -> None:
     user = await use_spanish(db)
-    letters = Letters(whatsapp, job_watcher, slow_after_s=0.05)
+    letters = Letters(whatsapp, job_watcher, letter_results, slow_after_s=0.05)
 
     await letters.start(user.id, "doc_1")
     await asyncio.sleep(0.2)

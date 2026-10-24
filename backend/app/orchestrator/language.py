@@ -13,13 +13,12 @@ from dataclasses import dataclass
 from app.contracts import MessageDirection
 from app.contracts.common import LanguageCode, UserId
 from app.db import reads, tables
-from app.relay.replies import parse_choice
+from app.relay.replies import parse_choice, parse_yes_no
 from app.relay.templates import LANGUAGES
 
 CONFIRM = "language.confirm"
 MENU = "language.menu"
 _PROMPTS = {CONFIRM, MENU}
-_YES = {"si", "sí", "yes"}
 
 
 @dataclass(frozen=True)
@@ -39,7 +38,7 @@ def answer_to_prompt(
     if last_prompt is None:
         return None
     if last_prompt.template == CONFIRM:
-        choice = 1 if text.strip().lower() in _YES else parse_choice(text, 2)
+        choice = parse_yes_no(text)
         if choice == 1:
             return LanguageStep(chosen=last_prompt.language)
         if choice == 2:

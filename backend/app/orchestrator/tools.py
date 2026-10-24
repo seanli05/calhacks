@@ -5,8 +5,9 @@ a model; `build_tools` wraps it for the SDK's tool runner. Results are JSON in
 English. Sensitive values stay `<ref:...>` placeholders: nothing here resolves a ref
 (C11, C34).
 
-`request_consent` and `start_call` arrive with the consent gate (Goal 6.3); research
-starts from photos, so there's no `start_research` tool.
+`request_consent` only asks: there's no `start_call` tool, because a call starts
+only from the user's own numbered YES, in code (consent.py, rule 4). Research starts
+from photos, so there's no `start_research` tool.
 """
 
 import json
@@ -23,6 +24,7 @@ from app.db.events import append_event
 from app.db.ids import new_id
 from app.db.tables import utcnow
 from app.db.writes import orchestrator as writes
+from app.orchestrator.consent import ConsentGate
 from app.relay.outbound import send_template
 from app.relay.templates import LANGUAGES
 from app.relay.whatsapp import WhatsApp
@@ -35,10 +37,17 @@ _LETTER_FIELDS = ("doc_type", "issuer", "deadline", "what_is_asked", "urgency")
 
 
 class CaseTools:
-    def __init__(self, user: tables.User, whatsapp: WhatsApp) -> None:
+    def __init__(
+        self,
+        user: tables.User,
+        whatsapp: WhatsApp,
+        consent: ConsentGate | None = None,
+    ) -> None:
         self.user = user
         self._whatsapp = whatsapp
+        self._consent = consent
         self.language_switched = False
+        self.consent_requested = False
 
     async def list_active_cases(self) -> str:
         cases = []
@@ -59,12 +68,14 @@ class CaseTools:
         if case is None:
             return _json({"error": f"No case {case_id} for this user."})
         verification = await reads.latest_verification(case.id)
+        calls = await reads.list_calls(case.id)
         return _json(
             {
                 "case_id": case.id,
                 "stage": str(await reads.case_progress(case.id)),
                 "letter": _letter(case.fast_result),
                 "verification": _verification(verification),
+                "last_call": _call(calls[-1]) if calls else None,
             }
         )
 
@@ -120,6 +131,21 @@ class CaseTools:
             }
         )
 
+    async def request_consent(self, case_id: CaseId) -> str:
+        if self._consent is None:
+            return _json({"error": "Calls aren't available right now."})
+        refusal = await self._consent.request(self.user, case_id)
+        if refusal is not None:
+            return _json({"error": refusal})
+        self.consent_requested = True
+        return _json(
+            {
+                "asked": case_id,
+                "note": "The user was sent a yes/no question about the call. Don't "
+                "reply further.",
+            }
+        )
+
     async def _own_case(self, case_id: CaseId) -> tables.Case | None:
         case = await reads.get_case(case_id)
         return case if case is not None and case.user_id == self.user.id else None
@@ -159,6 +185,18 @@ def build_tools(tools: CaseTools) -> list[BetaAsyncFunctionTool[Any]]:
         return await tools.close_case(case_id)
 
     @beta_async_tool
+    async def request_consent(case_id: str) -> str:
+        """Ask the user whether we may call USCIS about this letter. Sends them a
+        yes/no question; the call starts only if they answer yes. Use it when the
+        user asks for a call, or to offer one again. It refuses if the letter
+        isn't verified or a call is already under way.
+
+        Args:
+            case_id: A case ID from list_active_cases.
+        """
+        return await tools.request_consent(case_id)
+
+    @beta_async_tool
     async def set_language(language: str) -> str:
         """Switch the language the user is written to in, when they ask for it.
 
@@ -167,7 +205,14 @@ def build_tools(tools: CaseTools) -> list[BetaAsyncFunctionTool[Any]]:
         """
         return await tools.set_language(language)
 
-    return [list_active_cases, get_case_status, get_profile, close_case, set_language]
+    return [
+        list_active_cases,
+        get_case_status,
+        get_profile,
+        close_case,
+        request_consent,
+        set_language,
+    ]
 
 
 def _letter(fast_result: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -199,6 +244,19 @@ def _verification(row: tables.Verification | None) -> dict[str, Any]:
         return {"status": "pending"}
     result = row.result or {}
     return {"status": str(row.status), "red_flags": result.get("red_flags", [])}
+
+
+def _call(call: tables.Call) -> dict[str, Any]:
+    """The call's state and, once it has ended, what the report says to tell the
+    user (P3)."""
+    report = call.report or {}
+    return {
+        "state": str(call.state),
+        "outcome": report.get("outcome"),
+        "reference_number": report.get("reference_number"),
+        "next_steps": report.get("next_steps_en", []),
+        "new_deadlines": report.get("new_deadlines", []),
+    }
 
 
 def _json(value: Any) -> str:

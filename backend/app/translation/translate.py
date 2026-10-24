@@ -153,3 +153,15 @@ def get_translator() -> Translator | None:
     return Translator(
         AsyncAnthropic(api_key=settings.anthropic_api_key), settings.model_fast
     )
+
+
+async def localize(
+    translator: Translator | None, text_en: str, language: LanguageCode
+) -> str | None:
+    """`text_en` in `language`, or None when it can't be translated (no translator,
+    or the call failed). Callers fall back to a template, never to English."""
+    if language == "en":
+        return text_en
+    if translator is None:
+        return None
+    return await translator.from_english(text_en, language)

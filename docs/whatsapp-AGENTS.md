@@ -14,8 +14,10 @@ For an agent (or human) reviewing person 2's work: the WhatsApp pipe, the relay,
 |---|---|---|
 | WhatsApp pipe: webhook, language pick, photo grouping, sending and logging | Goal 2 | Merged to `main` in PR #6 |
 | ask_user, call-status messages, fake phone agent | Goals 3.1–3.6 | Merged to `main` in PR #7 |
-| Letter to research, job watcher, fake research agent, turn outside the lock | Goals 4.2–4.4 | Branch `lauren-goal4-research-jobs` |
-| Claude turn and tools, translation at the edges | Goals 4.1, 4.5, 5.1 | Branch `lauren-goal4-claude-turn` (built on the one above) |
+| Letter to research, job watcher, fake research agent, turn outside the lock | Goals 4.2–4.4 | Merged to `main` in PR #9 |
+| Claude turn and tools, translation at the edges | Goals 4.1, 4.5, 5.1 | Branch `lauren-goal4-claude-turn` |
+| ask_user option labels translated | Goal 5 (concern 7) | Branch `lauren-goal5-option-labels` (built on the one above) |
+| Explanation, verdict, consent gate, call, summary, memory job, fake phone worker | Goals 6.1–6.5 | Branch `lauren-goal6-consent-call` (built on the one above) |
 
 If the branch isn't on GitHub yet, ask person 2 to push it.
 
@@ -34,19 +36,24 @@ Paths are under `backend/` unless noted. "New" means person 2 created the file; 
 | `whatsapp.py` | The thin Twilio wrapper. `WhatsApp` is a Protocol so tests can swap in a fake. `TwilioWhatsApp.send` uses the REST SDK in a worker thread (the SDK is synchronous), splits bodies over 1,600 chars with `split_body`, and raises `WhatsAppSendError` with Twilio's error code but no message text, which can contain numbers. |
 | `templates.py` | Every user-facing template, `template_id → {es, en}`, in formal *usted*. `render(id, None)` returns all supported languages, for before the user has picked one. A test fails if any language is missing. |
 | `outbound.py` | `send_template`, usable by anyone: sends, then logs to `messages` with `sender=relay`, `template`, the English `body_en`, and the Twilio SID. `send_text`: orchestrator free text only (rule 1). |
-| `replies.py` | `parse_choice(text, n)`: reads replies like "2", "2." or " 2 " as 1-based choices (C5). |
+| `replies.py` | `parse_choice(text, n)`: reads replies like "2", "2." or " 2 " as 1-based choices (C5). `parse_yes_no`: `1`/"sí"/"si"/"yes" or `2`/"no", for two-option questions (consent, the language confirm). |
 | `ask_user.py` | **New (Goal 3).** `ask_user(request)` is what the phone agent awaits (P1). It creates the `questions` row, sends the numbered question, and waits on an in-memory future. On timeout it calls `time_out_question` and returns the default. It logs all four `call.ask_user*` events. `question_for_reply` / `handle_reply` serve the inbound pipe: they answer, re-prompt, or send the late reply (C24, 10-minute window, once per question). |
 
 ### Orchestrator (`app/orchestrator/`): owned by person 2
 
 | File | What it does |
 |---|---|
-| `pipe.py` | `InboundPipe.handle` runs per webhook. Each WhatsApp number's messages are handled one at a time, in arrival order (a per-number `asyncio.Lock`). The sequence: user row → media downloaded and saved → inbound logged (with `question_id` if it answers one) → routed. **Routing order:** open ask_user question → language pick → letter photos → "same letter or new?" answer → orchestrator turn. **The turn runs after the routing lock is released** (`_handle` returns it), under a second per-number lock, so an ask_user reply never waits behind it. The turn is `OrchestratorTurn.run`, injected as `turn=`; with no Anthropic key it falls back to an echo. Inbound text gets `body_en` through the injected `to_english`, except replies to an open question. Non-choice text during "same letter or new?" goes to the turn with `same_or_new_pending=True`. A closed photo batch calls `Letters.start`; "same letter" calls `Letters.pages_added`. `get_pipe()` wires in the real Twilio client, Claude detection (only if `ANTHROPIC_API_KEY` is set), the shared `AskUser`, and `Letters` with the shared `JobWatcher`. |
+| `pipe.py` | `InboundPipe.handle` runs per webhook. Each WhatsApp number's messages are handled one at a time, in arrival order (a per-number `asyncio.Lock`). The sequence: user row → media downloaded and saved → inbound logged (with `question_id` if it answers one) → routed. **Routing order:** open ask_user question → language pick → letter photos → "same letter or new?" answer → consent answer → orchestrator turn. **The turn runs after the routing lock is released** (`_handle` returns it), under a second per-number lock, so an ask_user reply never waits behind it. The turn is `OrchestratorTurn.run`, injected as `turn=`; with no Anthropic key it falls back to an echo. Inbound text gets `body_en` through the injected `to_english`, except replies to an open question. Non-choice text during "same letter or new?" goes to the turn with `same_or_new_pending=True`. A closed photo batch calls `Letters.start`; "same letter" calls `Letters.pages_added`. `get_pipe()` wires in the real Twilio client, Claude detection (only if `ANTHROPIC_API_KEY` is set), the shared `AskUser`, and `Letters` with the shared `JobWatcher`. |
 | `language.py` | First-contact language pick (team decision, Oct 23): a one-tap confirm in the detected language, or a multilingual menu. The pending prompt is read back from `messages`, so it survives a restart. The decision functions are pure. |
 | `photos.py` | `PhotoBatcher`: photos with gaps under 6 s become one letter. Batches are held while the language is unknown. "Same letter or new?" answers wait here. All in memory. |
 | `letters.py` | **New (Goal 4.2).** `Letters.start` mints `case_id` and queues `research_fast`; `pages_added` re-runs it in the same case unless the last fast job is still queued. `active_letter` answers "has research started on a letter?" for "same letter or new?": the letter being read (in memory, because research creates the `cases` row only at the end of the fast pass), else the newest active case's newest document. Reacts to the fast job: "taking longer" at 45 s, ignores a stale job's result, logs the rest until Goal 6.1. |
+| `letter_result.py` | **New (Goal 6.1).** `LetterResults.fast_done(job)`: R1 → one `send_text` with the translated explanation and checklist, the date line and the closing as templates; a failed translation sends templates only. `needs_better_image` → `letter.retake_tip` / `letter.retake`. Starts the verdict watcher after sending. |
+| `verdicts.py` | **New (Goal 6.2).** `Verdicts.watch(user_id, case_id, since)`: polls `reads.list_events` for `research.deep_done` on the case, reads R2 from the event's `job_id`, and `react`s: verified (+ consent request, or "no need to call"), suspicious (warning with translated red flags, no call), unknown (explain, ask). |
+| `consent.py` | **New (Goals 6.3, 6.4).** `ConsentGate`: `request` (refuses unless verified, an official number, a brief, and no call running; sends `consent.request` with the translated goal; logs `consent.requested`), `answer` (from the pipe, on the user's 1/2), the re-check and `CallJob` enqueue, and `_call_finished` (summary, then retry consent or the close suggestion). |
+| `call_summary.py` | **New (Goal 6.4).** `send_call_summary`: next steps translated; reference number and dates in templates; failed and unreachable get their own templates. |
+| `dates.py` | **New (Goal 5.4).** `format_date` / `format_time` for `es` and `en`; ISO for anything else. |
 | `job_watch.py` | **New (Goal 4.3).** `JobWatcher.watch(job_id, on_finished, slow_after_s=, on_slow=)`: one task per job polls `reads.get_job` about once a second until done or failed. A DB error skips one poll; a missing job stops the watcher; a reaction's DB error is logged with the job's IDs. |
-| `turn.py` | **New (Goal 4.1).** `OrchestratorTurn.run(user)` builds an English context from stored rows (last 20 messages via `body_en`, open cases, the pending same-or-new note), runs `client.beta.messages.tool_runner` (`MODEL_DEFAULT`, cached system prompt, `max_iterations=6`, 30 s per call, 60 s overall), translates the English reply with `from_english`, and sends it with `send_text(..., body_en=...)`. An API error, timeout, refusal, empty reply, or failed translation sends the `orchestrator.unavailable` template, never English. |
+| `turn.py` | **New (Goal 4.1).** `OrchestratorTurn.run(user, message_id)` builds an English context from stored rows (last 20 messages via `body_en`, open cases, a pending same-or-new or consent note), runs `client.beta.messages.tool_runner` (`MODEL_DEFAULT`, cached system prompt, `max_iterations=6`, 30 s per call, 60 s overall), translates the English reply with `from_english`, and sends it with `send_text(..., body_en=...)`. An API error, timeout, refusal, empty reply, or failed translation sends the `orchestrator.unavailable` template, never English. Then queues `memory_write` on the user's message (Goal 6.5). |
 | `tools.py` | **New (Goals 4.1, 4.5).** `CaseTools` (testable without a model) plus `build_tools` (wraps it with `beta_async_tool`). `get_case_status` returns stage, R1 (refs stay placeholders, no `proposed_facts`), and the verdict; `close_case` appends `case.closed` (C22, IDs only); `set_language` takes only `LANGUAGES`, sends `language.set`, and ends the turn. Every case tool checks the case belongs to the user. |
 | `prompts.py` | **New.** The orchestrator's system prompt: English only, short replies, C33 (no legal advice, no interview interpreting), never show identifiers or refs, close only on request. |
 | `call_status.py` | **New (Goal 3.4).** `StatusRules` (pure) holds C36's rules: human detected always; dialing and unreachable once per call; on hold at most every 10 minutes per call; nothing else. `CallStatusWatcher.watch(user_id, since)` polls `reads.list_events` about once a second and sends through `send_template`. It stops at `call.ended` or after 3 hours. |
@@ -63,9 +70,11 @@ Paths are under `backend/` unless noted. "New" means person 2 created the file; 
 
 | File | What it does |
 |---|---|
-| `router.py` | `POST /dev/fake-call {"number": "+1…"}` and `POST /dev/fake-research {"minutes": 30}`. Both return 404 unless `DEV_ENDPOINTS=true`, and 403 unless the request comes from loopback with no `X-Forwarded-For` (requests through ngrok carry that header). The guard is a router-level dependency. |
+| `router.py` | `POST /dev/fake-call {"number": "+1…"}`, `POST /dev/fake-research {"minutes": 30}` and `POST /dev/fake-phone {"minutes": 30}`. All return 404 unless `DEV_ENDPOINTS=true`, and 403 unless the request comes from loopback with no `X-Forwarded-For` (requests through ngrok carry that header). The guard is a router-level dependency. |
 | `fake_call.py` | A scripted stand-in for the phone agent: dialing → menu → ask_user → three on-holds → human detected → user joined → ended → `case.closed`. It writes research and phone rows through **their writer modules**, because `questions.call_id` needs a real `calls` row. Only `dev/` does this. |
 | `fake_research.py` | **New (Goal 4.4).** A stand-in for the research agent: claims `research_fast` / `research_deep`, finishes them from `tests/fixtures/contracts/` after 5 s / 10 s, writing the case, refs (`[dev] fake …` values), R1, verification, and a brief with `call_goal_en` and `questions_to_ask` through `writes.research`, plus the research events. |
+
+| `fake_phone.py` | **New (Goal 6).** A stand-in for the phone agent's job loop: claims `call` jobs, checks `official_dial_number` (fails the job without one), creates the call with the job's real `consent_message_id`, plays `fake_call.play_call`, saves a transcript and the fixture's report, and finishes the job. Never dials. |
 
 The fake research agent's safety (please check): the verification's phone is `TWILIO_MOCK_AGENCY_NUMBER` or empty, never the fixture's real USCIS number (rule 2); a test checks the fixture number never appears in R2.
 
@@ -88,6 +97,8 @@ All on fakes: no Twilio, no Anthropic, no database.
 | `test_orchestrator_letters.py` | New (Goal 4). Letter → `research_fast` with a minted case, "same letter or new?" before any case row, re-run rules, a photo after an unreadable letter, "taking longer" once, stale results ignored, the watcher on failed and missing jobs, and an ask_user reply not waiting behind a slow turn. |
 | `test_orchestrator_turn.py` | New (Goals 4.1, 4.5). Each tool on `FakeDB` (refs kept, ownership, close once, language switch, active facts only), the turn on a fake tool runner (reply translated with `body_en`, refs never resolved, every failure path sends the template), and the pipe wiring. |
 | `test_translate.py` | New (Goal 5.1). English short-circuit, register and pass-through rules in the prompt, failures return None. |
+| `test_orchestrator_results.py` | New (Goal 6). Dates; R1 message (date line from a template, checklist, closing, English fallback); retake; the three verdict branches; the consent gate (one YES one call, yes words, decline, re-prompt, a verdict changed before the YES, no request without a verified number, no second request mid-call, the tool only asks); the summary and what follows each outcome. |
+| `test_fake_phone.py` | New (Goal 6). YES → fake phone → ask_user → status messages → summary through the real pipe, and the fake's rule 2 refusal. |
 | `test_fake_research.py` | New (Goal 4.4). Both fake passes from a real pipe letter, the mock line (never the fixture's number), no phone when unset, and the endpoint guards. |
 | `test_call_status.py` | New. Each C36 rule, the watcher end to end (including events sharing a timestamp), the dev endpoint's guards, and a full fake call run on fakes, checking that no runnable job is left behind. |
 
@@ -113,18 +124,18 @@ Each is explained in whatsapp-pipe.md → Decisions and Concerns.
 - **ask_user waits in memory** (P1's "asyncio future"); the `questions` row decides races.
 - **There's no "call ended" message.** Exactly four status events message the user (P2, `USER_MESSAGING_EVENTS`).
 - **The call-status watcher follows the user, not a call ID**, because the phone agent mints the call ID only when it picks up the job (C7).
-- **ask_user options go out in English** until translation is built (Goal 5).
-- **Incoming Spanish messages have `body_en = null`** until Goal 5.
-- **The turn can't start a call yet.** The call tools wait for the consent gate (decision 8).
-- **Which letter is being read lives in memory** (decision 6). A restart forgets it; a photo sent then starts a new letter.
-- **A finished fast pass is only logged** until Goal 6.1 sends the explanation.
+- **There's no `start_call` tool** (decision 9). Only the user's numbered YES starts a call.
+- **R2 is found through `research.deep_done` events** (decision 10), not a jobs helper.
+- **Dates go in templates, written in code** (decision 11), not through translation.
+- **Which letter is being read, the open consent request, and the verdict watchers live in memory** (decisions 6, 9, 10). A restart forgets them.
 
 ## Worth checking
 
-- **Rule 1:** `send_text` is called only from `orchestrator/pipe.py` (echo fallback) and `orchestrator/turn.py`; everything else uses `send_template`.
+- **Rule 1:** `send_text` is called only from `orchestrator/` (`pipe.py` echo fallback, `turn.py`, `letter_result.py`, `call_summary.py`); everything else uses `send_template`.
+- **Rule 4 and C21:** `CallJob` is enqueued only in `ConsentGate._start_call`, reached only from `answer` with choice 1, which the pipe calls only on a parsed reply to an open request. Check the re-check there and that the request is popped before the call starts.
 - **Rule 6:** the turn's context and reply are English; the only non-English text a user gets from the turn has gone through `from_english`.
 - **Rules 2 and 4:** nothing in person 2's code dials, and the fake call can't produce a runnable call job (see its tests).
-- **Rule 5:** `relay/` writes only `questions` (through `writes.relay`) plus the append-only `messages` and `events`. `orchestrator/` writes only `users`, `media` and `documents` (through `writes.orchestrator`). `dev/` is the documented exception (fake call and fake research). The orchestrator also queues `research_fast` through `jobs.enqueue`.
+- **Rule 5:** `relay/` writes only `questions` (through `writes.relay`) plus the append-only `messages` and `events`. `orchestrator/` writes only `users`, `media` and `documents` (through `writes.orchestrator`). `dev/` is the documented exception (fake call, fake research, fake phone). The orchestrator also queues `research_fast`, `call` and `memory_write` through `jobs.enqueue`.
 - **C27:** event `data` carries IDs, option numbers, and menu option labels. Option labels aren't user facts, but say so if you disagree.
 - **Races in `ask_user.py`:** `ask` losing to an answer (`_time_out` waits up to 5 s for the future), and `handle_reply` losing to the timeout (late reply, deduplicated through `_late_replied`).
 - **`call_status.py` timestamps:** reads from `since - 1 µs` and skips seen event IDs, so events sharing a timestamp aren't lost.
