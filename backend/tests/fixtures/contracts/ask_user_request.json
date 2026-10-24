@@ -1,0 +1,11 @@
+{
+  "question_id": "question_3",
+  "call_id": "call_5",
+  "template": "menu_choice",
+  "options_en": [
+    "Speak to a representative about an appointment",
+    "Case status"
+  ],
+  "default_option": 1,
+  "timeout_s": 45
+}

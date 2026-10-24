@@ -1,0 +1,12 @@
+{
+  "job": "memory_write",
+  "user_id": "user_9",
+  "source": "from_call",
+  "source_ref": "call_5",
+  "proposed_facts": [
+    {
+      "fact": "Asylum interview confirmed for Nov 18",
+      "source": "from_call"
+    }
+  ]
+}

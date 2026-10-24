@@ -1,0 +1,8 @@
+{
+  "job": "research_deep",
+  "case_id": "case_123",
+  "user_id": "user_9",
+  "document_ids": [
+    "doc_1"
+  ]
+}

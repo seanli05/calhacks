@@ -1,0 +1,22 @@
+{
+  "call_id": "call_5",
+  "case_id": "case_123",
+  "outcome": "resolved",
+  "reference_number": "R-55821",
+  "rep_name": "Maria",
+  "next_steps_en": [
+    "Interview is still on for Nov 18",
+    "If the interpreter can't come, contact the asylum office before the interview to ask to reschedule"
+  ],
+  "new_deadlines": [
+    "2026-11-17"
+  ],
+  "transcript_id": "transcript_5",
+  "proposed_facts": [
+    {
+      "fact": "Asylum interview confirmed for Nov 18",
+      "source": "from_call"
+    }
+  ],
+  "followup_needed": true
+}
