@@ -36,6 +36,31 @@ CLAIM_FIELDS = frozenset(
 
 MAX_QUESTIONS = 4
 
+# Menu hints by meaning, never key numbers: real menus renumber, and the phone
+# agent drops any hint that names a key (docs/specs/case-brief.md). These describe
+# how agency phone lines are organized in general, not any one tree.
+MENU_LANGUAGE = "If offered a language choice, choose English"
+MENU_TOPIC_APPOINTMENT = (
+    "Choose the option for an existing case, or for an interview or appointment notice"
+)
+MENU_TOPIC_NOTICE = (
+    "Choose the option for an existing case, or for a notice you received"
+)
+MENU_NO_IDENTIFIERS = (
+    "If asked for a receipt number, A-Number, date of birth, or other identifier, "
+    "don't give it: say the caller doesn't have it, or pick the option for callers "
+    "without one. Don't stay silent; menus hang up on silence"
+)
+MENU_STATE_GOAL = "If asked why you're calling, state the call goal plainly"
+MENU_ASK_FIRST = (
+    "If a choice would commit the applicant to something (such as rescheduling), "
+    "ask the user first"
+)
+MENU_REPRESENTATIVE = (
+    "Ask for a representative when the menu allows it; hold until a person answers, "
+    "then bring in the user"
+)
+
 # What the rep would call each ref field; others fall back to the field name.
 FIELD_LABELS = {
     "a_number": "A-Number",
@@ -83,6 +108,7 @@ def build_brief(case: CaseRecord, findings: DeepFindings) -> CaseBrief:
         deadline=r1.deadline,
         appointment=r1.appointment,
         call_goal_en=call_goal,
+        expected_menu_path=_menu_path(case),
         questions_to_ask=_questions(case),
         must_not_do=[*REQUIRED_MUST_NOT_DO, *EXTRA_MUST_NOT_DO],
         facts=_safe_facts(r1.key_facts),
@@ -99,6 +125,22 @@ def build_brief(case: CaseRecord, findings: DeepFindings) -> CaseBrief:
             if s.state in ("not_found", "uncertain")
         ],
     )
+
+
+def _menu_path(case: CaseRecord) -> list[str]:
+    """How to get through the agency's menu to a person, by meaning."""
+    r1 = case.r1
+    about_appointment = r1.appointment is not None or "interview" in (
+        f"{r1.doc_type or ''} {r1.what_is_asked or ''}".lower()
+    )
+    return [
+        MENU_LANGUAGE,
+        MENU_TOPIC_APPOINTMENT if about_appointment else MENU_TOPIC_NOTICE,
+        MENU_NO_IDENTIFIERS,
+        MENU_STATE_GOAL,
+        MENU_ASK_FIRST,
+        MENU_REPRESENTATIVE,
+    ]
 
 
 def _questions(case: CaseRecord) -> list[str]:

@@ -6,7 +6,7 @@ from collections.abc import Callable, Iterator
 from datetime import datetime, timedelta
 
 import pytest
-from app.contracts import CallJob, CallState, Component, Event, EventType
+from app.contracts import CallJob, CallState, CaseBrief, Component, Event, EventType
 from app.db import tables
 from app.db.ids import new_id
 from app.db.tables import utcnow
@@ -201,8 +201,15 @@ async def test_fake_call_plays_the_script_and_never_leaves_a_runnable_job(
         db.cases.append(case)
         return case
 
-    async def save_brief(case_id: str, brief: dict, note: str) -> tables.CaseBrief:
-        return tables.CaseBrief(case_id=case_id, brief=brief, handoff_note=note)
+    async def save_brief(
+        case_id: str, brief: CaseBrief, note: str | None = None
+    ) -> tables.CaseBrief:
+        return tables.CaseBrief(
+            id=brief.brief_id,
+            case_id=case_id,
+            brief=brief.model_dump(mode="json"),
+            handoff_note=note or brief.handoff_note,
+        )
 
     async def enqueue(payload: CallJob, *args: object) -> tables.Job:
         job = tables.Job(type=payload.job, created_by="orchestrator", user_id=user.id)

@@ -6,7 +6,13 @@ from app.contracts import (
     ChecklistItem,
     KeyFact,
 )
-from app.research.brief import USER_ANSWERS, build_brief
+from app.phone.menu import _KEY_NUMBER
+from app.research.brief import (
+    MENU_TOPIC_APPOINTMENT,
+    MENU_TOPIC_NOTICE,
+    USER_ANSWERS,
+    build_brief,
+)
 from app.research.fake import fake_deep_findings, fake_fast_pass_output
 from app.research.models import (
     CaseRecord,
@@ -133,3 +139,24 @@ def test_punctuation_only_call_purpose_is_skipped() -> None:
     record = case().model_copy(update={"call_purpose": " . "})
     brief = build_brief(record, fake_deep_findings())
     assert not any(q.startswith("Can you help us") for q in brief.questions_to_ask)
+
+
+def test_menu_path_is_by_meaning_and_survives_the_phone_filter() -> None:
+    """The phone agent drops any hint that names a key (docs/specs/case-brief.md)."""
+    brief = build_brief(case(), fake_deep_findings())
+    assert brief.expected_menu_path
+    assert all(not _KEY_NUMBER.search(hint) for hint in brief.expected_menu_path)
+    assert all(not any(c.isdigit() for c in hint) for hint in brief.expected_menu_path)
+    assert any("representative" in hint for hint in brief.expected_menu_path)
+
+
+def test_menu_path_names_the_appointment_when_there_is_one() -> None:
+    interview = build_brief(
+        case(doc_type="uscis_i797c_asylum_interview"), fake_deep_findings()
+    )
+    assert MENU_TOPIC_APPOINTMENT in interview.expected_menu_path
+    notice = build_brief(
+        case(doc_type="benefits_renewal", appointment=None, what_is_asked="Renew"),
+        fake_deep_findings(),
+    )
+    assert MENU_TOPIC_NOTICE in notice.expected_menu_path

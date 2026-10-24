@@ -8,7 +8,14 @@ comes with real audio (Phase 2).
 from collections.abc import Sequence
 from typing import Any
 
-from app.contracts import AskUserReply, AskUserRequest, CallJob, CallReport, Event
+from app.contracts import (
+    AskUserReply,
+    AskUserRequest,
+    CallJob,
+    CallReport,
+    CaseBrief,
+    Event,
+)
 from app.contracts.common import (
     BriefId,
     CallId,
@@ -40,9 +47,13 @@ class DbNumberSource:
 
 class DbCaseReader:
     async def get_brief(self, brief_id: BriefId) -> dict[str, Any]:
+        """Validated against `CaseBrief` (docs/specs/case-brief.md), so a brief that
+        breaks the contract (e.g. without the required `must_not_do`) stops the
+        call before it dials. Returned as JSON; the runner reads it defensively."""
         row = await reads.get_brief(brief_id)
         if row is None:
             raise NotFound(f"case_briefs {brief_id} not found")
+        CaseBrief.model_validate(row.brief)
         return row.brief
 
 

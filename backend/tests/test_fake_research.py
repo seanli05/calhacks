@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 from app.contracts import (
+    CaseBrief,
     DeepResult,
     EventType,
     FastResult,
@@ -46,8 +47,15 @@ def research_db(db: FakeDB, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     async def save_verification(case_id: str, verification: Verification) -> None:
         written["verifications"].append(verification)
 
-    async def save_brief(case_id: str, brief: dict, note: str) -> tables.CaseBrief:
-        row = tables.CaseBrief(case_id=case_id, brief=brief, handoff_note=note)
+    async def save_brief(
+        case_id: str, brief: CaseBrief, note: str | None = None
+    ) -> tables.CaseBrief:
+        row = tables.CaseBrief(
+            id=brief.brief_id,
+            case_id=case_id,
+            brief=brief.model_dump(mode="json"),
+            handoff_note=note or brief.handoff_note,
+        )
         written["briefs"].append(row)
         return row
 

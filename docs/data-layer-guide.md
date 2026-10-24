@@ -75,7 +75,7 @@ Need a read that doesn't exist? Add a small one to `app.db.reads` (one query, ex
 | P1 | `AskUserRequest`; reply `AskUserReply` | `questions` |
 | P3 | `CallReport` | `jobs.result` and `calls.report` |
 | C14 | `Event`, `EventType`, `USER_MESSAGING_EVENTS` | `events` |
-| — | `CaseBrief` | `case_briefs.brief` |
+| — | `CaseBrief` (spec: [case-brief.md](specs/case-brief.md)) | `case_briefs.brief` |
 
 Enums and string types (`LanguageCode`, `PhoneE164`, `RefPlaceholder`, ID aliases) are in `app.contracts.common`.
 

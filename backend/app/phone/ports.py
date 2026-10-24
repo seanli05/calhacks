@@ -99,7 +99,8 @@ class Relay(Protocol):
 
 class CaseReader(Protocol):
     async def get_brief(self, brief_id: BriefId) -> dict[str, Any]:
-        """The case brief (`CaseBrief` is still a dict). Raises `NotFound`."""
+        """The case brief as JSON, already valid against `CaseBrief`
+        (docs/specs/case-brief.md). Raises `NotFound`."""
         ...
 
 

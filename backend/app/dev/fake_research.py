@@ -29,6 +29,7 @@ from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.contracts import (
+    CaseBrief,
     Component,
     DeepResult,
     Event,
@@ -43,6 +44,7 @@ from app.contracts.common import CaseId, JobId, PhoneE164, UserId
 from app.db import jobs, reads, tables
 from app.db.events import append_event
 from app.db.ids import new_id
+from app.db.reset import demo_brief
 from app.db.tables import utcnow
 from app.db.writes import research
 from app.settings import get_settings
@@ -180,14 +182,13 @@ class FakeResearch:
         )
         brief = await research.save_brief(
             payload.case_id,
-            {
-                "call_goal_en": fixture.call_goal_en,
-                "questions_to_ask": [
-                    "Is the interview still scheduled for this date and time?",
-                    "What should I do if my interpreter can't come?",
-                ],
-            },
-            "[dev] fake research brief",
+            CaseBrief.model_validate(
+                {
+                    **demo_brief(payload.case_id, new_id("brief")),
+                    "call_goal_en": fixture.call_goal_en or "Confirm the interview",
+                    "handoff_note": "[dev] fake research brief",
+                }
+            ),
         )
         result = fixture.model_copy(
             update={"verification": verification, "brief_id": brief.id}
