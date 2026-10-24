@@ -1,0 +1,11 @@
+[cartesia]
+name = "Mock USCIS Line"
+description = "Demo-only mock of a USCIS asylum office phone line: phone tree, hold, live officer"
+version = "0.1.0"
+
+[cartesia.server]
+port = 8000
+host = "0.0.0.0"
+
+[cartesia.environment]
+required_vars = ["ANTHROPIC_API_KEY", "MOCK_AGENCY_OFFICER_MODEL"]

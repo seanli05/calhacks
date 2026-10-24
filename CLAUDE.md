@@ -4,7 +4,7 @@ Guidance for anyone (human or Claude) writing code in this repo.
 
 ## What this is
 
-A Cal Hacks project: a WhatsApp agent that helps limited-English families with government letters. It explains the letter in the user's language, checks that it's legitimate, calls the agency, waits on hold, and rings the user when a human picks up.
+A Cal Hacks project: a WhatsApp agent that helps immigrant families with immigration letters (core document: the USCIS I-797C asylum interview notice). It explains the letter in the user's language, checks that it's legitimate, calls the agency, waits on hold, and rings the user when a human picks up.
 
 Three agents (orchestrator, research, phone) plus shared modules (translation, memory writer, message relay, glossary worker), coordinated through Postgres. The full spec (data model, handoff payloads, failure rules) lives in [Plan.md](Plan.md). Treat it as the source of truth and don't restate it here.
 

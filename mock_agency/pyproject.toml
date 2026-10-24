@@ -1,0 +1,8 @@
+[project]
+name = "mock-agency-line"
+version = "0.1.0"
+description = "Demo-only mock USCIS phone line on Cartesia Line"
+requires-python = ">=3.12"
+dependencies = [
+    "cartesia-line==0.2.19",
+]
