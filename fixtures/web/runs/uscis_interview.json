@@ -1,0 +1,37 @@
+{
+ "doc_type": "uscis_i797c_asylum_interview",
+ "call_purpose": "Confirm the asylum interview is still scheduled and ask what to do if the interpreter can't come",
+ "fetched_urls": [
+  "https://www.uscis.gov/contactcenter",
+  "https://www.uscis.gov/i-797-info",
+  "https://www.usa.gov/agencies/u-s-citizenship-and-immigration-services"
+ ],
+ "submission": {
+  "issuer_official_domain": "uscis.gov",
+  "official_phone": "1-800-375-5283",
+  "phone_source_url": "https://www.usa.gov/agencies/u-s-citizenship-and-immigration-services",
+  "phone_label": "Toll-free number",
+  "phone_purpose": "USCIS Contact Center main toll-free line for questions about an existing case or appointment, such as an asylum interview",
+  "alternative_contacts": [
+   {
+    "name": "USCIS TTY",
+    "purpose": "TTY line for callers who are deaf, hard of hearing, or have a speech disability",
+    "phone": "1-800-767-1833",
+    "source_url": "https://www.usa.gov/agencies/u-s-citizenship-and-immigration-services"
+   }
+  ],
+  "evidence": [
+   {
+    "signal": "issuer",
+    "url": "https://www.usa.gov/agencies/u-s-citizenship-and-immigration-services",
+    "note": "USAGov directory lists U.S. Citizenship and Immigration Services, links to its website www.uscis.gov, and gives the toll-free number 1-800-375-5283"
+   },
+   {
+    "signal": "url_domains",
+    "url": "https://www.usa.gov/agencies/u-s-citizenship-and-immigration-services",
+    "note": "Official directory links to uscis.gov as the agency website, which matches the uscis.gov / uscis.gov/contactcenter printed on the letter"
+   }
+  ],
+  "notes": "uscis.gov/contactcenter, uscis.gov/i-797-info, and the uscis.gov homepage all returned 403 or were refused (site blocks automated fetches). Used the fallback directory usa.gov agency page for the main toll-free number. Could not fetch any uscis.gov page that mentions Form I-797C or I-589. No return address or printed phone numbers came with the letter signals."
+ }
+}

@@ -1,0 +1,18 @@
+{
+  "doc_type": "uscis_i797c_asylum_interview",
+  "call_purpose": "Confirm the asylum interview is still scheduled and ask what to do if the interpreter can't come",
+  "signals": {
+    "letterhead": "Department of Homeland Security",
+    "sub_agency": "U.S. Citizenship and Immigration Services",
+    "urls": [
+      "https://www.uscis.gov/contactcenter",
+      "uscis.gov"
+    ],
+    "form_ids": [
+      "Form I-797C (Rev. 01/20/25)",
+      "I-589"
+    ],
+    "case_number_format": "3 letters + 10 digits",
+    "phones": []
+  }
+}

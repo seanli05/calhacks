@@ -1,0 +1,22 @@
+{
+  "doc_type": "uscis_notice",
+  "call_purpose": "Ask about the fee the letter demands",
+  "signals": {
+    "letterhead": "U.S. Citizenship and Immigration Services",
+    "urls": [
+      "https://uscis-gov-payments.com/pay"
+    ],
+    "form_ids": [
+      "I-797C"
+    ],
+    "case_number_format": null,
+    "phones": [
+      {
+        "number": "+12025550147",
+        "label": "Payment line",
+        "quote": "Call (202) 555-0147 to pay"
+      }
+    ],
+    "payment_instructions": "Pay the $500 processing fee immediately with Google Play gift cards and read the card numbers to the officer by phone. If you do not pay within 24 hours you will be arrested and deported. FINAL NOTICE"
+  }
+}
