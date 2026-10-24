@@ -9,16 +9,20 @@ from typing import Any
 
 from app.contracts import (
     AskUserRequest,
+    CaseBrief,
     Component,
     Event,
     EventType,
     FactStatus,
+    FastResult,
+    FastResultStatus,
     JobPayload,
     JobStatus,
     JobType,
     MessageDirection,
     MessageSender,
     QuestionStatus,
+    Verification,
     VerificationStatus,
 )
 from app.db import tables
@@ -295,21 +299,41 @@ class FakeDB:
         status: VerificationStatus = VerificationStatus.VERIFIED,
         official_phone: str | None = "+15105550199",
     ) -> tables.Case:
-        """A case research has finished: R1 saved, a verdict, and a brief."""
-        case = tables.Case(
-            user_id=user.id,
-            doc_type="uscis_i797c_asylum_interview",
-            fast_result={"status": "ok", "issuer": "USCIS"},
-        )
-        self.cases.append(case)
-        self.verifications[case.id] = tables.Verification(
-            case_id=case.id, status=status, official_phone=official_phone
-        )
-        self.briefs[case.id] = tables.CaseBrief(
+        """A case research has finished: R1 saved, a verdict, and a brief, stored as
+        research's writers store them (contract models dumped to JSON)."""
+        doc_type = "uscis_i797c_asylum_interview"
+        case = tables.Case(user_id=user.id, doc_type=doc_type)
+        case.fast_result = FastResult(
             case_id=case.id,
-            brief={"call_goal_en": "Confirm the interview is still on"},
-            handoff_note="test brief",
+            status=FastResultStatus.OK,
+            doc_type=doc_type,
+            issuer="USCIS",
+            explanation_en="An asylum interview notice.",
+        ).model_dump(mode="json")
+        self.cases.append(case)
+        verification = Verification(
+            status=status,
+            official_phone=official_phone,
+            letter_phone_matches=None,
+            evidence=["https://www.uscis.gov/contactcenter"],
+            red_flags=[],
         )
+        self.verifications[case.id] = tables.Verification(
+            case_id=case.id,
+            status=status,
+            official_phone=official_phone,
+            result=verification.model_dump(mode="json"),
+        )
+        brief = tables.CaseBrief(case_id=case.id, brief={}, handoff_note="test brief")
+        brief.brief = CaseBrief(
+            brief_id=brief.id,
+            case_id=case.id,
+            doc_type=doc_type,
+            issuer="USCIS",
+            call_goal_en="Confirm the interview is still on",
+            handoff_note=brief.handoff_note,
+        ).model_dump(mode="json")
+        self.briefs[case.id] = brief
         return case
 
     async def get_profile(self, user_id: str) -> tables.Profile | None:

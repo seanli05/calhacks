@@ -11,6 +11,7 @@ import httpx2
 import pytest
 from app.contracts import (
     AskUserRequest,
+    CallState,
     EventType,
     FactStatus,
     JobType,
@@ -48,10 +49,11 @@ async def test_case_status_explains_the_letter_and_keeps_refs(
 ) -> None:
     user = await use_spanish(db)
     case = await letter_case(db, user)
+    deep = json.loads((FIXTURES / "deep_result.json").read_text(encoding="utf-8"))
     db.verifications[case.id] = tables.Verification(
         case_id=case.id,
         status=VerificationStatus.VERIFIED,
-        result={"red_flags": []},
+        result=deep["verification"],
     )
 
     status = json.loads(await CaseTools(user, whatsapp).get_case_status(case.id))
@@ -59,6 +61,8 @@ async def test_case_status_explains_the_letter_and_keeps_refs(
     assert status["stage"] == "awaiting_consent"
     assert status["verification"] == {"status": "verified", "red_flags": []}
     letter = status["letter"]
+    assert letter["doc_type"] == "uscis_i797c_asylum_interview"
+    assert letter["explanation"]
     assert letter["appointment"] == {
         "date": "2026-11-18",
         "time": "08:30",
@@ -71,6 +75,65 @@ async def test_case_status_explains_the_letter_and_keeps_refs(
     }
     assert letter["identifiers_on_letter"] == ["receipt_number", "a_number"]
     assert "proposed_facts" not in letter
+
+
+def ended_call(case: tables.Case, report: dict[str, Any]) -> tables.Call:
+    return tables.Call(
+        case_id=case.id,
+        job_id="job_1",
+        brief_id="brief_1",
+        consent_message_id="msg_1",
+        state=CallState.ENDED,
+        report=report,
+    )
+
+
+async def test_case_status_reads_the_call_report(
+    db: FakeDB, whatsapp: FakeWhatsApp
+) -> None:
+    user = await use_spanish(db)
+    case = await letter_case(db, user)
+    report = json.loads((FIXTURES / "call_report.json").read_text(encoding="utf-8"))
+    call = ended_call(case, {**report, "case_id": case.id})
+    db.calls[call.id] = call
+
+    status = json.loads(await CaseTools(user, whatsapp).get_case_status(case.id))
+
+    assert status["last_call"] == {
+        "state": "ended",
+        "outcome": "resolved",
+        "reference_number": "R-55821",
+        "next_steps": report["next_steps_en"],
+        "new_deadlines": ["2026-11-17"],
+    }
+
+
+async def test_case_status_survives_rows_that_no_longer_validate(
+    db: FakeDB, whatsapp: FakeWhatsApp
+) -> None:
+    """Rows written before a contract change: the turn goes on without them, and
+    never resolves a ref."""
+    user = await use_spanish(db)
+    case = tables.Case(
+        user_id=user.id,
+        doc_type="uscis_i797c_asylum_interview",
+        fast_result={"status": "ok", "issuer": "USCIS", "a_number": "<ref:a_number>"},
+    )
+    db.cases.append(case)
+    db.verifications[case.id] = tables.Verification(
+        case_id=case.id, status=VerificationStatus.VERIFIED, result={"red_flags": []}
+    )
+    call = ended_call(case, {"outcome": "resolved"})
+    db.calls[call.id] = call
+
+    status = json.loads(await CaseTools(user, whatsapp).get_case_status(case.id))
+
+    assert status["letter"] == "not available"
+    assert status["verification"] == {
+        "status": "verified",
+        "red_flags": "not available",
+    }
+    assert status["last_call"] == {"state": "ended", "report": "not available"}
 
 
 async def test_tools_refuse_another_users_case(

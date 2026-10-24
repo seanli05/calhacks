@@ -1,6 +1,6 @@
 # WhatsApp side: status, interfaces, and decisions
 
-Owner: person 2 (Lauren). Last updated 2026-10-24, branch `lauren-goal6-consent-call`.
+Owner: person 2 (Lauren). Last updated 2026-10-24, branch `lauren-contract-fixes`.
 
 This page is the record for the WhatsApp side (relay, orchestrator pipe, call status). Other components should build against the interfaces and decisions here. If something here conflicts with Plan.md, Plan.md wins; tell person 2.
 
@@ -16,6 +16,7 @@ This page is the record for the WhatsApp side (relay, orchestrator pipe, call st
 - **ask_user (P1).** The phone agent awaits `ask_user(request)`, and the user replies with a number.
   - **Timeout:** the agent gets the default option.
   - **Late answer** (C24): the user is told which option was already taken.
+  - **Cancelled** (the phone agent moved on): the question is closed quietly, and the next reply goes to normal routing.
   - **Anything else while the question is open:** the user is asked again for a number.
   - **Priority:** an open question gets the user's reply before anything else.
 - **Call status (P2, C36).** The orchestrator watches a call's events and sends four kinds of message: dialing, on hold (at most every 10 minutes), human detected (always, at once), and unreachable.
@@ -40,6 +41,8 @@ This page is the record for the WhatsApp side (relay, orchestrator pipe, call st
 - **Research's question (C39, added overnight Oct 24 by person 1's session).** An R1 with `needs_user_input` (the photos look like different letters) gets research's `question_en`, translated, instead of an explanation; the verdict isn't watched yet. The user's next text, in English, re-runs the fast pass on the same case as `user_note_en`, and research reads it as data. `letter_result.py` (`LetterQuestion`), `letters.py` (`answer_question`), the pipe's routing (after "same letter or new?", before consent).
 - **Official-source questions (C38, same).** The turn's `ask_official_source` tool queues a `research_question` job and tells the user it's looking. When the job finishes, `orchestrator/research_questions.py` sends the answer translated with up to three source URLs. Declines (legal advice, the asylum claim, not found) and failures get fixed templates, so they never depend on a model or a translation.
 - **Fake phone worker.** `POST /dev/fake-phone` claims the `call` jobs the orchestrator queues after a YES, plays the fake call's script on them (with a real ask_user question), and finishes each with the fixture's call report. It never dials, and it fails a job whose case has no verified number.
+
+**Stored results are read through the contract models.** The turn's tools, the consent gate and the letter question read R1, the verification, the brief, the call report and job payloads with `FastResult`, `Verification`, `CaseBrief`, `CallReport` and `jobs.payload_of`. A row that no longer validates (written before a contract change) is logged with its IDs and treated as missing: the tool says "not available", the consent request is the generic one to USCIS, the letter question keeps no documents.
 
 `pytest` covers every routing path on fakes, with no network.
 
@@ -94,6 +97,7 @@ reply.choice  # 1-based; equals default_option if the user didn't answer in time
 ```
 
 - **Don't log `call.ask_user*` events yourself.** The relay writes the `questions` row and all four of those events.
+- **To stop waiting, cancel the task awaiting `ask_user`** (a new menu prompt, hold, a person picked up, a hang-up). The relay closes the question and re-raises `CancelledError`, even if the close fails (it logs that). The user gets no message, no `call.ask_user_timeout` is logged, and no late-reply window opens, so their next reply (e.g. a `1` to a retry consent request) goes to normal routing.
 - **Cases you don't need to handle:** if the question can't be sent, you get the default at once. An unknown `template` raises `ValueError` before anything is sent.
 - **`template` names the kind of question.** Only `menu_choice` exists so far. Ask person 2 for another kind, and it gets `es` + `en` text.
 - **Keep `timeout_s` at 45 or more** (see concern 6).
