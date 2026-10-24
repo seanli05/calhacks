@@ -1,8 +1,10 @@
-# Cal Hacks Agent System Spec (v3 draft)
+# Cal Hacks Agent System Spec (v3)
 
-Oct 23, 2026 · @Sean Li · v3 edits by @Chris, pending Sean's review
+Oct 23, 2026 · @Sean Li · v3 edits by @Chris, for team sign-off
 
-> **About this draft.** This is Plan.txt (v2) restyled as Markdown, with fixes for contradictions and missing pieces found while planning the schema. Every change is tagged inline as **[C#]** and justified in [Changes from v2](#changes-from-v2). Untagged text is v2 unchanged apart from formatting. Questions that need a team decision are listed under [Open questions](#open-questions) rather than decided here.
+> **About this version.** This is Plan.txt (v2) restyled as Markdown, with fixes for contradictions and missing pieces found while planning the schema, plus the team's product decisions. Every change is tagged inline as **[C#]** and justified in [Changes from v2](#changes-from-v2). Untagged text is v2 unchanged apart from formatting. Once everyone signs off, this is the plan we build against.
+>
+> **Scope rule:** this is a hackathon project. When in doubt, build what is visible in the demo and skip edge cases the demo never hits.
 
 ## Overview
 
@@ -30,9 +32,9 @@ We're building a WhatsApp-based agent that helps limited-English families deal w
 
 | # | Change | Why |
 |---|---|---|
-| C1 | Add a `users` table (WhatsApp number, language, fallback language), written by the orchestrator. Language moves here from `profile`. | The user picks a language before any profile exists, and the first reply must go out in under 2 s. The memory writer runs in the background after replies, so it can't be the source of something the very next reply needs. |
+| C1 | Add a `users` table (WhatsApp number, language), written by the orchestrator. Language moves here from `profile`. (Fallback language dropped by C28.) | The user picks a language before any profile exists, and the first reply must go out in under 2 s. The memory writer runs in the background after replies, so it can't be the source of something the very next reply needs. |
 | C2 | The one-writer rule gets one exception: append-only logs (`messages`, `events`) may be inserted by several components, and rows are never updated. | v2 already lists two writers for `messages`, and every component is told to log its decisions to `events` (handoffs "go through … a jobs row plus events"). Insert-only rows can't conflict, so this keeps the rule's intent. |
-| C3 | Fact deletes from the dashboard go through the memory writer (the dashboard calls it; it doesn't write `facts` itself). | v2 requires "let the user view and delete everything" and also makes the memory writer the only writer of `facts`. |
+| C3 | *Replaced by C26.* (Was: fact deletes from the dashboard go through the memory writer.) | v2 requires "let the user view and delete everything" and also makes the memory writer the only writer of `facts`. |
 | C4 | One set of fact sources everywhere: `user_said`, `from_document`, `from_call`, `inferred`. | v2 payloads used `document` and `call`, while the facts table used `from_document` and `from_call`. |
 | C5 | Option numbers in ask_user are 1-based everywhere (`default_option`, `choice`). | v2 had `default_option: 0` alongside `choice: 1` with no rule; a mismatch presses the wrong key on the call. 1-based matches what the user types. |
 | C6 | H2 no longer carries `user_phone`; it carries `user_id`, and the phone agent reads the number through a helper. | Payloads carry IDs; agents pull details through tools (design principle). Keeps the user's phone number out of job rows and logs. |
@@ -45,10 +47,20 @@ We're building a WhatsApp-based agent that helps limited-English families deal w
 | C13 | Define job types (`research_fast`, `research_deep`, `call`, `memory_write`, `glossary_lookup`) and job statuses. R1, R2, and P3 are the `result` of their jobs. | v2 only names `research_fast` and `call`. The deep pass ("starts automatically"), the memory writer ("runs after each reply"), and the glossary worker had no job type. |
 | C14 | Define the event envelope, dotted event type names, and a starter type list, with the user-messaging events from P2 marked. | v2 lists the event format as a contract to agree (persons 1 and 4) but doesn't give one; the dashboard timeline depends on it. This is a starting proposal for that conversation. |
 | C15 | Sensitive facts are saved as `pending_consent`; the orchestrator asks the user on its next turn, and the memory writer confirms or deletes the fact based on the answer. | v2 says "ask before saving sensitive facts", but the memory writer can't talk to the user (only the orchestrator can). |
-| C16 | Facts get `status` (`active`, `pending_consent`, `superseded`, `expired`) and `expires_at`. | Needed by v2's own rules: supersede, expire stale facts, ask before saving sensitive ones, and treat inferred facts as tentative. |
+| C16 | Facts get `status` (`active`, `pending_consent`, `superseded`). (Expiry dropped by C28.) | Needed by v2's own rules: supersede, ask before saving sensitive ones, and treat inferred facts as tentative. |
 | C17 | No stored case status: a case's progress is computed from its verification, jobs, and calls. | `cases` is written only by research, but the orchestrator (consent) and phone agent (call) also move a case forward. Computing progress keeps one writer per table. |
 | C18 | Verification status values: `pending`, `verified`, `suspicious`, `unknown`. | v2 uses all four across R1, R2, and the failure rules but never lists them together. |
 | C19 | Shared formats: prefixed IDs, UTC ISO 8601 times, ISO 639-1 language codes, E.164 phone numbers. Example payloads updated to match. | Four people build against the same payloads; fixing formats now avoids cross-team format bugs. v2's examples (`c_123`, `u_9`) already hint at prefixed IDs. |
+| C20 | A document is one letter with one or more page images. Several photos of one letter become one document. If the orchestrator can't tell whether a new photo is another page or a new letter, it asks by text. | Real letters run several pages; the demo letter may too. v2's `document_ids` list read as one image per document. |
+| C21 | A YES covers exactly one call. Retrying (e.g., after hold exceeded max) asks for consent again, and the user is told why. | Team decision: consent is per call, and the user always knows a call is about to happen. |
+| C22 | Add an orchestrator tool `close_case` and a `case.closed` event. A case is active until that event exists. The orchestrator suggests closing when a call resolves with no follow-up; the user decides. | Team decision: the user closes a letter. Using an event keeps `cases` single-writer (C17). |
+| C23 | The dashboard shows a live feed in the user's language. Event types shown on the demo screen render from pre-translated templates (filled from the event's `data`); any other event's `summary_en` is translated on read and cached. The dashboard becomes a user of the translation module. | Team decision: the web app is a live feed in the user's language. Translating at write time would slow the phone agent mid-call; templates are instant and pre-checked for the demo. |
+| C24 | If the user answers an ask_user question after it timed out, the relay replies with what the agent already chose and why, and logs `call.ask_user_late_reply` (shown in the feed). | Team decision: tell the user what happened, on WhatsApp and in the feed. |
+| C25 | Sensitive categories for "ask before saving": immigration, income, health. | Team decision; v2 named the rule but not the categories. |
+| C26 | User-initiated deletes are the second exception to the one-writer rule: one data-layer delete helper erases a fact, a document, or a transcript, or everything for a user. Each delete leaves a dated `*.deleted` event in the feed. | Team decision: delete facts, letters, and transcripts individually, plus delete everything. Routing each through its owning component would put three owners behind one button. |
+| C27 | Events that concern facts or documents carry their IDs, never their content. The feed looks up the text when it renders and shows "(deleted [date])" once it's gone. | Events are never updated (C2), so an event holding a fact's text would keep showing data the user deleted, on screen in the memory demo. |
+| C28 | Out of the MVP: fallback language, fact expiry (`expires_at`, `expired`, the v2 rule "expire stale facts"), supersede logic (the `supersedes` column stays), and the `glossary_lookup` job (moves with stretch goal #3; the hand-seeded glossary stays). **Needs Sean's OK:** supersede logic and expiry were v2 rules. | Scope rule: none of these is visible in the MVP demo. Supersede matters for stretch goal #5 (memory on a second visit). |
+| C29 | The open questions are answered; see [Decisions](#decisions). The demo letter is always addressed to the user, the user's phone is always their WhatsApp number, the dashboard uses a plain link (no per-user access), and no call audio is stored. | Team decisions. |
 
 ## MVP and stretch goals
 
@@ -66,7 +78,7 @@ We're building a WhatsApp-based agent that helps limited-English families deal w
 8. Human detection, brief intro to the caseworker, then a regular phone call rings the user.
 9. Post-call summary on WhatsApp: reference number, next steps, deadline.
 10. Basic memory: profile plus extracted facts.
-11. Web dashboard: live call timeline, case view, "What we know about you" page.
+11. Web dashboard: live call timeline (a feed in the user's language **[C23]**), case view, "What we know about you" page.
 12. Backup video of the full flow.
 
 **Protect items 6–8 above everything else.**
@@ -102,8 +114,11 @@ Three agents plus four shared modules. Only the orchestrator converses with the 
 - Turns research results and call reports into user-facing messages.
 - Creates the `users` row on first contact and records the user's language pick. **[C1]**
 - Asks the user about sensitive facts the memory writer has held as `pending_consent`. **[C15]**
+- Groups several photos of one letter into one document, asking by text when unsure. **[C20]**
+- Asks for consent before every call, including retries. **[C21]**
+- Suggests closing a case when a call resolves with no follow-up; closes it when the user agrees. **[C22]**
 
-**Tools:** `start_research`, `get_case_status`, `request_consent`, `start_call`, `get_profile`, `list_active_cases`.
+**Tools:** `start_research`, `get_case_status`, `request_consent`, `start_call`, `get_profile`, `list_active_cases`, `close_case` **[C22]**.
 
 **Does not:** parse documents, browse the web, place calls, or write facts directly (the memory writer does that after each reply).
 
@@ -132,10 +147,10 @@ Three agents plus four shared modules. Only the orchestrator converses with the 
 
 ### Shared modules (not agents)
 
-- **Translation:** two-way, glossary-grounded, with register instructions (e.g., warm, simple, formal usted). Used by the orchestrator, the relay's templates, and summaries.
-- **Memory writer:** runs in the background after each orchestrator reply, research result, and call report. Extracts facts, deduplicates, and supersedes outdated ones. The only writer to profile and facts, including deletes requested from the dashboard. **[C3]**
-- **Message relay:** sends short templated WhatsApp messages instantly (acknowledgments, call status, ask_user) and routes replies back by `question_id`. Templates are pre-translated per language. Records each question and its answer in `questions`. **[C10]**
-- **Glossary worker:** background job that finds official translations for unknown terms and records source and trust level. Seed 20–30 terms by hand first.
+- **Translation:** two-way, glossary-grounded, with register instructions (e.g., warm, simple, formal usted). Used by the orchestrator, the relay's templates, summaries, and the dashboard's live feed **[C23]**.
+- **Memory writer:** runs in the background after each orchestrator reply, research result, and call report. Extracts facts, deduplicates, and supersedes outdated ones (supersede logic is post-MVP **[C28]**). The only writer to profile and facts, apart from user-initiated deletes **[C26]**.
+- **Message relay:** sends short templated WhatsApp messages instantly (acknowledgments, call status, ask_user) and routes replies back by `question_id`. Templates are pre-translated per language. Records each question and its answer in `questions` **[C10]**, and answers late replies with what was already chosen **[C24]**.
+- **Glossary worker:** background job that finds official translations for unknown terms and records source and trust level. Seed 20–30 terms by hand first. The worker itself is stretch goal #3; the hand seed is MVP. **[C28]**
 
 ## Speed targets
 
@@ -171,13 +186,13 @@ All handoffs go through Postgres: a `jobs` row (type, status, payload, result) p
 | `research_deep` | Research agent, after the fast pass | Research agent | R2 |
 | `call` | Orchestrator, after consent | Phone agent | P3 |
 | `memory_write` | Orchestrator (after each reply), research agent (with R1/R2), phone agent (with P3) | Memory writer | Facts saved, superseded, or held for consent |
-| `glossary_lookup` | Research agent | Glossary worker | Glossary entry |
+| `glossary_lookup` (stretch **[C28]**) | Research agent | Glossary worker | Glossary entry |
 
 **Statuses:** `queued` → `running` → `done` or `failed`. The handler moves the status and writes `result` (or an error). The orchestrator reacts when `research_fast`, `research_deep`, and `call` jobs for its cases finish.
 
 ### H1. Orchestrator → Research (fast pass)
 
-Trigger: user sends a photo or PDF. Relay acknowledges immediately.
+Trigger: user sends a photo or PDF. Relay acknowledges immediately. Each document is one letter and may hold several page images. **[C20]**
 
 ```json
 { "job": "research_fast", "case_id": "case_123", "user_id": "user_9",
@@ -223,7 +238,7 @@ The case brief (`brief_77`) stays in Postgres: JSON fields (doc type, issuer, de
 
 ### H2. Orchestrator → Phone
 
-Trigger: user replies YES to consent. The dialed number always comes from the verified official number. The phone agent creates the call and its `call_id` **[C7]**, and reads the user's phone number through a helper **[C6]**. `consent_message_id` points at the user's YES in `messages` **[C8]**.
+Trigger: user replies YES to consent. A YES covers this one call only; a retry asks again. **[C21]** The dialed number always comes from the verified official number. The phone agent creates the call and its `call_id` **[C7]**, and reads the user's phone number through a helper **[C6]**. `consent_message_id` points at the user's YES in `messages` **[C8]**.
 
 ```json
 { "job": "call", "case_id": "case_123", "user_id": "user_9", "brief_id": "brief_77",
@@ -236,6 +251,8 @@ Trigger: user replies YES to consent. The dialed number always comes from the ve
 Trigger: menu decision returns "unsure." The relay records the question in `questions` **[C10]**, sends the pre-translated question, and routes the reply `{ "question_id": "question_3", "choice": 1 }` straight back to the waiting phone agent (an asyncio future keyed by `question_id`). On timeout, the agent uses the default, which is always the safest option. The orchestrator sees the exchange in message history but isn't in the loop.
 
 Option numbers are 1-based: `choice: 1` is the first option, matching what the user types. **[C5]**
+
+A reply that arrives after the timeout gets a templated answer saying which option the agent already chose and why, and is logged as `call.ask_user_late_reply`. **[C24]**
 
 ```json
 { "question_id": "question_3", "call_id": "call_5", "template": "menu_choice",
@@ -293,49 +310,58 @@ Starter type list (persons 1 and 4 finalize; the four in P2 are the only ones th
 
 | Area | Types |
 |---|---|
-| Case | `case.created`, `case.document_added` |
+| Case | `case.created`, `case.document_added`, `case.closed` **[C22]** |
 | Research | `research.fast_started`, `research.fast_done`, `research.deep_started`, `research.deep_done` |
 | Verification | `verification.verified`, `verification.suspicious`, `verification.unknown` |
 | Consent | `consent.requested`, `consent.given`, `consent.declined` |
-| Call | `call.dialing`, `call.menu_heard`, `call.menu_choice`, `call.ask_user`, `call.ask_user_answered`, `call.ask_user_timeout`, `call.on_hold`, `call.human_detected`, `call.user_dialed`, `call.user_joined`, `call.user_unreachable`, `call.ended` |
-| Memory | `memory.fact_saved`, `memory.fact_superseded`, `memory.fact_pending_consent`, `memory.fact_deleted` |
+| Call | `call.dialing`, `call.menu_heard`, `call.menu_choice`, `call.ask_user`, `call.ask_user_answered`, `call.ask_user_timeout`, `call.ask_user_late_reply` **[C24]**, `call.on_hold`, `call.human_detected`, `call.user_dialed`, `call.user_joined`, `call.user_unreachable`, `call.ended` |
+| Memory | `memory.fact_saved`, `memory.fact_superseded`, `memory.fact_pending_consent` |
+| Deletes **[C26]** | `fact.deleted`, `document.deleted`, `transcript.deleted`, `user.deleted_all` |
 | Glossary | `glossary.term_added` |
+
+**Live feed in the user's language [C23].** The dashboard shows events as a feed in the user's language. Event types that appear on the demo screen have a pre-translated feed template per language, filled from the event's `data`. Any other event's `summary_en` is translated when the dashboard reads it, and the translation is cached.
+
+**No user data in events [C27].** Events that concern a fact or document carry its ID in `data`, never its content, and `summary_en` doesn't repeat it. The feed looks up the text when it renders and shows "(deleted [date])" once it's gone.
 
 ## Data model and memory
 
-Each table has exactly one writer, so agents never conflict. The one exception is append-only logs (`messages`, `events`): several components may insert rows, but rows are never updated. **[C2]**
+Each table has exactly one writer, so agents never conflict. Two exceptions:
+
+- Append-only logs (`messages`, `events`): several components may insert rows, but rows are never updated. **[C2]**
+- User-initiated deletes: one data-layer delete helper erases facts, documents, transcripts, or everything for a user, and logs a `*.deleted` event. **[C26]**
 
 | Table | Written by | Holds |
 |---|---|---|
-| `users` **[C1]** | Orchestrator | WhatsApp number, language, fallback language |
+| `users` **[C1]** | Orchestrator | WhatsApp number (also the number the user is rung on **[C29]**), language |
 | `messages` | Orchestrator, relay (append-only) | Every WhatsApp message, original + English, direction, template used, linked question |
 | `profile` | Memory writer | County, household size, contact prefs (language moved to `users` **[C1]**) |
 | `facts` | Memory writer | Semi-structured facts (below) |
-| `documents` | Orchestrator (on upload) | Media files and metadata |
+| `documents` | Orchestrator (on upload) | One letter per document: its page images in order, plus metadata **[C20]** |
 | `cases`, `case_briefs`, `verifications` | Research agent | Parsed letter, brief, verdict + evidence |
 | `case_refs` **[C11]** | Research agent | Real values behind `<ref:...>` placeholders, read only through a resolve helper |
 | `glossary` | Glossary worker | Term, translation, language, source URL, trust level |
-| `calls`, `transcripts` | Phone agent | Call state, call report **[C12]**, full transcript |
+| `calls`, `transcripts` | Phone agent | Call state, call report **[C12]**, full transcript. A case can have several calls. No call audio is stored. **[C29]** |
 | `events` | Every component (append-only) **[C2]** | Every decision, in the shared envelope **[C14]** |
 | `questions` **[C10]** | Relay | Each ask_user question, its options and default, the answer or timeout |
 | `jobs` | Creator; handler updates status | Handoffs between agents |
 
-A case has no stored status; its progress is computed from its verification, jobs, and calls. **[C17]**
+A case has no stored status; its progress is computed from its verification, jobs, and calls. **[C17]** It stays active until a `case.closed` event exists. **[C22]**
 
 ### Memory: three layers, all read through tools
 
 - **Profile:** fixed fields every agent needs. A short summary goes in each agent's prompt.
-- **Facts:** one record per fact with `fact`, `category`, `source` (`user_said`, `from_document`, `from_call`, `inferred`) **[C4]**, `source_ref`, `recorded_at`, `supersedes`, `sensitivity`, `status` (`active`, `pending_consent`, `superseded`, `expired`), and `expires_at` **[C16]**. A user will have tens of facts, so put all current facts in the prompt; no vector database needed.
+- **Facts:** one record per fact with `fact`, `category`, `source` (`user_said`, `from_document`, `from_call`, `inferred`) **[C4]**, `source_ref`, `recorded_at`, `supersedes`, `sensitivity`, and `status` (`active`, `pending_consent`, `superseded`) **[C16]**. A user will have tens of facts, so put all current facts in the prompt; no vector database needed.
 - **Raw sources:** letters, transcripts, call reports, re-readable when an agent needs exact wording.
 
 ### Rules
 
 - Facts marked inferred are tentative; agents confirm them before acting.
-- New facts supersede old ones rather than piling up (income, address).
+- New facts supersede old ones rather than piling up (income, address). Post-MVP. **[C28]**
 - Per-agent views: research sees the full profile; the phone agent sees only what the brief needs.
-- Sensitive data: store less (e.g., "pending green card application," not full history), ask before saving sensitive facts, encrypt sensitive fields, expire stale facts, and let the user view and delete everything on the "What we know about you" page.
+- Sensitive data: store less (e.g., "pending green card application," not full history), ask before saving sensitive facts, encrypt sensitive fields, expire stale facts (post-MVP **[C28]**), and let the user view and delete everything on the "What we know about you" page.
+- Sensitive categories: immigration, income, health. **[C25]**
 - Asking before saving: the memory writer holds a sensitive fact as `pending_consent`; the orchestrator asks the user on its next turn; the memory writer marks it `active` on yes and deletes it on no. **[C15]**
-- Deleting from the dashboard goes through the memory writer. **[C3]**
+- Deleting: the user can delete any fact, letter, or transcript, or everything at once. Deletes erase the data and leave a dated line in the feed. **[C26]**
 
 ## Failure rules
 
@@ -348,7 +374,8 @@ Decided now so nobody improvises during the build.
 | Verification unknown | No automatic call offer; orchestrator explains and asks the user |
 | Letter looks like a scam | Warn the user with reasons; never call the letter's number |
 | ask_user times out | Use the default (safest) option and log it |
-| Hold exceeds max | Hang up, report failed, offer to retry later |
+| Hold exceeds max | Hang up, report failed, offer to retry later (a retry asks for consent again **[C21]**) |
+| ask_user answered after timeout | Tell the user what the agent already chose and why; show it in the feed **[C24]** |
 | User doesn't answer bridged call in 30 s | `user_unreachable`: tell caseworker the account holder will call back, end call, orchestrator follows up |
 | Caseworker asks for identity verification | The user handles it in their own voice; the agent never answers for them |
 
@@ -413,12 +440,24 @@ Person 2 has the most surface area; if it bottlenecks, move the message relay to
 - [ ] Check Cal Hacks track rules and caps
 - [ ] Decide the project name
 
-## Open questions
+## Decisions
 
-These affect what the user experiences, so they're for the team rather than this draft.
+Product decisions made by the team while planning the schema **[C29]**:
 
-1. **Language pick.** Is it a menu on the first message ("Reply 1 for Español…")? Can the user change it later?
-2. **Several letters.** `list_active_cases` implies several open letters at once. When a new photo arrives, how do we tell a new letter from another page of one already in progress?
-3. **Late answers.** If the user answers an ask_user question after it timed out and the agent took the safe default, what do we tell them?
-4. **Sensitive facts.** Which kinds count for "ask before saving" (immigration status, income, health)? Is a case number sensitive?
-5. **Deleting.** When a user deletes a fact, is it gone for good, or hidden but kept as a record that it was deleted?
+| Topic | Decision |
+|---|---|
+| Scope | Build what the demo shows. The letter is always addressed to the user. |
+| Language | The user selects their language. |
+| Which phone we ring | Always the user's WhatsApp number. |
+| Long letters | Several photos form one document **[C20]**. |
+| Which letter a message is about | The orchestrator reasons from the conversation and asks by text if unsure. |
+| Closing a letter | The user closes it; the agent suggests it when a call resolves **[C22]**. |
+| Consent | Asked before every call, including retries; the user is notified **[C21]**. |
+| Call history | A letter keeps every call attempt. |
+| Late ask_user answers | Tell the user what happened, on WhatsApp and in the live feed **[C24]**. |
+| Live feed | The web app shows what's happening in the user's language **[C23]**. |
+| Recording | Transcripts and call records, no audio. |
+| Sensitive facts | Immigration, income, health **[C25]**. |
+| Deleting | Facts, letters, and transcripts individually, plus delete everything. Deletes erase the data and leave a dated line in the feed **[C26]**. |
+| Stale facts | Ask whether a fact is still true; post-MVP **[C28]**. |
+| Dashboard access | A plain link; no per-user access for the demo. |
