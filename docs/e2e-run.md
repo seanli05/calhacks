@@ -124,10 +124,11 @@ Check in this order: the ngrok inspector (http://127.0.0.1:4040), then Twilio **
 | No reply, nothing in the ngrok inspector, Twilio error **11200** | Twilio sent it to another URL: the error's URL is the old webhook | Check the sandbox settings are on the team account and saved. Right after a change, wait a few minutes and resend |
 | Save in sandbox settings shows no confirmation | The save request failed in the browser | Private window or another browser; log in again |
 | `POST /whatsapp` → **403** | Signature check failed | `TWILIO_AUTH_TOKEN` and `PUBLIC_BASE_URL` must match the account and ngrok URL the sandbox uses. Restart after editing `.env` |
-| `POST /whatsapp` → 200 but no reply; log full of `connection was closed in the middle of operation` / `TimeoutError` | The database connection dropped. Venue wifi cuts idle connections | Resend the message. For the full run, put the backend laptop on a phone hotspot |
+| `POST /whatsapp` → 200 but no reply; log full of `connection was closed in the middle of operation` / `TimeoutError` | The database connection dropped. Venue wifi cuts idle connections | Resend the message. For the full run, put the backend laptop on a phone hotspot, but never the applicant's phone (next row) |
 | Worker tracebacks `claiming research_… failed` | Same; the worker retries a second later | Noise unless it doesn't stop |
 | Bot forgot the consent question after a restart | Open consent requests live in memory | Ask it to call again; it re-asks |
 | YES accepted, but no call | `PHONE_WORKER` is off, or a setting is missing | The startup log names missing settings. Restart after changing `.env` |
+| Listen-in goes silent and drops; at the same moment, `phase reading failed: TimeoutError`, `menu decision failed`, Cartesia `peer has stopped reading` | The backend laptop is on the hotspot of the phone being called: a voice call on that phone stalls its hotspot data (Oct 24) | Put the laptop on wifi or another phone's hotspot |
 | Your phone never rings for the bridge | You're also the agency (same phone), or voicemail took it | Two phones; see [Who plays the agency](#who-plays-the-agency) |
 | Replies stop entirely | Sandbox join expired (3 days) | Send the join code again |
 
