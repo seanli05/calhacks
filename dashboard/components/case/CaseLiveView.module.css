@@ -1,34 +1,94 @@
-/* One screen at 1080p: the three columns fill the viewport and scroll inside. */
+/* The page grows with its tab; during the live call it fills the viewport and the
+   transcript scrolls inside. */
 .page {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   gap: var(--gap);
-  max-width: 1880px;
+  max-width: 1440px;
   margin: 0 auto;
   padding-left: max(20px, env(safe-area-inset-left, 0px));
   padding-right: max(20px, env(safe-area-inset-right, 0px));
+  padding-bottom: 24px;
+}
+
+.fixed {
+  height: 100vh;
   padding-bottom: 14px;
 }
 
-.grid {
+/* Which case this is, above the tabs. */
+.caseBar {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding-top: 4px;
+}
+
+.docType {
+  font-size: var(--fs-xl);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.meta {
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
+.meta::before {
+  content: "·";
+  margin-inline-end: 14px;
+  color: var(--faint);
+}
+
+.verdictPill {
+  margin-inline-start: auto;
+  align-self: center;
+}
+
+/* The tab's content. Each tab picks its own width so nothing stretches edge to edge. */
+.panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: 6px;
+}
+
+/* Now: the moment and the work (or the live translation) take most of the width;
+   the verdict (or the tips) sit beside it. */
+.now {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(300px, 340px) minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr);
   gap: var(--gap);
 }
 
-/* On the call: the transcript gets 55% of the width, the book and the tips share the rest. */
-.onCall {
-  grid-template-columns: minmax(260px, 9fr) minmax(0, 22fr) minmax(260px, 9fr);
-}
-
-.live {
+.main {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.rail > section:last-child {
+  max-height: none;
+}
+
+.now > section {
+  min-height: 0;
 }
 
 .feed {
@@ -36,17 +96,98 @@
   padding: 16px 26px 20px;
 }
 
-/* During the bridge: tips on top of the assistant. */
-.rail {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap);
-  min-height: 0;
-  min-width: 0;
+.bookButton {
+  flex: none;
+  gap: 10px;
+  font-size: var(--fs-md);
+  padding: 12px 16px;
 }
 
-.fill {
-  flex: 1;
+.bookButton span:last-child {
+  margin-inline-start: auto;
+}
+
+/* The overview's side cards: the appointment and the letter's key words. */
+.peek {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 18px 22px;
+  text-align: start;
+}
+
+button.peek:hover {
+  border-color: var(--forest-2);
+}
+
+.peekDate {
+  font-size: var(--fs-xl);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.peekSub {
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
+.peekLink {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--forest-2);
+}
+
+.peekWords {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+}
+
+.peekWords li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.peekWords b {
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.peekWords span {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  text-align: end;
+}
+
+/* Messages: at the end of the tab row, opens the WhatsApp thread in a drawer. */
+.messagesButton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.messagesButton:hover {
+  border-color: var(--forest-2);
 }
 
 .status {
@@ -67,26 +208,33 @@
 }
 
 @media (max-width: 1100px) {
-  .page {
+  .fixed {
     height: auto;
-    min-height: 100vh;
   }
 
-  .grid {
+  .now {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .live {
-    order: -1;
-  }
-
-  .feed {
-    max-height: 520px;
+  .main {
+    max-height: 80vh;
   }
 }
 
 @media (max-width: 640px) {
-  .feed {
-    padding: 14px 16px;
+  .main {
+    max-height: none;
+  }
+
+  .messagesButton span {
+    display: none;
+  }
+
+  .verdictPill {
+    margin-inline-start: 0;
+  }
+
+  .meta::before {
+    display: none;
   }
 }

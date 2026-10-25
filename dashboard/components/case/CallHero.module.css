@@ -248,6 +248,20 @@
     padding: 18px 16px;
   }
 
+  /* No room for one row on a phone: the title takes its own line under the pill and timer. */
+  .compact {
+    flex-wrap: wrap;
+  }
+
+  .compact .headline {
+    order: 4;
+    flex-basis: 100%;
+  }
+
+  .compact .headline h1 {
+    white-space: normal;
+  }
+
   .timer {
     align-items: flex-start;
   }

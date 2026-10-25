@@ -18,7 +18,8 @@ function domain(url: string): string {
  * The translation book beside the live call: search it in either language, or see
  * the words the call has used so far, newest first. Each entry says where its
  * translation comes from, so an official USCIS wording reads as one. `flash` marks
- * the entry the user just picked in the transcript.
+ * the entry the user just picked in the transcript. `browse` (the Key terms tab)
+ * lists the whole book when there's no search.
  */
 export function GlossaryBook({
   entries,
@@ -26,16 +27,18 @@ export function GlossaryBook({
   query,
   flash,
   onQuery,
+  browse = false,
 }: {
   entries: GlossaryEntry[];
   seen: GlossaryEntry[];
   query: string;
   flash: GlossaryEntry | null;
   onQuery: (query: string) => void;
+  browse?: boolean;
 }) {
   const { lang } = useLang();
   const t = stringsFor(lang).case.live;
-  const rows = query.trim() ? searchGlossary(entries, query) : seen;
+  const rows = query.trim() ? searchGlossary(entries, query) : browse ? entries : seen;
 
   return (
     <section className={styles.book} aria-labelledby="book-title">
@@ -52,7 +55,7 @@ export function GlossaryBook({
           onChange={(e) => onQuery(e.target.value)}
         />
       </div>
-      {!query.trim() && seen.length > 0 && <p className={styles.sub}>{t.fromCall}</p>}
+      {!query.trim() && !browse && seen.length > 0 && <p className={styles.sub}>{t.fromCall}</p>}
       {query.trim() && rows.length === 0 && <p className={styles.sub}>{t.none}</p>}
       <ul className={styles.rows}>
         {rows.map((e) => (

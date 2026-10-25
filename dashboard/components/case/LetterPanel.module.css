@@ -1,5 +1,5 @@
 .panel {
-  padding: 16px;
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -23,7 +23,7 @@
 .paper {
   position: relative;
   flex: none;
-  height: 250px;
+  height: 340px;
   overflow: hidden;
   background: var(--paper);
   border: 1px solid var(--line-strong);
@@ -186,26 +186,6 @@
   color: var(--amber);
 }
 
-.verdict {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-}
-
-.verdict ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-}
-
 .refs {
   display: grid;
   gap: 4px;
@@ -230,38 +210,22 @@
   font-size: var(--fs-sm);
 }
 
-/* During the call: the paper shrinks to its header, inside the split column. */
-.compact {
-  flex: 1;
-  gap: 12px;
+/* Paper beside the plain-language facts; stacked on narrow screens. */
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
 }
 
-.compact .paper {
-  height: auto;
-  padding-bottom: 10px;
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
-.compact .paper::after,
-.compact .pGrid,
-.compact .pBody,
-.compact .pTitle {
-  display: none;
-}
-
-.compact .pHead {
-  padding: 0;
-  margin: 0;
-  border: 0;
-}
-
-.compact .stamp {
-  top: 12px;
-}
-
-.compact .facts {
-  gap: 8px;
-}
-
-.compact .fv {
-  font-size: var(--fs-sm);
+@media (max-width: 900px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

@@ -165,3 +165,10 @@
     animation: none;
   }
 }
+
+/* The line the user needs to respond to, matching the "your turn" bar below. */
+.turn {
+  background: var(--amber-soft);
+  border-inline-start: 4px solid var(--amber);
+  padding-inline: 10px 12px;
+}

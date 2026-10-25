@@ -1,4 +1,4 @@
-/* One screen at 1080p, like the case view: cases + history on the left, assistant on the right. */
+/* One screen at 1080p: the case cards on the left, the assistant on the right. */
 .page {
   height: 100vh;
   display: flex;
@@ -65,18 +65,6 @@
   color: var(--muted);
 }
 
-.history {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 16px 26px 20px;
-}
-
-.feed {
-  flex: 1;
-}
 
 .status {
   margin: 0;
@@ -106,17 +94,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .history {
-    max-height: 520px;
-  }
-
   .grid > aside {
     height: 640px;
-  }
-}
-
-@media (max-width: 640px) {
-  .history {
-    padding: 14px 16px;
   }
 }

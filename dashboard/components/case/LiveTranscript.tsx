@@ -12,16 +12,19 @@ import styles from "./LiveTranscript.module.css";
 /**
  * Both legs of the bridged call in the viewer's language, each line streaming in a
  * word or two at a time with the English it came from muted below. Words in the
- * translation book are underlined; picking one opens it in the book.
+ * translation book are underlined; picking one opens it in the book. The line the
+ * user needs to respond to (`turnLineId`) is marked.
  */
 export function LiveTranscript({
   lines,
   glossary,
   onTerm,
+  turnLineId = null,
 }: {
   lines: LiveLine[];
   glossary: GlossaryEntry[];
   onTerm: (entry: GlossaryEntry) => void;
+  turnLineId?: string | null;
 }) {
   const { lang } = useLang();
   const t = stringsFor(lang).case;
@@ -46,7 +49,10 @@ export function LiveTranscript({
       </div>
       {lines.length === 0 && <p className={styles.waiting}>{t.live.waiting}</p>}
       {lines.map((line) => (
-        <div key={line.id} className={`${styles.line} ${styles[line.speaker] ?? ""}`}>
+        <div
+          key={line.id}
+          className={`${styles.line} ${styles[line.speaker] ?? ""} ${line.id === turnLineId ? styles.turn : ""}`}
+        >
           <span className={styles.who}>{t.speakers[line.speaker]}</span>
           <div className={styles.body}>
             <p className={styles.text}>
