@@ -1,0 +1,88 @@
+.mascot {
+  position: relative;
+  flex: none;
+}
+
+.mascot svg {
+  display: block;
+  overflow: visible;
+}
+
+.bob {
+  animation: bob 3s ease-in-out infinite;
+}
+
+/* Waves from the shoulder. */
+.arm {
+  transform-origin: 123px 104px;
+  animation: wave 1.8s ease-in-out infinite;
+}
+
+/* Beside the face on wide screens; above it on phones, where space is narrow. */
+.hello {
+  position: absolute;
+  top: 22px;
+  inset-inline-end: 100%;
+  margin-inline-end: 2px;
+  padding: 6px 14px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  border-end-end-radius: 4px;
+  font-weight: 650;
+  font-size: var(--fs-lg);
+  color: var(--forest);
+  white-space: nowrap;
+  box-shadow: 0 8px 18px -12px rgba(14, 59, 44, 0.5);
+  animation: pop 300ms ease-out both;
+}
+
+@media (max-width: 640px) {
+  .hello {
+    top: auto;
+    bottom: 100%;
+    inset-inline-end: auto;
+    inset-inline-start: 60%;
+    margin: 0 0 4px;
+    border-radius: 16px;
+    border-end-start-radius: 4px;
+  }
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes wave {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0deg);
+  }
+  15% {
+    transform: rotate(-18deg);
+  }
+  30% {
+    transform: rotate(10deg);
+  }
+  45% {
+    transform: rotate(-12deg);
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

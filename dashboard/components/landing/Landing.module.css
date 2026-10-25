@@ -3,21 +3,21 @@
 }
 
 .wrap {
-  max-width: 1600px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding-left: max(20px, env(safe-area-inset-left, 0px));
-  padding-right: max(20px, env(safe-area-inset-right, 0px));
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
 }
 
-/* Hero + ticker fill the first screen at 1080p; the bento starts at the fold. */
+/* Sized by its content, so "How it works" peeks above the fold instead of empty bands. */
 .hero {
-  min-height: calc(100vh - var(--header-h) - 64px);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 600px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 500px);
   align-items: center;
-  gap: clamp(40px, 5vw, 96px);
-  padding-top: 40px;
-  padding-bottom: 72px;
+  gap: clamp(40px, 5vw, 88px);
+  min-height: min(66vh, 620px);
+  padding-top: clamp(16px, 3vh, 40px);
+  padding-bottom: clamp(56px, 10vh, 120px);
 }
 
 .copy {
@@ -30,35 +30,87 @@
 
 .headline {
   margin: 0;
-  font-size: clamp(44px, 4.6vw, 88px);
+  font-size: clamp(36px, 3.6vw, 60px);
   font-weight: 650;
-  line-height: 1.02;
-  letter-spacing: -0.04em;
+  line-height: 1.06;
+  letter-spacing: -0.025em;
   text-wrap: balance;
+  max-width: 19ch;
+}
+
+/* Each phrase on its own line, so the highlight never breaks mid-phrase. */
+.headline > span {
+  display: block;
+}
+
+.headline .mark {
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .sub {
   margin: 0;
-  font-size: var(--fs-xl);
-  line-height: 1.4;
+  font-size: 19px;
+  line-height: 1.55;
   color: var(--muted);
-  max-width: 42ch;
+  max-width: 50ch;
 }
 
+/* Small reassurances, quieter than the buttons: answers to "is this safe and easy?". */
+.perks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.perks li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.perks svg {
+  color: var(--forest-2);
+}
+
+/* Room above the chat for Avocado, so the pair sits clear of the top bar. */
 .demo {
-  /* Room for the lime offset behind the card. */
-  padding: 0 14px 14px 0;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding-top: 108px;
   animation: rise 500ms 150ms ease-out both;
 }
 
+/* One rhythm for every section below the hero. */
 .section {
-  padding-top: clamp(64px, 10vh, 112px);
+  padding-top: clamp(56px, 9vh, 96px);
+  padding-bottom: clamp(56px, 9vh, 96px);
+}
+
+.promiseBand {
+  padding-block: clamp(64px, 10vh, 112px);
+  background: var(--forest);
 }
 
 /* The band sits inset by the same gutter on the sides and the bottom. */
 .closing {
   padding-top: clamp(64px, 10vh, 112px);
   padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
+}
+
+/* Avocado perches on top of the chat window, waving hello, never over a message. */
+.buddy {
+  position: absolute;
+  /* 108px of room above the chat, minus how far Avocado overlaps its header. */
+  top: 10px;
+  inset-inline-end: 32px;
+  z-index: 1;
 }
 
 @media (max-width: 1100px) {
@@ -69,6 +121,17 @@
 }
 
 @media (max-width: 640px) {
+  .demo {
+    padding-top: 96px;
+  }
+
+  .buddy {
+    top: -8px;
+    inset-inline-end: 16px;
+    scale: 0.7;
+    transform-origin: bottom right;
+  }
+
   .hero {
     padding-top: 28px;
     padding-bottom: 48px;
