@@ -90,7 +90,9 @@ class FakeStream:
 
 
 class Line:
-    def __init__(self, registry: LineRegistry | None = None) -> None:
+    def __init__(
+        self, registry: LineRegistry | None = None, *, join_gate: bool = True
+    ) -> None:
         self.calls = FakeCalls()
         self.line = TwilioTelephony(
             FakeNumberSource({"case_1": OFFICIAL}, users={"user_9": APPLICANT}),
@@ -99,6 +101,7 @@ class Line:
             user_language="es",
             registry=registry or LineRegistry(),
             timing=FAST,
+            join_gate=join_gate,
         )
 
     async def answered(self, call_id: str = "call_1") -> "Line":
@@ -203,8 +206,12 @@ async def test_the_sink_sends_twilio_media_and_drops_when_behind() -> None:
 # The listen leg on the line
 
 
-async def test_a_request_rings_the_users_own_number_behind_a_gate() -> None:
-    line = await Line().ringing()
+@pytest.mark.parametrize("join_gate", [True, False])
+async def test_a_request_rings_the_users_own_number_behind_a_gate(
+    join_gate: bool,
+) -> None:
+    """Even with no join gate for the bridge, listening in keeps its gate (C29)."""
+    line = await Line(join_gate=join_gate).ringing()
 
     listen = line.calls.created[1]
     assert listen["to"] == APPLICANT

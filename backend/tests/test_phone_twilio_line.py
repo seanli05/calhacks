@@ -78,7 +78,9 @@ class FakeStream:
 
 
 class Line:
-    def __init__(self, *, verified: bool = True, language: str = "es") -> None:
+    def __init__(
+        self, *, verified: bool = True, language: str = "es", join_gate: bool = True
+    ) -> None:
         self.calls = FakeCalls()
         self.registry = LineRegistry()
         numbers = FakeNumberSource(
@@ -92,6 +94,7 @@ class Line:
             user_language=language,
             registry=self.registry,
             timing=FAST,
+            join_gate=join_gate,
         )
 
     async def dialed(self) -> "Line":
@@ -435,6 +438,72 @@ async def test_another_sid_cant_press_for_the_applicant() -> None:
     assert "<Hangup" in line.line.user_pressed_key("CA999")
     line.line.on_user_status("CA999", "busy")
     assert await line.events() == [AgencyAnswered()]
+
+
+# No join gate (PHONE_JOIN_GATE=false, the demo): picking up joins
+
+
+async def test_with_no_gate_the_applicant_leg_is_the_conference_itself() -> None:
+    line, _ = await Line(join_gate=False).rung()
+
+    twiml = line.calls.created[1]["twiml"]
+    assert "<Gather" not in twiml and JOIN_PROMPTS["es"].text not in twiml
+    assert ">bridge-call_1</Conference>" in twiml
+    assert 'url="wss://agent.example.app/phone/calls/call_1/fork/user"' in twiml
+    assert "record" not in twiml.lower()  # C29
+
+
+async def test_with_no_gate_picking_up_joins_once_whichever_comes_first() -> None:
+    by_callback, _ = await Line(join_gate=False).rung()
+    by_callback.line.on_user_status(USER_SID, "in-progress")
+    assert by_callback.line.attach_fork("user", USER_SID)
+    by_callback.line.on_user_status(USER_SID, "in-progress")
+
+    by_fork, _ = await Line(join_gate=False).rung()
+    assert by_fork.line.attach_fork("user", USER_SID)
+    by_fork.line.on_user_status(USER_SID, "in-progress")
+
+    for line in (by_callback, by_fork):
+        assert await line.events() == [AgencyAnswered(), UserAnswered()]
+
+
+async def test_with_no_gate_another_sid_cant_join_for_the_applicant() -> None:
+    line, _ = await Line(join_gate=False).rung()
+    assert not line.line.attach_fork("user", SID)
+    line.line.on_user_status("CA999", "in-progress")
+    assert await line.events() == [AgencyAnswered()]
+
+
+async def test_with_no_gate_the_agency_leaving_first_keeps_the_applicant_out() -> None:
+    line, _ = await Line(join_gate=False).rung()
+    line.line.on_status(SID, "completed")
+    assert not line.line.attach_fork("user", USER_SID)
+    assert UserAnswered() not in await line.events()
+
+
+@pytest.mark.parametrize(
+    ("status", "reason"), [("busy", "busy"), ("no-answer", "no_answer")]
+)
+async def test_with_no_gate_a_missed_ring_is_still_unreachable(
+    status: str, reason: str
+) -> None:
+    line, _ = await Line(join_gate=False).rung()
+    line.line.on_user_status(USER_SID, status)
+    assert await line.events() == [AgencyAnswered(), UserUnreachable(reason=reason)]
+
+
+async def test_with_the_gate_picking_up_alone_doesnt_join() -> None:
+    line, _ = await Line().rung()
+    line.line.on_user_status(USER_SID, "in-progress")
+    assert not line.line.attach_fork("user", USER_SID)
+    assert await line.events() == [AgencyAnswered()]
+
+
+async def test_with_no_gate_connect_user_bridges_after_pick_up() -> None:
+    line, _ = await Line(join_gate=False).rung()
+    line.line.on_user_status(USER_SID, "in-progress")
+    await line.line.connect_user()
+    assert ">bridge-call_1</Conference>" in line.calls.updates[-1]
 
 
 async def test_connect_user_moves_the_agency_leg_into_the_conference() -> None:

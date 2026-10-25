@@ -21,6 +21,11 @@ as answered. A key press puts the applicant in the call's conference and emits
 agency leg's media stream, which from then on is expected, not a hang-up, and the
 agent can't speak any more (rule 3).
 
+With `join_gate=False` (`PHONE_JOIN_GATE=false`, for the demo) there's no gate: the
+leg's TwiML is the conference itself, so picking up joins at once, and the first
+sign of it (the `in-progress` callback or the leg's fork) emits `UserAnswered`.
+Voicemail that picks up then joins too; the risk is accepted for the demo phone.
+
 `LINES` maps each `call_id` to its line so the routes can find it. Twilio doesn't
 promise the order of callbacks and streams, so the line keeps how far the agency
 leg has got and never moves back: answered once (by the stream or the callback,
@@ -145,7 +150,8 @@ def say_seconds(text: str) -> float:
 
 class TwilioTelephony:
     """One call's agency leg, and the applicant's leg bridged into it.
-    `user_language` is the call job's: the join gate speaks it."""
+    `user_language` is the call job's: the join gate speaks it. Without
+    `join_gate`, the applicant joins as soon as their phone picks up."""
 
     def __init__(
         self,
@@ -156,6 +162,7 @@ class TwilioTelephony:
         user_language: LanguageCode,
         registry: LineRegistry = LINES,
         timing: LineTiming | None = None,
+        join_gate: bool = True,
     ) -> None:
         self._numbers = numbers
         self._calls = calls
@@ -163,6 +170,7 @@ class TwilioTelephony:
         self._user_language = user_language
         self._registry = registry
         self._timing = timing or LineTiming()
+        self._join_gate = join_gate
         self._queue: asyncio.Queue[LineEvent | None] = asyncio.Queue()
         self._call_id: CallId | None = None
         self._sid: str | None = None
@@ -267,7 +275,7 @@ class TwilioTelephony:
             self._listen.end("failed")
             await self._end_leg("listener", self._calls.end, sid)
         number = await self._numbers.user_number(user_id)
-        if self._user_language not in JOIN_PROMPTS:
+        if self._join_gate and self._user_language not in JOIN_PROMPTS:
             logger.warning(
                 "no join prompt in %r; using English (call_id=%s)",
                 self._user_language,
@@ -277,11 +285,7 @@ class TwilioTelephony:
         try:
             sid = await self._calls.create(
                 to=number,
-                twiml=user_gate_twiml(
-                    join_prompt(self._user_language),
-                    self._urls.user_joined(call_id),
-                    self._urls.user_missed(call_id),
-                ),
+                twiml=self._user_twiml(call_id),
                 status_callback=self._urls.user_status(call_id),
             )
         except _REST_ERRORS as exc:
@@ -445,7 +449,9 @@ class TwilioTelephony:
         self._user_sid = self._user_sid or call_sid
         logger.info("applicant leg %s (call_id=%s)", status, self._call_id)
         if self._user_stage == "ringing":
-            if status in _UNREACHABLE or status == "canceled":
+            if status == "in-progress" and not self._join_gate:
+                self._user_picked_up(call_sid)
+            elif status in _UNREACHABLE or status == "canceled":
                 self._user_gone(
                     UserUnreachable(reason=_UNREACHABLE.get(status, "failed"))
                 )
@@ -471,11 +477,40 @@ class TwilioTelephony:
                 self._user_stage,
             )
             return hang_up_twiml()
+        self._user_joined(call_sid)
+        return conference_twiml(
+            self._conference(), self._urls.fork(self._require_call_id(), "user")
+        )
+
+    def _user_picked_up(self, call_sid: str) -> None:
+        """No gate: the applicant's leg answered, so they're in the conference.
+        Called by whichever comes first, the callback or the fork."""
+        if (
+            self._join_gate
+            or not self._matches_user(call_sid)
+            or self._user_stage != "ringing"
+            or self._hung_up
+            or self._agency_gone
+        ):
+            return
+        self._user_joined(call_sid)
+
+    def _user_joined(self, call_sid: str) -> None:
         self._user_sid = self._user_sid or call_sid
         self._user_stage = "joined"
         self.emit(UserAnswered())
-        return conference_twiml(
-            self._conference(), self._urls.fork(self._require_call_id(), "user")
+
+    def _user_twiml(self, call_id: CallId) -> str:
+        """What the applicant's leg runs on pick-up: the join gate, or with no gate
+        the conference itself."""
+        if not self._join_gate:
+            return conference_twiml(
+                self._conference(), self._urls.fork(call_id, "user")
+            )
+        return user_gate_twiml(
+            join_prompt(self._user_language),
+            self._urls.user_joined(call_id),
+            self._urls.user_missed(call_id),
         )
 
     def user_missed_gate(self, call_sid: str) -> str:
@@ -490,6 +525,7 @@ class TwilioTelephony:
             return False
         if speaker == "agency":
             return self._bridged and call_sid == self._sid
+        self._user_picked_up(call_sid)
         return self._user_stage == "joined" and call_sid == self._user_sid
 
     def attach_stream(self, stream: AudioStream, call_sid: str) -> int | None:

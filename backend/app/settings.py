@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     # default: only the deployed backend claims jobs on the shared database, and the
     # dev fake phone (POST /dev/fake-phone) must not run beside it.
     phone_worker: bool = False
+    # Ring the applicant with a "press any key to join" gate, which keeps voicemail
+    # off the call. False (the demo) joins them on pick-up instead.
+    phone_join_gate: bool = True
 
     @field_validator("demo_dial_number")
     @classmethod

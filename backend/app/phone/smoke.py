@@ -511,6 +511,7 @@ async def main(args: argparse.Namespace) -> None:
         TwilioCalls(settings),
         LineUrls.from_settings(settings),
         user_language=args.language,
+        join_gate=not args.no_gate,
     )
     line = GuardedTelephony(raw, blocked)
     mode = (
@@ -556,6 +557,11 @@ def cli() -> None:
         choices=sorted(JOIN_PROMPTS),
         default=SMOKE_LANGUAGE,
         help="the applicant's language: the join prompt speaks it",
+    )
+    parser.add_argument(
+        "--no-gate",
+        action="store_true",
+        help="join the applicant on pick-up, with no key press (PHONE_JOIN_GATE)",
     )
     parser.add_argument("--port", type=int, default=8000, help="where ngrok forwards")
     parser.add_argument(

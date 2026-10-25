@@ -16,6 +16,8 @@ Before each session: ngrok up, `PUBLIC_BASE_URL` matches it, backend stopped, an
 
 ## The bridge (Two phones)
 
+B2–B5 test the join gate (`PHONE_JOIN_GATE=true`, the default); G1 tests the demo's `--no-gate`.
+
 | # | You (agency) | Friend (applicant) | Expect | Status |
 |---|---|---|---|---|
 | B1 | Greet like a rep | Answers, presses a key | Ring < 5 s after your greeting; you hear the intro; you're connected; the transcript shows `agency:` / `user:` lines | ✅ 2026-10-24 |
@@ -30,6 +32,7 @@ Before each session: ngrok up, `PUBLIC_BASE_URL` matches it, backend stopped, an
 | B10 | After the bridge, ask the friend for name and date of birth, then read out a reference number with letters and digits ("IOE, 0, 9, 1, 2…") | Answers your questions | The reference number appears whole in the saved transcript under `agency`; the agent says nothing | |
 | B11 | After the bridge, ask "press 1 if you're the applicant" | Presses 1 | Expected: you hear the tone (key presses cross the conference) | |
 | B12 | Keep the bridged call going 5+ minutes, talking now and then | Talks back | Both forks keep transcribing; no drop; nothing closes early | |
+| G1 | Greet like a rep; run with `--no-gate` | Answers | No prompt: the friend hears you within ~2 s of picking up; the transcript shows `agency:` / `user:` lines | |
 
 ## While the applicant's phone rings (Two phones)
 
