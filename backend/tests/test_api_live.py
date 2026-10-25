@@ -187,6 +187,8 @@ def test_live_route_sends_server_sent_events(
     ) as res:
         assert res.status_code == 200
         assert res.headers["content-type"].startswith("text/event-stream")
+        # Proxies that compress (Next.js's /api rewrite) would buffer the stream.
+        assert "no-transform" in res.headers["cache-control"]
         body = "".join(res.iter_text())
     events = [
         json.loads(chunk.removeprefix("data: "))

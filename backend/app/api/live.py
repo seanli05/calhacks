@@ -94,7 +94,9 @@ async def live_call(
     return StreamingResponse(
         _sse(events),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        # `no-transform`: the dashboard's Next.js proxy gzips responses otherwise,
+        # and gzip holds an open stream's events back until the call ends.
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
     )
 
 
