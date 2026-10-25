@@ -18,6 +18,7 @@ One per deploy, set with `MOCK_AGENCY_MODE`:
 |---|---|---|
 | `demo` (default) | Full phone tree, hold, then the officer | The demo, and testing the menu and hold |
 | `quick` | A short greeting, then the officer picks up at once (no menu, no hold) | Testing live calling: human detection, the bridge, and what happens after the call is resolved |
+| `short` | Greeting, the appointment menu (2 for an asylum interview; no main menu and no star), the open "why are you calling" question, a short hold (`MOCK_AGENCY_SHORT_HOLD_SECONDS`, 15 s), then the same officer. No attendance question | A demo take with one key press and one spoken answer |
 
 To keep both handy, deploy the folder as two Cartesia agents on two numbers, and point the backend's `DEMO_DIAL_NUMBER` at the one you want.
 
@@ -77,9 +78,10 @@ This folder deploys to Cartesia as its own project, with its own [pyproject.toml
 |---|---|---|---|
 | `ANTHROPIC_API_KEY` | yes | | For the officer |
 | `MOCK_AGENCY_OFFICER_MODEL` | yes | | LiteLLM string, e.g. `anthropic/claude-haiku-5-5` (fast model; it's a live voice turn) |
-| `MOCK_AGENCY_MODE` | no | `demo` | `demo` or `quick` (see [Modes](#modes)). Anything else fails at startup |
+| `MOCK_AGENCY_MODE` | no | `demo` | `demo`, `quick`, or `short` (see [Modes](#modes)). Anything else fails at startup |
 | `MOCK_AGENCY_CASE` | no | `demo` | Which case the line knows: `demo` (Ana Morales, Los Angeles) or `sf_demo` (Mariam Namuna, San Francisco; the demo video). The officer's intro and case record follow it. Anything else fails at startup |
-| `MOCK_AGENCY_HOLD_SECONDS` | no | `45` | Total hold time. Keep it short for the video. |
+| `MOCK_AGENCY_HOLD_SECONDS` | no | `45` | Total hold time in `demo` mode. Keep it short for the video. |
+| `MOCK_AGENCY_SHORT_HOLD_SECONDS` | no | `15` | Total hold time in `short` mode |
 | `MOCK_AGENCY_HOLD_ANNOUNCE_EVERY_S` | no | `15` | Gap between hold announcements |
 | `MOCK_AGENCY_NO_INPUT_SECONDS` | no | `12` | Silence before a reprompt, counted only once the line stops talking |
 | `MOCK_AGENCY_OFFICER_NAME` | no | `Daniel Reyes` | |

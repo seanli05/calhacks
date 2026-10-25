@@ -1,12 +1,37 @@
 import type { LandingStrings } from "../en/landing";
 
 export const landing: LandingStrings = {
-  headline: ["Tu carta, explicada.", "Tu llamada, hecha."],
-  sub: "Leemos cartas de inmigración en tu idioma, verificamos que son reales y esperamos en la línea con la agencia por ti.",
+  headline: ["¡Hola! Soy Avocado.", "Tus documentos, más fáciles."],
+  sub: "Empezar una nueva vida en otro país, con todos sus formularios, es difícil. Con Avocado puedes escribir por WhatsApp en tu idioma, enviar los formularios que no entiendes y hacer que llamemos a los representantes por ti. ¡Todo en tu propio idioma!",
   tryIt: "Pruébalo en WhatsApp",
-  watch: "Ver una llamada en vivo",
-  scan: "O escanea con tu teléfono",
+  watch: "Ver un ejemplo",
+  scan: "¿Estás en una computadora? Escanea esto con tu teléfono.",
   thenSend: "El mensaje ya está escrito. Solo presiona enviar:",
+  perks: ["Sin apps nuevas: es por WhatsApp", "Español · English · دری", "Nada pasa sin tu permiso"],
+  loading: "Preparando…",
+
+  chat: {
+    name: "Avocado",
+    status: "Responde en un minuto",
+    user: "¿Me ayudas con esta carta?",
+    explain: "Es tu aviso de entrevista de asilo. Es el jueves 12 de noviembre a las 9:00 a. m. Lleva tu pasaporte y un intérprete.",
+    real: "Esta carta es real. La revisamos en uscis.gov.",
+    ask: "¿Quieres que llamemos a USCIS por ti? Esperamos en la línea y te llamamos cuando conteste una persona.",
+    yes: "Sí, por favor",
+    calling: "Perfecto. Estamos llamando a USCIS. Te llamamos cuando conteste una persona.",
+    typing: "escribiendo",
+  },
+
+  steps: {
+    says: ["¡Recibido! Déjame verla.", "Es real. Esto es lo que significa.", "Te llamo cuando conteste alguien."],
+    sub: "Tres pasos. Tú solo haces el primero.",
+    title: "Cómo funciona",
+    items: [
+      { title: "Envía una foto", body: "Tómale una foto a la carta y mándanosla por WhatsApp." },
+      { title: "La explicamos y revisamos", body: "Qué dice, la fecha, qué llevar y si es real." },
+      { title: "Llamamos por ti", body: "Si dices que sí, esperamos en la línea y te llamamos cuando conteste una persona." },
+    ],
+  },
 
   demo: {
     live: "Llamada en curso",
@@ -108,18 +133,40 @@ export const landing: LandingStrings = {
   },
 
   promises: {
-    title: "Lo que nunca haremos.",
-    sub: "Son reglas en nuestro código, no ajustes.",
+    title: "Nuestra promesa para ti",
+    greeting: "Hola,",
+    sub: "Tú siempre decides. Avocado cumple estas promesas en cada carta y cada llamada.",
+    signoff: "Con cariño,",
     items: [
-      { title: "Marcar un número sin verificar", body: "Solo el número oficial, del sitio de la propia agencia." },
-      { title: "Hablar por ti", body: "Nunca decimos tu A-Number, número de recibo ni fecha de nacimiento. Contestas tú." },
-      { title: "Llamar sin tu permiso", body: "Te preguntamos antes de cada llamada y guardamos tu respuesta." },
-      { title: "Guardar lo que borras", body: "Borra lo que quieras, o todo, cuando quieras." },
+      { title: "Solo marcamos números oficiales", body: "El número que llamamos siempre viene del sitio web de la oficina, nunca de la carta." },
+      { title: "Tú hablas por ti", body: "Nunca decimos tu A-Number, número de recibo ni fecha de nacimiento. Eso lo contestas tú." },
+      { title: "Preguntamos antes de cada llamada", body: "No pasa nada hasta que dices que sí." },
+      { title: "Borra lo que quieras", body: "Mira lo que recordamos de ti y quita una cosa o todo." },
+    ],
+  },
+
+  example: {
+    back: "Volver al inicio",
+    title: "Mira cómo ayuda Avocado",
+    sub: "Una carta, de la foto a la llamada. Se reproduce sola.",
+    pause: "Pausa",
+    play: "Reproducir",
+    prev: "Anterior",
+    next: "Siguiente",
+    step: (n: number, total: number) => `Paso ${n} de ${total}`,
+    alt: "La página de Avocado para esta carta",
+    done: "¿Listo para probarlo con tu propia carta?",
+    slides: [
+      { title: "Tu carta, explicada", body: "Avocado lee la carta, te la explica en tu idioma y revisa en el sitio oficial que sea real. Luego te pregunta si quieres que llame." },
+      { title: "Dices que sí y Avocado llama", body: "Con tu permiso, Avocado llama al número oficial y pasa el menú telefónico por ti." },
+      { title: "Avocado espera en la línea", body: "No tienes que esperar junto al teléfono. Puedes ver lo que pasa en vivo." },
+      { title: "Tu teléfono suena", body: "Cuando contesta una persona, Avocado te llama para que te unas, con traducción en vivo y qué puedes decir." },
+      { title: "Recibes un resumen", body: "Después de la llamada, recibes lo que se dijo y tus próximos pasos, en tu idioma." },
     ],
   },
 
   closing: {
     title: ["¿Te llegó una carta?", "Envíanos una foto."],
-    sub: "Solo necesitas una foto. Español, inglés y dari por ahora.",
+    sub: "Solo necesitas una foto. En español, inglés o dari.",
   },
 };

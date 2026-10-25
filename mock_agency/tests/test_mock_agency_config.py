@@ -78,3 +78,18 @@ def test_same_voice_for_menu_and_officer_fails_at_startup(
     env.setenv("MOCK_AGENCY_IVR_VOICE_ID", OFFICER_VOICE_ID)
     with pytest.raises(ValidationError):
         MockAgencySettings.from_env()
+
+
+def test_short_mode_holds_for_the_short_hold(env: pytest.MonkeyPatch) -> None:
+    env.setenv("MOCK_AGENCY_MODE", "short")
+    env.setenv("MOCK_AGENCY_HOLD_SECONDS", "45")
+    env.delenv("MOCK_AGENCY_SHORT_HOLD_SECONDS", raising=False)
+    settings = MockAgencySettings.from_env()
+    assert settings.mode is Mode.SHORT
+    assert settings.call_hold_seconds == 15.0
+
+
+def test_demo_mode_keeps_the_full_hold(env: pytest.MonkeyPatch) -> None:
+    env.setenv("MOCK_AGENCY_MODE", "demo")
+    env.setenv("MOCK_AGENCY_HOLD_SECONDS", "45")
+    assert MockAgencySettings.from_env().call_hold_seconds == 45.0

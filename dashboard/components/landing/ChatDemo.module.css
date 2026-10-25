@@ -1,0 +1,176 @@
+/* A chat window, not a device mockup: rounded card, our forest header, soft paper thread. */
+.phone {
+  margin: 0;
+  width: 100%;
+  max-width: 500px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 30px 60px -32px rgba(14, 59, 44, 0.4);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--forest);
+  color: #fff;
+}
+
+.avatar {
+  border-radius: 50%;
+  background: #fff;
+  padding: 3px;
+  flex: none;
+}
+
+.name {
+  margin: 0;
+  font-weight: 650;
+  font-size: var(--fs-lg);
+}
+
+.status {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* Fixed height, newest at the bottom: older messages scroll up like a real chat,
+   so the card never changes size while the script plays. */
+.thread {
+  height: 430px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 18px 22px;
+  background: var(--sunk);
+}
+
+.enter {
+  display: flex;
+  flex-direction: column;
+  animation: pop 320ms ease-out both;
+}
+
+.msg {
+  align-self: flex-start;
+  max-width: 84%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 15px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  border-end-start-radius: 4px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.msg p {
+  margin: 0;
+}
+
+.mine {
+  align-self: flex-end;
+  background: var(--lime-soft);
+  border-color: transparent;
+  border-radius: 18px;
+  border-end-end-radius: 4px;
+}
+
+.real {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: var(--forest);
+}
+
+.badge {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--lime);
+  color: var(--forest);
+}
+
+.reply {
+  align-self: flex-end;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: var(--forest);
+  color: #fff;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+/* Three bouncing dots while "we" type. */
+.typing {
+  flex-direction: row;
+  gap: 5px;
+  padding: 14px 16px;
+}
+
+.typing i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+  animation: blink 1s infinite ease-in-out;
+}
+
+.typing i:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.typing i:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@media (max-width: 640px) {
+  .phone {
+    max-width: none;
+  }
+
+  .thread {
+    height: 460px;
+  }
+
+  .msg {
+    max-width: 92%;
+    font-size: var(--fs-md);
+  }
+}

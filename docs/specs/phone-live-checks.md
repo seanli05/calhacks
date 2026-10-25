@@ -78,3 +78,4 @@ The real menu and hold path into the bridge. The mock is a test target, not a sp
 Write anything surprising here, with the date and the run file (`backend/smoke_runs/…`, local only).
 
 - 2026-10-24, B1 + B7: human detected 0.92 on "This is Sean. How can I help you today?", ring ~2 s after the greeting ended; friend pressed a key ~9 s after picking up (the prompt); bridge clean, forks labelled correctly.
+- 2026-10-25, mock line, 12:50 AM call: the transcript stopped ~25 s after the bridge while the call went on ~3 more minutes (no `agent` lines either), so the report said `failed`. No logs; not reproduced. The 1:23 AM call (logged) was complete over a ~1:45 bridge: 40 lines from all three speakers, both forks' speech-to-text up until hang-up. Its fork lines split sentences at short pauses (VAD stop 0.3 s, no join), so the forks went back to the main stream's timing. B12 (5+ minutes) still to run.
