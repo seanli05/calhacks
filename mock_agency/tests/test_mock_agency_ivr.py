@@ -2,7 +2,7 @@ import pytest
 from agency import prompts
 from agency.case_record import DEMO_CASE
 from agency.ivr import MAX_NO_INPUT, Node, PhoneTree
-from agency.speech import Topic, classify_reason, extract_receipt, spoken_digit
+from agency.speech import Topic, classify_reason, spoken_digit
 
 
 def tree_at(node: Node) -> PhoneTree:
@@ -11,7 +11,7 @@ def tree_at(node: Node) -> PhoneTree:
     path = {
         Node.MAIN_MENU: [],
         Node.APPOINTMENT: ["2"],
-        Node.RECEIPT: ["2", "2"],
+        Node.REASON: ["2", "2"],
     }[node]
     for key in path:
         tree.press(key)
@@ -19,89 +19,53 @@ def tree_at(node: Node) -> PhoneTree:
     return tree
 
 
-def press_all(tree: PhoneTree, keys: str):
-    turn = None
-    for key in keys:
-        turn = tree.press(key)
-    return turn
-
-
 def test_greeting_goes_straight_to_english_main_menu():
     turn = PhoneTree(DEMO_CASE).start()
     assert turn.lines == [prompts.GREETING, prompts.MAIN_MENU]
 
 
-def test_happy_path_by_keypad_reaches_transfer():
-    tree = tree_at(Node.RECEIPT)
-    turn = press_all(tree, DEMO_CASE.receipt_digits)
+def test_happy_path_reaches_transfer_without_any_identifier():
+    tree = tree_at(Node.APPOINTMENT)
+    turn = tree.press("2")
     assert tree.node is Node.REASON
-    assert prompts.RECEIPT_FOUND in turn.lines
+    assert turn.lines == [prompts.REASON_PROMPT]
 
     tree.hear("I have a question about bringing an interpreter")
     assert tree.node is Node.ATTENDANCE
 
     turn = tree.press("1")
     assert turn.transfer
-    assert tree.info.receipt_matched
     assert tree.info.topic is Topic.INTERPRETER
     assert tree.info.wants_reschedule is False
 
 
-def test_spoken_receipt_needs_confirmation():
-    tree = tree_at(Node.RECEIPT)
-    turn = tree.hear("Z L A two six nine zero zero one two three four five")
-    assert tree.node is Node.RECEIPT_CONFIRM
-    assert "Z L A 2 6 9 0 0 1 2 3 4 5" in turn.lines[0]
-
-    tree.hear("yes")
-    assert tree.node is Node.REASON
-    assert tree.info.receipt_number == DEMO_CASE.receipt_number
-
-
-def test_saying_no_at_confirmation_asks_again():
-    tree = tree_at(Node.RECEIPT)
-    tree.hear("ZLA2690012345")
-    tree.hear("no")
-    assert tree.node is Node.RECEIPT
-
-
-def test_wrong_receipt_retries_then_moves_on():
-    tree = tree_at(Node.RECEIPT)
-    for _ in range(2):
-        turn = press_all(tree, "1111111111")
-        assert tree.node is Node.RECEIPT
-        assert prompts.RECEIPT_NOT_FOUND in turn.lines
-    press_all(tree, "1111111111")
-    assert tree.node is Node.REASON
-    assert not tree.info.receipt_matched
-
-
-def test_pound_submits_partial_keypad_entry():
-    tree = tree_at(Node.RECEIPT)
-    press_all(tree, "123")
-    turn = tree.press("#")
-    assert prompts.RECEIPT_NOT_FOUND in turn.lines
+def test_no_prompt_asks_for_an_identifier():
+    """C35: the phone agent never gives one, so the menu never asks."""
+    said = " ".join(
+        value
+        for name, value in vars(prompts).items()
+        if name.isupper() and isinstance(value, str)
+    ).lower()
+    for asked in ("your receipt number", "a-number", "date of birth"):
+        assert asked not in said
 
 
 def test_reason_step_requires_speech():
-    tree = tree_at(Node.RECEIPT)
-    press_all(tree, DEMO_CASE.receipt_digits)
+    tree = tree_at(Node.REASON)
     turn = tree.press("1")
     assert tree.node is Node.REASON
     assert prompts.REASON_NEEDS_SPEECH in turn.lines
 
 
 def test_reschedule_reason_skips_attendance_menu():
-    tree = tree_at(Node.RECEIPT)
-    press_all(tree, DEMO_CASE.receipt_digits)
+    tree = tree_at(Node.REASON)
     turn = tree.hear("I need to reschedule my interview")
     assert turn.transfer
     assert tree.info.wants_reschedule is True
 
 
 def test_unclear_reason_reprompts_once_then_accepts():
-    tree = tree_at(Node.RECEIPT)
-    press_all(tree, DEMO_CASE.receipt_digits)
+    tree = tree_at(Node.REASON)
     turn = tree.hear("um, hello?")
     assert tree.node is Node.REASON
     assert prompts.REASON_NOT_UNDERSTOOD in turn.lines
@@ -115,7 +79,7 @@ def test_menus_accept_spoken_numbers_and_option_names():
     tree.hear("press two")
     assert tree.node is Node.APPOINTMENT
     tree.hear("asylum interview")
-    assert tree.node is Node.RECEIPT
+    assert tree.node is Node.REASON
 
 
 def test_wrong_branch_returns_to_main_menu():
@@ -161,19 +125,6 @@ def test_input_resets_no_input_count():
 )
 def test_spoken_digit(text, digit):
     assert spoken_digit(text) == digit
-
-
-@pytest.mark.parametrize(
-    "text",
-    [
-        "ZLA2690012345",
-        "Z, L, A, 2, 6, 9, 0, 0, 1, 2, 3, 4, 5.",
-        "My receipt number is zee el ay 269-001-2345",
-        "Z L A two six nine oh oh one two three four five",
-    ],
-)
-def test_extract_receipt(text):
-    assert extract_receipt(text)[-10:] == DEMO_CASE.receipt_digits
 
 
 @pytest.mark.parametrize(

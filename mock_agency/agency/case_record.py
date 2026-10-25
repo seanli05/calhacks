@@ -21,10 +21,6 @@ class MockCase(BaseModel):
     interview_office: str
     interview_address: str
 
-    @property
-    def receipt_digits(self) -> str:
-        return self.receipt_number[3:]
-
 
 DEMO_CASE = MockCase(
     receipt_number="ZLA2690012345",

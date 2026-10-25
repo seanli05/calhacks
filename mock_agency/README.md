@@ -15,9 +15,7 @@ It has three phases:
 ```
 Greeting ─► MAIN MENU        1 case status · 2 interview/appointment notice · 3 address · 4 work permit · 9 repeat
          2 ─► APPOINTMENT    1 biometrics · 2 asylum interview · 3 naturalization · * main menu
-                2 ─► RECEIPT (open)       say "ZLA2690012345", or key 2690012345 then #
-                       └─► CONFIRM        "I heard Z L A 2 6 9 ... say yes or press 1"
-                     ─► REASON (open)     "In a few words, tell me why you're calling" (speech only)
+                2 ─► REASON (open)     "In a few words, tell me why you're calling" (speech only)
                      ─► ATTENDANCE        1 attending as scheduled · 2 need a new date   ◄── the ask_user moment
                      ─► HOLD ─► OFFICER
 ```
@@ -28,7 +26,6 @@ What each step tests in the phone agent:
 |---|---|---|
 | Main menu, appointment | Closed (key or spoken number/option name) | Menu choices from the case brief |
 | Wrong branches (1, 3, 4) | Dead end, back to main menu | Recovering from a wrong press |
-| Receipt number | Open, spoken or keypad | Reading a `<ref:receipt_number>` aloud; a confirmation loop |
 | Reason for calling | Open, **speech only** (keys get "please say your answer out loud") | Saying the call goal in plain words |
 | Attendance | Closed, but depends on what the user wants | The agent can't know this, so it should ask the user on WhatsApp |
 | Hold | Recorded announcements | Hold vs. human detection |
@@ -38,7 +35,7 @@ Other behaviors:
 
 - Pressing 0 or asking for a "representative" gets: choose a menu option first.
 - After 12 s of silence the line reprompts. After 3 silent prompts in a row it hangs up.
-- The receipt is matched on its 10 digits, because speech-to-text mishears letters far more often than digits. After 3 failed tries the line moves on anyway.
+- The menu never asks for an identifier (receipt number, A-Number, date of birth). The phone agent may not give one (Plan.md C35), so only the officer asks, and the applicant answers in their own voice once bridged.
 - Saying "reschedule" at the reason step skips the attendance menu.
 
 The fictional case data (receipt number, A-number, name, date of birth, interview date and place) is in [agency/case_record.py](agency/case_record.py). The demo letter must use the same values.
@@ -51,7 +48,7 @@ The fictional case data (receipt number, A-number, name, date of birth, intervie
 |---|---|
 | [main.py](main.py) | Line entry point: phases, no-input timer, hold, officer handoff |
 | [agency/ivr.py](agency/ivr.py) | The phone tree as a pure state machine (no SDK imports) |
-| [agency/speech.py](agency/speech.py) | Transcript parsing: menu digits, yes/no, receipt numbers, reason topics |
+| [agency/speech.py](agency/speech.py) | Transcript parsing: menu digits, requests for a person, reason topics |
 | [agency/prompts.py](agency/prompts.py) | Every line the menu says, plus the officer's system prompt |
 | [agency/case_record.py](agency/case_record.py) | The fictional demo case |
 | [agency/config.py](agency/config.py) | Settings from env vars |
@@ -105,4 +102,4 @@ Then attach a phone number to the agent in the [Cartesia dashboard](https://play
 
 - No hold music. Line speaks text only, so hold is announcements with silence in between.
 - Like a real line, the caller can't talk over recorded prompts, but can interrupt the officer. Menu and hold prompts always play to the end, and speech that ends mid-prompt is dropped (logged as `ignored_speech_during_prompt`). Key presses register mid-prompt and take effect once the prompt finishes. The officer stops talking when interrupted and responds to what was said.
-- One fixed case. Any other receipt number gets "couldn't find a case".
+- One fixed case.

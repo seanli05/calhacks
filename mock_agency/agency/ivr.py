@@ -5,12 +5,13 @@ timeouts, and plays back the returned IvrTurn. Keeping it pure lets us test
 every path without a call.
 
 English only, like the line it mocks: no language menu and no interpreter option.
+It never asks for an identifier (receipt number, A-Number, date of birth): the
+phone agent may not give one (Plan.md C35), so only the officer asks, and the
+applicant answers in their own voice once bridged.
 
 Tree:
     MAIN_MENU      closed  1 status, 2 interview notice, 3 address, 4 work permit
     APPOINTMENT     closed  1 biometrics, 2 asylum interview, 3 naturalization
-    RECEIPT         open    say the receipt number, or key its 10 digits + #
-    RECEIPT_CONFIRM closed  yes/1 or no/2
     REASON          open    say why you're calling (speech only)
     ATTENDANCE      closed  1 attending as scheduled, 2 needs a new date
     -> transfer to hold, then a live officer
@@ -24,24 +25,17 @@ from agency.speech import (
     Topic,
     asks_for_human,
     classify_reason,
-    extract_receipt,
-    spell_out,
     spoken_digit,
-    yes_or_no,
 )
 from pydantic import BaseModel, Field
 
 MAX_NO_INPUT = 3
-MAX_RECEIPT_ATTEMPTS = 3
 MAX_REASON_ATTEMPTS = 2
-RECEIPT_KEYPAD_DIGITS = 10
 
 
 class Node(StrEnum):
     MAIN_MENU = "main_menu"
     APPOINTMENT = "appointment"
-    RECEIPT = "receipt"
-    RECEIPT_CONFIRM = "receipt_confirm"
     REASON = "reason"
     ATTENDANCE = "attendance"
     TRANSFERRED = "transferred"
@@ -59,22 +53,17 @@ class IvrTurn(BaseModel):
 class CallerInfo(BaseModel):
     """What the menu collected, handed to the officer at transfer."""
 
-    receipt_number: str | None = None
-    receipt_matched: bool = False
     reason_said: str | None = None
     topic: Topic | None = None
     wants_reschedule: bool | None = None
 
     def summary(self) -> str:
-        receipt = self.receipt_number or "not given"
-        matched = "matches the case record" if self.receipt_matched else "not matched"
         attendance = {
             True: "needs a new interview date",
             False: "plans to attend as scheduled",
             None: "not asked",
         }[self.wants_reschedule]
         return (
-            f"- Receipt number entered: {receipt} ({matched})\n"
             f'- Reason for calling, in their words: "{self.reason_said or "not given"}"\n'
             f"- Topic: {self.topic or 'unknown'}\n"
             f"- Attendance: {attendance}"
@@ -87,10 +76,7 @@ class PhoneTree:
         self.node = Node.MAIN_MENU
         self.info = CallerInfo()
         self._no_input_count = 0
-        self._receipt_attempts = 0
         self._reason_attempts = 0
-        self._keypad_buffer = ""
-        self._pending_receipt: str | None = None
 
     # --- inputs -------------------------------------------------------------
 
@@ -100,8 +86,6 @@ class PhoneTree:
     def press(self, key: str) -> IvrTurn:
         """Handle one DTMF key press."""
         self._no_input_count = 0
-        if self.node is Node.RECEIPT:
-            return self._receipt_key(key)
         if self.node is Node.REASON:
             return IvrTurn(lines=[prompts.REASON_NEEDS_SPEECH, prompts.REASON_PROMPT])
         return self._choose(key)
@@ -109,14 +93,8 @@ class PhoneTree:
     def hear(self, text: str) -> IvrTurn:
         """Handle one finished spoken turn."""
         self._no_input_count = 0
-        if self.node is Node.RECEIPT:
-            return self._receipt_spoken(text)
         if self.node is Node.REASON:
             return self._reason(text)
-        if self.node is Node.RECEIPT_CONFIRM:
-            answer = yes_or_no(text)
-            if answer is not None:
-                return self._choose("1" if answer else "2")
         if asks_for_human(text):
             return IvrTurn(lines=[prompts.HUMAN_NOT_YET, self._prompt()])
         digit = spoken_digit(text) or self._keyword_choice(text)
@@ -154,15 +132,9 @@ class PhoneTree:
             case Node.APPOINTMENT, "1" | "3":
                 return self._info_then_main(prompts.NOT_ASYLUM_INFO)
             case Node.APPOINTMENT, "2":
-                return self._go(Node.RECEIPT)
+                return self._go(Node.REASON)
             case Node.APPOINTMENT, "*":
                 return self._go(Node.MAIN_MENU)
-
-            case Node.RECEIPT_CONFIRM, "1":
-                return self._accept_receipt()
-            case Node.RECEIPT_CONFIRM, "2":
-                self._pending_receipt = None
-                return self._go(Node.RECEIPT)
 
             case Node.ATTENDANCE, "1" | "2":
                 self.info.wants_reschedule = key == "2"
@@ -206,51 +178,6 @@ class PhoneTree:
                 return key
         return None
 
-    # --- open-ended: receipt number ---------------------------------------------
-
-    def _receipt_key(self, key: str) -> IvrTurn:
-        if key.isdigit():
-            self._keypad_buffer += key
-            if len(self._keypad_buffer) < RECEIPT_KEYPAD_DIGITS:
-                return IvrTurn()
-        elif key != "#":
-            return IvrTurn()
-        entered, self._keypad_buffer = self._keypad_buffer, ""
-        if not entered:
-            return IvrTurn(lines=[prompts.RECEIPT_NOT_HEARD, prompts.RECEIPT_PROMPT])
-        return self._check_receipt(entered)
-
-    def _receipt_spoken(self, text: str) -> IvrTurn:
-        if asks_for_human(text) and extract_receipt(text) is None:
-            return IvrTurn(lines=[prompts.HUMAN_NOT_YET, prompts.RECEIPT_PROMPT])
-        receipt = extract_receipt(text)
-        if receipt is None:
-            return self._receipt_retry(prompts.RECEIPT_NOT_HEARD)
-        self._pending_receipt = receipt
-        self.node = Node.RECEIPT_CONFIRM
-        return IvrTurn(
-            lines=[prompts.RECEIPT_CONFIRM.format(spelled=spell_out(receipt))]
-        )
-
-    def _accept_receipt(self) -> IvrTurn:
-        receipt, self._pending_receipt = self._pending_receipt or "", None
-        return self._check_receipt(receipt)
-
-    def _check_receipt(self, receipt: str) -> IvrTurn:
-        """Match on the 10 digits; STT mishears letters far more often than digits."""
-        self.info.receipt_number = receipt
-        if receipt[-RECEIPT_KEYPAD_DIGITS:] == self.case.receipt_digits:
-            self.info.receipt_number = self.case.receipt_number
-            self.info.receipt_matched = True
-            return self._go(Node.REASON, before=[prompts.RECEIPT_FOUND])
-        return self._receipt_retry(prompts.RECEIPT_NOT_FOUND)
-
-    def _receipt_retry(self, problem: str) -> IvrTurn:
-        self._receipt_attempts += 1
-        if self._receipt_attempts >= MAX_RECEIPT_ATTEMPTS:
-            return self._go(Node.REASON, before=[problem, prompts.RECEIPT_GIVE_UP])
-        return self._go(Node.RECEIPT, before=[problem])
-
     # --- open-ended: reason for calling -----------------------------------------
 
     def _reason(self, text: str) -> IvrTurn:
@@ -273,10 +200,6 @@ class PhoneTree:
         return {
             Node.MAIN_MENU: prompts.MAIN_MENU,
             Node.APPOINTMENT: prompts.APPOINTMENT_MENU,
-            Node.RECEIPT: prompts.RECEIPT_PROMPT,
-            Node.RECEIPT_CONFIRM: prompts.RECEIPT_CONFIRM.format(
-                spelled=spell_out(self._pending_receipt or "")
-            ),
             Node.REASON: prompts.REASON_PROMPT,
             Node.ATTENDANCE: prompts.ATTENDANCE_MENU,
         }[self.node]
