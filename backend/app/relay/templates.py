@@ -14,13 +14,13 @@ from app.translation.script import for_display, local_digits
 LANGUAGES: tuple[LanguageCode, ...] = ("es", "en", "fa")
 """Supported languages, in the order the language menu lists them."""
 
+# No numbers to pick from (C45): the user writes the language, or just writes to us
+# in it. A number still works, in this order (decision 20 in whatsapp-pipe.md).
 _MENU = (
     "Hola 👋 Hello 👋 سلام\n"
     "¿En qué idioma prefiere que le escriba? / Which language would you like?\n"
     "به کدام زبان برایتان بنویسم؟\n"
-    "1 Español\n"
-    "2 English\n"
-    "3 دری"
+    "Español · English · دری"
 )
 
 # The end of every consent request: how the call works, then the choice.
@@ -60,17 +60,6 @@ _WANT_CALL_GENERIC = {
 _LEGAL_HELP_FA = "یک وکیل یا یک نمایندهٔ معتبر وزارت عدلیهٔ امریکا (DOJ)"
 
 TEMPLATES: dict[str, dict[LanguageCode, str]] = {
-    "language.confirm": {
-        "es": "Parece que habla español. ¿Seguimos en español?\n1 Sí\n2 Otro idioma",
-        "en": (
-            "It looks like you're writing in English. Shall we continue in English?\n"
-            "1 Yes\n2 Another language"
-        ),
-        "fa": (
-            "معلوم می‌شود که شما به دری می‌نویسید. به دری ادامه بدهیم؟\n"
-            "۱ بلی\n۲ زبان دیگر"
-        ),
-    },
     "language.menu": {"es": _MENU, "en": _MENU, "fa": _MENU},
     "language.set": {
         "es": (
@@ -86,18 +75,20 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "یا سوال خود را برایم بنویسید."
         ),
     },
+    # Also after a language read from the first message (C45), so it says in passing
+    # how to change it.
     "language.set_letter": {
         "es": (
-            "Perfecto, seguimos en español. Recibí su carta. Si tiene más páginas, "
-            "envíelas ahora."
+            "Gracias, recibí su carta. Le escribo en español; si le resulta más fácil "
+            "otro idioma, solo dígamelo. Si la carta tiene más páginas, envíelas ahora."
         ),
         "en": (
-            "Great, we'll continue in English. I got your letter. If it has more "
-            "pages, send them now."
+            "Thanks, I got your letter. I'll write in English; if another language is "
+            "easier, just tell me. If it has more pages, send them now."
         ),
         "fa": (
-            "خوب، به دری ادامه می‌دهیم. نامهٔ شما را گرفتم. اگر صفحه‌های بیشتر دارد، "
-            "حالا بفرستید."
+            "تشکر، نامهٔ شما را گرفتم. به دری برایتان می‌نویسم؛ اگر زبان دیگری برایتان "
+            "آسان‌تر است، فقط بگویید. اگر نامه صفحه‌های بیشتر دارد، حالا بفرستید."
         ),
     },
     # No question mark: a question invites a "no, that's it" that needs a turn.
@@ -211,18 +202,60 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         "en": "📅 Deadline: {date}.",
         "fa": "📅 مهلت: {date}.",
     },
-    "letter.checking": {
+    # C46: the letter is read; the explanation waits for the legitimacy check.
+    "letter.double_checking": {
         "es": (
-            "Ahora estoy verificando que la carta sea auténtica. "
-            "Le escribo en unos minutos."
+            "Gracias, ya leí su carta. Solo estoy verificando que de verdad venga "
+            "de USCIS. Le escribo en un momento."
         ),
         "en": (
-            "I'm now checking that this letter is legitimate. "
-            "I'll write again in a few minutes."
+            "Thank you, I've read your letter. I'm just double-checking that it "
+            "really comes from USCIS. I'll write again in a moment."
         ),
         "fa": (
-            "حالا بررسی می‌کنم که این نامه اصلی باشد. "
-            "چند دقیقه بعد دوباره برایتان می‌نویسم."
+            "تشکر، نامهٔ شما را خواندم. فقط بررسی می‌کنم که واقعاً از طرف ادارهٔ "
+            "USCIS باشد. چند لحظه بعد دوباره برایتان می‌نویسم."
+        ),
+    },
+    # C46: research's instant checks found signs of a scam. No explanation, never a
+    # call; the reasons come from the deep pass only if the user asks.
+    "letter.looks_like_scam": {
+        "es": (
+            "Gracias por enviármela. Me preocupa que esta carta sea una estafa: "
+            "tiene señales que las cartas reales de USCIS no tienen. Por favor, no "
+            "pague nada, no llame a ningún número de la carta y no dé sus datos. "
+            "Hizo bien en consultarlo primero. Escríbame si tiene preguntas."
+        ),
+        "en": (
+            "Thank you for sending this. I'm worried this letter may be a scam: it "
+            "has signs that real USCIS letters don't. Please don't pay anything, "
+            "don't call any number on it, and don't give out your details. You did "
+            "the right thing by checking first. Write to me if you have questions."
+        ),
+        "fa": (
+            "تشکر که این را فرستادید. نگران هستم که این نامه کلاهبرداری باشد: "
+            "نشانه‌هایی دارد که نامه‌های اصلی ادارهٔ USCIS ندارند. لطفاً هیچ پولی "
+            "پرداخت نکنید، به هیچ شماره‌ای در نامه زنگ نزنید و معلومات شخصی خود را "
+            "به کسی ندهید. خوب کردید که اول بررسی کردید. اگر سوالی دارید، برایم "
+            "بنویسید."
+        ),
+    },
+    # C46: the end of an explanation sent before the verdict came.
+    "letter.still_checking": {
+        "es": (
+            "⚠️ Todavía estoy verificando que esta carta de verdad venga de USCIS. "
+            "Hasta confirmarlo, por favor no pague nada ni llame a ningún número de "
+            "la carta. Le escribo cuando lo sepa."
+        ),
+        "en": (
+            "⚠️ I'm still checking that this letter really comes from USCIS. Until "
+            "I'm sure, please don't pay anything or call any number on it. I'll "
+            "write again when I know."
+        ),
+        "fa": (
+            "⚠️ هنوز بررسی می‌کنم که این نامه واقعاً از طرف ادارهٔ USCIS باشد. تا "
+            "وقتی مطمئن نشده‌ام، لطفاً هیچ پولی پرداخت نکنید و به هیچ شماره‌ای در "
+            "نامه زنگ نزنید. وقتی معلوم شد، دوباره برایتان می‌نویسم."
         ),
     },
     "letter.explain_failed": {
@@ -397,23 +430,24 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "اگر سوالی دارید، برایم بنویسید."
         ),
     },
-    # Plan.md → Failure rules: verification unknown. No call offer; explain and ask.
+    # Plan.md → Failure rules: verification unknown. No call offer, and a gentle
+    # caution; it ends the explanation, or follows it alone (C46).
     "verification.unknown": {
         "es": (
-            "No pude confirmar si esta carta es auténtica, así que todavía no le "
-            "ofrezco llamar a USCIS. Puedo explicarle lo que dice la carta, o usted "
-            "puede revisar su caso en uscis.gov. ¿Qué prefiere?"
+            "No pude confirmar que esta carta de verdad venga de USCIS, así que "
+            "todavía no le ofrezco llamar. Por precaución, no pague nada ni llame a "
+            "ningún número de la carta. Puede revisar su caso en uscis.gov."
         ),
         "en": (
-            "I couldn't confirm whether this letter is genuine, so I'm not offering "
-            "to call USCIS yet. I can explain what the letter says, or you can check "
-            "your case on uscis.gov. What would you like to do?"
+            "I couldn't confirm that this letter really comes from USCIS, so I won't "
+            "offer to call yet. To be safe, please don't pay anything or call any "
+            "number on it. You can check your case at uscis.gov."
         ),
         "fa": (
-            "نتوانستم تأیید کنم که این نامه اصلی است، به همین خاطر هنوز پیشنهاد "
-            "نمی‌کنم که با ادارهٔ USCIS تماس بگیرم. می‌توانم توضیح بدهم که نامه چه "
-            "می‌گوید، یا خود شما می‌توانید دوسیهٔ خود را در ویب سایت uscis.gov بررسی "
-            "کنید. کدام را می‌خواهید؟"
+            "نتوانستم تأیید کنم که این نامه واقعاً از طرف ادارهٔ USCIS است، به همین "
+            "خاطر هنوز پیشنهاد تماس نمی‌کنم. برای احتیاط، لطفاً هیچ پولی پرداخت "
+            "نکنید و به هیچ شماره‌ای در نامه زنگ نزنید. می‌توانید دوسیهٔ خود را در "
+            "ویب سایت uscis.gov بررسی کنید."
         ),
     },
     # Consent (Goal 6.3, C21). A YES covers one call; every call asks again.

@@ -1,22 +1,20 @@
 "use client";
 
 import { AssistantPanel } from "@/components/AssistantPanel";
-import { FeedList } from "@/components/FeedList";
 import { Header } from "@/components/Header";
 import { api } from "@/lib/api/client";
-import { useFeed, usePoll } from "@/lib/api/hooks";
+import { usePoll } from "@/lib/api/hooks";
 import { useLang, useStrings } from "@/lib/i18n";
 
 import { CaseCard } from "./CaseCard";
 import styles from "./CasesPage.module.css";
 
-/** My cases: active case cards and the user's history | assistant. */
+/** My cases: one card per active case (each opens the case) | assistant. */
 export function CasesPage({ userId }: { userId: string }) {
   const { lang } = useLang();
   const s = useStrings();
   const t = s.cases;
   const { data: cases, error } = usePoll(() => api.cases(userId, lang), `${userId}:${lang}`);
-  const { items } = useFeed(userId);
 
   return (
     <div className={styles.page}>
@@ -41,17 +39,6 @@ export function CasesPage({ userId }: { userId: string }) {
               ))}
             </ul>
           )}
-
-          <section className={`card ${styles.history}`} aria-labelledby="history-title">
-            <div className="label" id="history-title">
-              {t.history}
-            </div>
-            {items.length ? (
-              <FeedList items={items} className={styles.feed} />
-            ) : (
-              <p className={styles.status}>{t.historyEmpty}</p>
-            )}
-          </section>
         </div>
         <AssistantPanel userId={userId} />
       </main>

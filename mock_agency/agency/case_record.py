@@ -20,6 +20,9 @@ class MockCase(BaseModel):
     interview_time: str
     interview_office: str
     interview_address: str
+    reschedule_slots: list[str]
+    """Openings the officer can move the interview to on the call, same office.
+    Fixed, so the officer never invents a date and every take is the same."""
 
 
 DEMO_CASE = MockCase(
@@ -33,6 +36,10 @@ DEMO_CASE = MockCase(
     interview_time="8:30 AM",
     interview_office="Los Angeles Asylum Office",
     interview_address="1585 Corporate Drive, Tustin, California",
+    reschedule_slots=[
+        "Thursday, December 3, 2026 at 8:30 AM",
+        "Thursday, December 10, 2026 at 8:30 AM",
+    ],
 )
 """The default case. The backend's database seed and tests depend on it."""
 
@@ -48,6 +55,10 @@ SF_DEMO_CASE = DEMO_CASE.model_copy(
         "interview_address": (
             "75 Hawthorne Street, Suite 303S, San Francisco, California"
         ),
+        "reschedule_slots": [
+            "Wednesday, December 9, 2026 at 8:30 AM",
+            "Wednesday, December 16, 2026 at 8:30 AM",
+        ],
     }
 )
 """The demo video's case: demo/letters/i797c_mariam_namuna.png.

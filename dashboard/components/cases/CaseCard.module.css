@@ -34,6 +34,27 @@
 
 .bad {
   background: var(--coral-soft);
+  border-color: var(--coral);
+}
+
+/* A scam: the warning in place of the tracker. */
+.scam {
+  margin: 0;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--coral);
+  font-size: var(--fs-md);
+}
+
+.scam svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.scam b {
+  display: block;
+  font-size: var(--fs-lg);
 }
 
 .warn {

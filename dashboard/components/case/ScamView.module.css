@@ -1,0 +1,145 @@
+.scam {
+  align-self: start;
+  max-height: 100%;
+  border-color: var(--coral);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.head {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  padding: 26px 30px 24px;
+  background: var(--coral-soft);
+  border-bottom: 1px solid var(--coral);
+}
+
+.icon {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  background: var(--coral);
+  color: #fff;
+}
+
+.head h2 {
+  margin: 0;
+  font-size: var(--fs-hero);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+  color: var(--coral);
+  text-wrap: balance;
+}
+
+.head p {
+  margin: 10px 0 0;
+  font-size: var(--fs-lg);
+  max-width: 56ch;
+}
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 30px;
+  padding: 24px 30px;
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.flags,
+.dont {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.flags li,
+.dont li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-lg);
+  line-height: 1.4;
+}
+
+.flags small {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-sm);
+  color: var(--faint);
+}
+
+.n {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  background: var(--coral);
+  color: #fff;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  margin-top: 1px;
+}
+
+.dont li > svg {
+  color: var(--coral);
+  margin: 3px auto 0;
+}
+
+.report {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.foot {
+  margin: 0;
+  padding: 14px 30px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border-top: 1px solid var(--line);
+  background: var(--sunk);
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
+.foot svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--forest-2);
+}
+
+@media (max-width: 900px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .head,
+  .body,
+  .foot {
+    padding-inline: 18px;
+  }
+
+  .icon {
+    width: 40px;
+    height: 40px;
+  }
+}

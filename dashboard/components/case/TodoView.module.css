@@ -1,0 +1,294 @@
+/* Two columns on wide screens: what to do (when, checklist) | what it is (meaning, letter, numbers). */
+.grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: var(--gap);
+  align-items: start;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  min-width: 0;
+}
+
+/* When and where: the biggest type on the tab. */
+.when {
+  padding: 26px 30px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.date {
+  margin: 6px 0 0;
+  font-size: var(--fs-hero);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+.time {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: var(--fs-xl);
+  font-weight: 500;
+}
+
+.countdown {
+  font-size: var(--fs-sm);
+}
+
+.place {
+  margin: 6px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: var(--fs-lg);
+}
+
+.place a {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--forest-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.asks {
+  margin: 6px 0 0;
+  font-size: var(--fs-xl);
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.when small {
+  font-size: var(--fs-sm);
+  color: var(--faint);
+}
+
+/* Checklist. */
+.checklist {
+  padding: 20px 22px 14px;
+}
+
+.listHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.progress {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--forest-2);
+}
+
+.bar {
+  height: 4px;
+  margin: 12px 0 6px;
+  background: var(--line);
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  background: var(--forest-2);
+  transition: width 300ms ease;
+}
+
+.checklist ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.checklist li + li {
+  border-top: 1px solid var(--line);
+}
+
+.item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding: 14px 4px;
+  border: 0;
+  background: transparent;
+  text-align: start;
+  font-size: var(--fs-lg);
+}
+
+.box {
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid var(--line-strong);
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.item:hover .box {
+  border-color: var(--forest-2);
+}
+
+.done .box {
+  background: var(--forest-2);
+  border-color: var(--forest-2);
+}
+
+.itemText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.itemText small {
+  font-size: var(--fs-sm);
+  color: var(--faint);
+}
+
+.done .itemText {
+  color: var(--faint);
+  text-decoration: line-through;
+  text-decoration-color: var(--line-strong);
+}
+
+.kind {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--forest-2);
+}
+
+.must .kind {
+  color: var(--amber);
+}
+
+/* What the letter says. */
+.says {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.says p {
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: 1.5;
+}
+
+.says small {
+  font-size: var(--fs-sm);
+  color: var(--faint);
+}
+
+/* The letter: a row that opens it in the drawer. */
+.letter {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  text-align: start;
+}
+
+.letter:hover {
+  border-color: var(--forest-2);
+}
+
+.letterText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.letterText b {
+  font-size: var(--fs-lg);
+}
+
+.letterText span {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.open {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--forest-2);
+  white-space: nowrap;
+}
+
+/* Masked numbers. */
+.numbers {
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--sunk);
+}
+
+.numbers dl {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.numbers dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.numbers dt {
+  color: var(--muted);
+}
+
+.numbers dd {
+  margin: 0;
+}
+
+.numbers p {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  color: var(--faint);
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .when {
+    padding: 20px 18px 22px;
+  }
+
+  .checklist,
+  .says,
+  .numbers {
+    padding-inline: 16px;
+  }
+}

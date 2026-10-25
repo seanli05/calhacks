@@ -27,6 +27,8 @@ import type {
 
 export const FIXTURE_USER_ID = "user_demo000000000001";
 export const FIXTURE_CASE_ID = "case_demo000000000001";
+/** A second, made-up letter that research flagged as a scam. */
+const SCAM_CASE_ID = "case_demo000000000002";
 const CALL_ID = "call_demo000000000001";
 const DOC_ID = "doc_demo0000000000001";
 const TRANSCRIPT_ID = "transcript_demo000000001";
@@ -257,10 +259,52 @@ export function cases(_userId: string, lang: string): CaseSummary[] {
       thumbnail_media_id: deletedDocument ? null : LETTER_MEDIA_ID,
       created_at: min(-2 * 24 * 60),
     },
+    {
+      id: SCAM_CASE_ID,
+      doc_type: null,
+      stage: "suspicious",
+      deadline: null,
+      appointment: null,
+      latest_call: null,
+      thumbnail_media_id: null,
+      created_at: min(-5 * 60),
+    },
   ];
 }
 
+function scamDetail(lang: string): CaseDetail {
+  return {
+    id: SCAM_CASE_ID,
+    user_id: FIXTURE_USER_ID,
+    doc_type: null,
+    issuer: "USCIS",
+    stage: "suspicious",
+    deadline: null,
+    urgency: "high",
+    document_id: null,
+    page_media_ids: [],
+    explanation: null,
+    what_is_asked: null,
+    appointment: null,
+    checklist: [],
+    refs: [],
+    verification: {
+      status: "suspicious",
+      evidence: ["https://www.uscis.gov/scams-fraud-and-misconduct/avoid-scams/common-scams"],
+      red_flags: [
+        L(lang, "Pide pagar una multa con tarjetas de regalo. USCIS nunca acepta tarjetas de regalo.", "It asks you to pay a fine with gift cards. USCIS never takes gift cards."),
+        L(lang, "El teléfono de la carta no es un número de USCIS.", "The phone number on the letter isn't a USCIS number."),
+        L(lang, "Amenaza con deportarte en 48 horas si no pagas.", "It threatens deportation within 48 hours if you don't pay."),
+        L(lang, "El número de recibo no tiene el formato de USCIS.", "The receipt number doesn't match the USCIS format."),
+      ],
+    },
+    brief: null,
+    calls: [],
+  };
+}
+
 export function caseDetail(caseId: string, lang: string): CaseDetail {
+  if (caseId === SCAM_CASE_ID) return scamDetail(lang);
   const c = call(lang);
   return {
     id: caseId,

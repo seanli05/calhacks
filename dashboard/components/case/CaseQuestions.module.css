@@ -1,0 +1,50 @@
+.ask {
+  flex: none;
+  padding: 18px 22px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ask ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.q {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: var(--fs-md);
+  font-weight: 500;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.q:hover {
+  border-color: var(--forest-2);
+  background: var(--sunk);
+}
+
+.go {
+  flex: none;
+  color: var(--forest-2);
+  font-weight: 600;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
