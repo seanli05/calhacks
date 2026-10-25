@@ -66,7 +66,7 @@ npm run dev     # http://localhost:3000, against the backend on :8000
 NEXT_PUBLIC_DATA=fixtures npm run dev   # on fake data, no backend needed
 ```
 
-For the demo, set `NEXT_PUBLIC_DEMO_USERS` in `dashboard/.env.local` (see `dashboard/.env.example`) to show "Already have a dashboard?" on the landing page, one link per demo account. The IDs survive `app.db.reset --keep-users`; restart the dashboard after changing it.
+For the demo, set `NEXT_PUBLIC_MARIAM_HOST_DASHBOARD` and `NEXT_PUBLIC_ANA_HOST_DASHBOARD` in `dashboard/.env.local` (a user ID or a dashboard URL; see `dashboard/.env.example`) to show "Already have a dashboard?" in the landing page's top bar. The IDs survive `app.db.reset --keep-users`; restart the dashboard after changing it.
 
 ### Using the database
 

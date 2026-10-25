@@ -32,7 +32,7 @@ export function DashboardMenu({ users }: { users: DemoUser[] }) {
       <summary>{t.dashboards.prompt}</summary>
       <div className={styles.list}>
         {users.map((user) => (
-          <Link key={user.userId} href={`/u/${user.userId}`} className={styles.account}>
+          <Link key={user.href} href={user.href} className={styles.account}>
             <span dir="auto">{user.label}</span>
             <Icon name="arrow" size={15} />
           </Link>
