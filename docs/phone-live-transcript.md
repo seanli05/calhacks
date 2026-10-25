@@ -6,7 +6,7 @@
 
 The case view now has a live call screen. Once the user is bridged, both sides of the call show up line by line in the user's language, with the translation streaming in word by word, tips for what to say, and a searchable translation book. The dashboard API reads it from the call's `transcripts` row ([dashboard-api.md → Live call](specs/dashboard-api.md#live-call)).
 
-Today the runner writes that row once, at wrap-up (`runner.py`, `_wrap_up`). During the call the row doesn't exist, so the live screen stays empty.
+Today the runner writes that row once, at wrap-up (`runner.py`, `_wrap_up`). During the call the row doesn't exist, so the live screen never appears: the case view waits for the first line and keeps showing the activity feed until then. This change is the last piece of live translation; everything else is merged on the dashboard side.
 
 ## What I'd like changed
 
