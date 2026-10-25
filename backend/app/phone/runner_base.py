@@ -14,6 +14,7 @@ from app.contracts import CallJob, EventType
 from app.contracts.common import CallId, CallState, JobId
 from app.phone import phase
 from app.phone.call_events import CallEvents
+from app.phone.clock import with_timeout
 from app.phone.executor import MenuExecutor, Sent
 from app.phone.line import Heard, NonSpeech, Overheard
 from app.phone.llm import LlmClient
@@ -39,6 +40,10 @@ from app.phone.state import CallStateMachine, Trigger
 logger = logging.getLogger("app.phone.runner")
 
 S = CallState
+
+_LIVE_STATES = frozenset({S.BRIDGING, S.CONNECTED})
+"""While the applicant is joining or on the call, the dashboard follows the
+transcript live (docs/specs/phone-ports.md → The runner)."""
 
 
 class RunnerBase:
@@ -77,6 +82,8 @@ class RunnerBase:
         self.step = StepDraft(0.0, "start", S.DIALING)
 
         self.transcript: list[TranscriptLine] = []
+        self._live_save: asyncio.Task[None] | None = None
+        self._transcript_dirty = False
         self.heard_history: list[HeardTurn] = []
         self.menu_history: list[MenuTurn] = []
         self.menu_buffer: list[str] = []
@@ -167,6 +174,45 @@ class RunnerBase:
         self.transcript.append(
             TranscriptLine(at=self.clock.now(), speaker=speaker, text=text)
         )
+        if self.sm.state in _LIVE_STATES:
+            self._save_transcript_soon()
+
+    def _save_transcript_soon(self) -> None:
+        """Save the transcript in the background, so the dashboard's live view sees
+        each line as it's heard. One save at a time: lines that arrive during a save
+        go in the next one. Wrap-up still writes the final transcript."""
+        self._transcript_dirty = True
+        if self._live_save is None or self._live_save.done():
+            self._live_save = asyncio.create_task(self._save_live())
+
+    async def _save_live(self) -> None:
+        while self._transcript_dirty:
+            self._transcript_dirty = False
+            try:
+                await with_timeout(
+                    self.clock,
+                    self.deps.calls.save_transcript(
+                        self.call_id, list(self.transcript)
+                    ),
+                    self.config.cleanup_timeout_s,
+                )
+            except Exception:
+                # Only the live view misses out; wrap-up saves the whole transcript.
+                logger.warning(
+                    "live transcript save failed (%s)", self._ids(), exc_info=True
+                )
+                return
+
+    async def _settle_live_save(self, *, cancel: bool) -> None:
+        """Let a live save finish (or cancel it) before the final save, so an older
+        copy can't land after it."""
+        task, self._live_save = self._live_save, None
+        self._transcript_dirty = False
+        if task is None:
+            return
+        if cancel:
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
 
     def _sent(self, sent: Sent) -> None:
         self._said("agent", sent.out)

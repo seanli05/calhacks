@@ -39,7 +39,7 @@ The call runner talks to the outside world only through the Protocols in `ports.
 
 Files: `runner.py` (lifecycle, dispatch, hold, the person, the bridge), `runner_menu.py` (menu and ask_user), `runner_base.py` (shared state, logging, classify, transcript, observer), `runner_parts.py` (config, inbox inputs, timers), `executor.py` (C37), `call_lines.py` (the fixed lines to the rep), `report.py` (the P3 builder; below), `observe.py` (`StepRecord`).
 
-**Shape.** One inbox, one handler at a time. A pump task reads `events()` and stamps each event on arrival; the ask_user task and the timers (hold limit, user-answer backstop, menu budget, menu quiet, turn backstop) only post to the inbox. Model calls are awaited inside a handler, and whatever arrives meanwhile waits. Wrap-up is a `finally`: every exit (hang-up, timeout, crash) cancels the background work, hangs up, saves the transcript and the report, and fires `REPORT_SAVED`.
+**Shape.** One inbox, one handler at a time. A pump task reads `events()` and stamps each event on arrival; the ask_user task and the timers (hold limit, user-answer backstop, menu budget, menu quiet, turn backstop) only post to the inbox. Model calls are awaited inside a handler, and whatever arrives meanwhile waits. While `bridging` or `connected`, each new transcript line also saves the transcript in the background, so the dashboard's live call view can follow it: one save at a time (lines that arrive during a save go into the next one), and a failed save is logged and dropped. Wrap-up is a `finally`: every exit (hang-up, timeout, crash) cancels the background work, hangs up, lets a live transcript save finish, saves the transcript and the report, and fires `REPORT_SAVED`.
 
 **Policies** (numbers in `RunnerConfig`; first guesses, to tune on real lines):
 
@@ -56,7 +56,7 @@ Files: `runner.py` (lifecycle, dispatch, hold, the person, the bridge), `runner_
 | Menu gives up | Over 8 min in menus, or "representative" a 4th time in one menu stretch → `AGENT_ABORTED` |
 | Person | Ring the applicant at once (< 5 s) and say the intro meanwhile; `USER_DIALED` once ringing. So `FALSE_HUMAN` almost never fires: 1c's thresholds are the defense, and after the ring a transfer just means the applicant waits on hold too |
 | Bridging | The intro and holding lines play in the background, so the applicant joining (or not) is acted on at once and cuts them short. Rep speech gets one fixed holding line, at most twice, ≥ 8 s apart, never over a line still playing. `UserUnreachable` (or the 75 s backstop: 30 s ringing plus the join gate) → the call-back line, then hang up |
-| Connected | `Overheard` lines from the forks go into the transcript as `agency` / `user`; nothing else is decided |
+| Connected | `Overheard` lines from the forks go into the transcript as `agency` / `user`, saved as they arrive; nothing else is decided |
 | Blocked identifier | Nothing sent, flagged; a second in a row says "representative" instead |
 | Unexpected error | `AGENT_ABORTED` and wrap-up. With the applicant on (no abort from `connected`), the bridge stays up and the runner only watches for the end |
 | `events()` ends unannounced | As a hang-up (`CALL_FINISHED` when connected) |

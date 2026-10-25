@@ -53,7 +53,7 @@ Conventions:
 - Each new agency or user line: `line` (the English as heard), then `delta`s with its translation streamed from `MODEL_FAST` (prompt in `live_prompts.py`, grounded in the glossary terms it uses), then `done`. English, no key, or a failure before the first token sends the line as heard in one `delta`.
 - Tips (`live_tips.py`) are rule-based, no model call, so rule 1 holds: `ask` is the next of the brief's `questions_to_ask`, one open at a time, after an agency line; `yourself` follows an agency line that asks about the applicant's identity and never carries an answer (rule 3). `tip_used` when the user's line says most of the question's words (any reply, for `yourself`).
 - A reconnect replays the call from the start; finished translations are cached in memory, so the replay makes no model calls. The dashboard folds replayed lines into what it has.
-- Lines only appear as the phone agent saves them. It saves the transcript once, at wrap-up, today; for a live view it has to save as each line is heard (`writes.phone.save_transcript` already allows that).
+- Lines only appear as the phone agent saves them. From `bridging` on it saves the transcript in the background as each line is heard, then once more in full at wrap-up.
 
 ### Feed rendering
 
