@@ -78,7 +78,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "yourself": "This question is for you: answer it yourself. We never answer for you.",
     },
     "es": {
-        "yourself": "Esta pregunta es para ti: contéstala tú. Nosotros nunca respondemos por ti.",
+        "yourself": (
+            "Esta pregunta es para usted: contéstela usted. "
+            "Nosotros nunca respondemos por usted."
+        ),
+    },
+    "fa": {
+        "yourself": (
+            "این سوال از شماست: خودتان جواب بدهید. ما هرگز به جای شما جواب نمی‌دهیم."
+        ),
     },
 }
 

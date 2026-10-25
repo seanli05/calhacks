@@ -93,7 +93,7 @@ def test_memory_lists_facts_documents_and_transcripts(
     body = client.get(f"/api/users/{user.id}/memory").json()
     assert body["profile"] == {"household_size": "3"}
     assert body["facts"][0]["fact"] == {
-        "text": "Prefieres mensajes de voz",
+        "text": "Prefiere mensajes de voz",
         "en": "Prefers voice notes",
     }
     assert body["documents"][0] | {"created_at": None} == {

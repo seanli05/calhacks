@@ -9,7 +9,7 @@ import { MiniLetter } from "@/components/MiniLetter";
 import { api, ApiError } from "@/lib/api/client";
 import { useFeed, useNow, usePoll } from "@/lib/api/hooks";
 import type { Memory } from "@/lib/api/types";
-import { relativeTime, shortDate } from "@/lib/format";
+import { formatNumber, relativeTime, shortDate } from "@/lib/format";
 import { useLang, useStrings } from "@/lib/i18n";
 import { englishBelow } from "@/lib/localized";
 
@@ -146,7 +146,7 @@ export function MemoryView({ userId }: { userId: string }) {
                   {Object.entries(memory.profile).map(([k, v]) => (
                     <div key={k}>
                       <dt>{t.profileFields[k] ?? k}</dt>
-                      <dd>{v}</dd>
+                      <dd dir="auto">{/^\d+$/.test(v) ? formatNumber(Number(v), lang) : v}</dd>
                     </div>
                   ))}
                 </dl>

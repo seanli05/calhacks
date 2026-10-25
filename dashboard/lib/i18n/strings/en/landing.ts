@@ -165,7 +165,7 @@ export const landing = {
       { title: "Your letter, explained", body: "Avocado reads the letter, explains it in your language, and checks that it's real on the official website. Then it asks if you'd like a call." },
       { title: "You say yes, Avocado calls", body: "With your OK, Avocado calls the official number and gets through the phone menu for you." },
       { title: "Avocado waits on hold", body: "You don't have to wait by the phone. You can see what's happening, live." },
-      { title: "Your phone rings", body: "When a person answers, Avocado rings you to join, with live translation and what you can say." },
+      { title: "Your phone rings", body: "When a person answers, Avocado rings you to join, and translates what they say, live." },
       { title: "You get a summary", body: "After the call, you get what was said and your next steps, in your language." },
     ],
   },

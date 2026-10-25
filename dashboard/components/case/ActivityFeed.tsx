@@ -67,7 +67,7 @@ function PlainItem({ item, now, last }: { item: FeedItem; now: number; last: boo
       <span className={styles.ic}>
         <Icon name={iconForEvent(item.type)} />
       </span>
-      <span className={styles.what}>
+      <span className={styles.what} dir="auto">
         {item.text.text}
         {item.deleted_at && <span className={styles.deleted}> {t.deleted(shortDate(item.deleted_at, lang))}</span>}
         {englishBelow(item.text, lang) && <small>{item.text.en}</small>}
@@ -97,7 +97,7 @@ function TaskCard({ task, now }: { task: Task; now: number }) {
   }, [task.running, touched]);
 
   const warn = !task.running && (iconForEvent(task.title.type) === "warn" || task.title.type.endsWith("_failed"));
-  const time = elapsed(task.startedAt, task.running ? now : Date.parse(task.endedAt));
+  const time = elapsed(task.startedAt, task.running ? now : Date.parse(task.endedAt), lang);
   const meta = [t.steps(task.steps), time, !task.running && !open ? t.show : null].filter(Boolean).join(" · ");
   const bodyId = `${task.id}-steps`;
 
@@ -117,7 +117,7 @@ function TaskCard({ task, now }: { task: Task; now: number }) {
         <span className={`${styles.badge} ${task.running ? "" : warn ? styles.badgeWarn : styles.badgeDone}`}>
           {task.running ? <span className={styles.spin} aria-hidden="true" /> : <Icon name={warn ? "warn" : "check"} size={14} />}
         </span>
-        <span className={styles.title}>
+        <span className={styles.title} dir="auto">
           <span className={task.running ? styles.shimmer : ""}>{task.title.text.text}</span>
           {englishBelow(task.title.text, lang) && <small>{task.title.text.en}</small>}
         </span>
@@ -155,7 +155,7 @@ function StepRow({ row, active }: { row: FeedItem; active: boolean }) {
         <span className={styles.ri}>
           <Icon name={icon} size={14} />
         </span>
-        <span className={styles.newsText}>
+        <span className={styles.newsText} dir="auto">
           {row.text.text}
           {englishBelow(row.text, lang) && <small>{row.text.en}</small>}
         </span>
@@ -169,12 +169,20 @@ function StepRow({ row, active }: { row: FeedItem; active: boolean }) {
       <span className={styles.ri}>
         <Icon name={icon} size={14} />
       </span>
-      <span className={styles.action}>{step.action.text}</span>
-      <span className={styles.detail}>{step.detail}</span>
+      <span className={styles.action} dir="auto">
+        {step.action.text}
+      </span>
+      <span className={styles.detail} lang="en">
+        {step.detail}
+      </span>
       {active ? (
         <span className={styles.spin} aria-hidden="true" />
       ) : (
-        step.result && <span className={`${styles.result} ${tone}`}>{step.result.text}</span>
+        step.result && (
+          <span className={`${styles.result} ${tone}`} dir="auto">
+            {step.result.text}
+          </span>
+        )
       )}
       {step.reason && (
         <span className={styles.why} lang="en">

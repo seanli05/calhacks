@@ -21,6 +21,7 @@ from urllib.parse import urlsplit
 from app.api.common import localize
 from app.api.models import FeedStep, Localized
 from app.contracts import Event
+from app.translation.script import local_digits
 
 STEP_TYPES = frozenset(
     {"research.search", "research.fetch", "research.check", "call.menu_heard"}
@@ -32,29 +33,29 @@ MAX_REASON = 280
 _DIGIT_RUN = re.compile(r"\d[\d\s-]{5,}\d")
 _REF = re.compile(r"<ref:[^>]*>")
 
-Pair = tuple[str, str]
-"""(English, Spanish). Other languages go through the translation cache, like the
-feed templates."""
+Pair = tuple[str, str, str]
+"""(English, Spanish, Dari). Other languages go through the translation cache, like
+the feed templates."""
 
-SEARCHING: Pair = ("Searching", "Buscando")
-READING: Pair = ("Reading", "Leyendo")
-CHECKING: Pair = ("Checking", "Comprobando")
-LISTENING: Pair = ("Listening", "Escuchando")
+SEARCHING: Pair = ("Searching", "Buscando", "جستجو")
+READING: Pair = ("Reading", "Leyendo", "خواندن")
+CHECKING: Pair = ("Checking", "Comprobando", "بررسی")
+LISTENING: Pair = ("Listening", "Escuchando", "شنیدن")
 
-FAILED: Pair = ("failed", "falló")
-BLOCKED: Pair = ("blocked", "bloqueada")
-READ: Pair = ("read", "leída")
+FAILED: Pair = ("failed", "falló", "ناکام شد")
+BLOCKED: Pair = ("blocked", "bloqueada", "باز نشد")
+READ: Pair = ("read", "leída", "خوانده شد")
 
 STATES: dict[str, tuple[Pair, bool | None]] = {
-    "match": (("matches", "coincide"), True),
-    "not_found": (("not found", "no aparece"), None),
-    "conflict": (("doesn't match", "no coincide"), False),
-    "uncertain": (("unclear", "no está claro"), None),
+    "match": (("matches", "coincide", "مطابقت دارد"), True),
+    "not_found": (("not found", "no aparece", "پیدا نشد"), None),
+    "conflict": (("doesn't match", "no coincide", "مطابقت ندارد"), False),
+    "uncertain": (("unclear", "no está claro", "واضح نیست"), None),
 }
 VERDICTS: dict[str, tuple[Pair, bool | None]] = {
-    "verified": (("real", "real"), True),
-    "suspicious": (("suspicious", "sospechosa"), False),
-    "unknown": (("unconfirmed", "sin confirmar"), None),
+    "verified": (("real", "real", "اصلی"), True),
+    "suspicious": (("suspicious", "sospechosa", "مشکوک"), False),
+    "unknown": (("unconfirmed", "sin confirmar", "تأیید نشده"), None),
 }
 CHECKS: dict[str, str] = {
     "scam_rules": "scam patterns",
@@ -83,21 +84,27 @@ PHASES: dict[str, str] = {
     "unclear": "the line",
 }
 ACTIONS: dict[str, Pair] = {
-    "press": ("press a key", "marcar"),
-    "say": ("answer", "responder"),
-    "wait": ("wait", "esperar"),
-    "ask_user": ("ask you", "preguntarte"),
+    "press": ("press a key", "marcar", "فشار دادن دکمه"),
+    "say": ("answer", "responder", "جواب دادن"),
+    "wait": ("wait", "esperar", "انتظار"),
+    "ask_user": ("ask you", "preguntarle", "پرسیدن از شما"),
 }
 
 LETTER_READ: dict[str, tuple[Pair, bool | None]] = {
-    "ok": (("read", "leída"), True),
-    "needs_better_image": (("needs a better photo", "necesita otra foto"), False),
-    "needs_user_input": (("needs your answer", "necesita tu respuesta"), None),
+    "ok": (("read", "leída", "خوانده شد"), True),
+    "needs_better_image": (
+        ("needs a better photo", "necesita otra foto", "عکس بهتر ضرورت است"),
+        False,
+    ),
+    "needs_user_input": (
+        ("needs your answer", "necesita su respuesta", "جواب شما ضرورت است"),
+        None,
+    ),
 }
 URGENCY: dict[str, Pair] = {
-    "high": ("high", "alta"),
-    "medium": ("medium", "media"),
-    "low": ("low", "baja"),
+    "high": ("high", "alta", "زیاد"),
+    "medium": ("medium", "media", "متوسط"),
+    "low": ("low", "baja", "کم"),
 }
 
 NO_RED_FLAGS = (
@@ -193,32 +200,43 @@ def _check(data: dict[str, Any], lang: str) -> FeedStep:
         result = (
             f"{flags} red flag{'' if flags == 1 else 's'}",
             f"{flags} alerta{'' if flags == 1 else 's'}",
+            f"{local_digits(str(flags), 'fa')} نشانهٔ خطر",
         )
         ok = flags == 0
     elif name == "verdict" and data.get("status") in VERDICTS:
         result, ok = VERDICTS[data["status"]]
     elif name == "discovery":
-        result, ok = ("stopped", "se detuvo"), False
+        result, ok = ("stopped", "se detuvo", "متوقف شد"), False
     elif name in {"verify_cache", "seed_snapshot"}:
         used = data.get("ok", True) is not False
-        result, ok = (("used", "usada"), True) if used else (("none", "no hay"), None)
+        result, ok = (
+            (("used", "usada", "استفاده شد"), True)
+            if used
+            else (("none", "no hay", "نیست"), None)
+        )
     elif name == "submission":
-        result, ok = ("received", "recibido"), None
+        result, ok = ("received", "recibido", "رسید"), None
     elif name == "letter_read" and data.get("status") in LETTER_READ:
         result, ok = LETTER_READ[data["status"]]
     elif name == "private_values" and isinstance(data.get("count"), int):
         count = data["count"]
-        result, ok = (f"{count} set aside", f"{count} apartados"), None
+        fa_count = local_digits(str(count), "fa")
+        result = (f"{count} set aside", f"{count} apartados", f"{fa_count} جدا شد")
+        ok = None
     elif name == "urgency" and data.get("urgency") in URGENCY:
         result, ok = URGENCY[data["urgency"]], None
     elif name == "asylum_gate":
-        result, ok = ("declined", "no se investiga"), None
+        result, ok = ("declined", "no se investiga", "جستجو نمی‌شود"), None
     elif name == "quote_on_page" and isinstance(data.get("passed"), bool):
         passed = data["passed"]
-        result = ("found", "encontrada") if passed else ("not found", "no aparece")
+        result = (
+            ("found", "encontrada", "پیدا شد")
+            if passed
+            else ("not found", "no aparece", "پیدا نشد")
+        )
         ok = passed
     elif name == "question_loop":
-        result, ok = ("stopped", "se detuvo"), False
+        result, ok = ("stopped", "se detuvo", "متوقف شد"), False
     elif data.get("state") in STATES:
         result, ok = STATES[data["state"]]
     return _step(CHECKING, detail, result, ok, lang, _check_reason(name, data))
@@ -289,9 +307,11 @@ def _masked(reason: str | None) -> str | None:
 
 
 def _localized(pair: Pair, lang: str) -> Localized:
-    en, es = pair
+    en, es, fa = pair
     if lang == "es":
         return Localized(text=es, en=en)
+    if lang == "fa":
+        return Localized(text=fa, en=en)
     return localize(en, lang)
 
 

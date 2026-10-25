@@ -74,6 +74,9 @@ const PATHS = {
 
 export type IconName = keyof typeof PATHS;
 
+/** Icons that point along the line, so they mirror on right-to-left pages. */
+const DIRECTIONAL: ReadonlySet<IconName> = new Set(["arrow"]);
+
 export function Icon({ name, size = 17 }: { name: IconName; size?: number }) {
   return (
     <svg
@@ -86,6 +89,7 @@ export function Icon({ name, size = 17 }: { name: IconName; size?: number }) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
+      className={DIRECTIONAL.has(name) ? "flip-rtl" : undefined}
       style={{ flex: "none" }}
     >
       {PATHS[name]}

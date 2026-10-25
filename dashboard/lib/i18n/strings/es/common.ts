@@ -1,5 +1,6 @@
 import type { CommonStrings } from "../en/common";
 
+/** US Spanish with formal usted, the register of every WhatsApp template (Plan.md). */
 export const common: CommonStrings = {
   appName: "Avocado",
   nav: {
@@ -16,14 +17,14 @@ export const common: CommonStrings = {
   docTypeFallback: "Carta",
   stages: {
     received: "Carta recibida",
-    explaining: "Leyendo tu carta",
+    explaining: "Leyendo su carta",
     needs_better_image: "Necesitamos otra foto",
     needs_answer: "Falta una respuesta",
     checking: "Verificando la carta",
     suspicious: "Podría no ser real",
     unknown: "No pudimos confirmarla",
     verified: "Carta verificada",
-    awaiting_consent: "Esperando tu permiso",
+    awaiting_consent: "Esperando su permiso",
     calling: "Llamando",
     on_hold: "En espera",
     connected: "Hablando con una persona",
@@ -34,11 +35,12 @@ export const common: CommonStrings = {
   assistant: {
     title: "Asistente",
     viaWhatsApp: "por WhatsApp",
-    placeholder: "Pregunta lo que quieras…",
+    placeholder: "Pregunte lo que quiera…",
     send: "Abrir en WhatsApp",
-    you: "Tú",
+    you: "Usted",
   },
   deleted: (date: string) => `(borrado el ${date})`,
+  quote: (text: string) => `“${text}”`,
   loading: "Cargando…",
   loadError: "No podemos conectar con el servidor. Reintentando…",
   notFound: "No encontramos eso.",

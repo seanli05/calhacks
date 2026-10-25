@@ -2,6 +2,7 @@
 
 import { Icon } from "@/components/Icon";
 import type { CaseDetail } from "@/lib/api/types";
+import { formatNumber } from "@/lib/format";
 import { useLang, useStrings } from "@/lib/i18n";
 import { englishBelow } from "@/lib/localized";
 
@@ -40,8 +41,8 @@ export function ScamView({ detail }: { detail: CaseDetail }) {
             <ol className={styles.flags}>
               {flags.map((f, i) => (
                 <li key={i}>
-                  <span className={styles.n}>{i + 1}</span>
-                  <span>
+                  <span className={styles.n}>{formatNumber(i + 1, lang)}</span>
+                  <span dir="auto">
                     {f.text}
                     {englishBelow(f, lang) && <small>{f.en}</small>}
                   </span>

@@ -6,6 +6,8 @@ export const caseView = {
   where: "Where",
   kinds: { who_must_come: "Required", bring: "Bring", deadline: "Deadline" },
   agencyFallback: "the agency",
+  /** The agency as the headlines name it ("USCIS"); Dari says «ادارهٔ USCIS». */
+  agencyName: (issuer: string) => issuer,
   refs: { receipt_number: "Receipt", a_number: "A-Number" } as Record<string, string>,
   verdict: {
     verified: "This letter is real",

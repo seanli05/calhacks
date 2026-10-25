@@ -60,7 +60,7 @@ def _texts(client: TestClient, query: str = "") -> list[dict]:
 
 def test_every_type_ends_with_a_variant_without_fields() -> None:
     for event_type, variants in TEMPLATES.items():
-        assert "en" in variants and "es" in variants, event_type
+        assert {"en", "es", "fa"} <= variants.keys(), event_type
         for lang_variants in variants.values():
             assert not fields_of(lang_variants[-1]), event_type
 
@@ -70,6 +70,17 @@ def test_template_renders_in_spanish_from_data(monkeypatch: pytest.MonkeyPatch) 
     (item,) = _texts(client)
     assert item["text"] == {
         "text": "Elegimos la opción 2 del menú",
+        "en": "We chose option 2 in the menu",
+    }
+
+
+def test_template_renders_in_dari_with_persian_digits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _serve(monkeypatch, [_event(EventType.CALL_MENU_CHOICE, digit="2")])
+    (item,) = _texts(client, "?lang=fa")
+    assert item["text"] == {
+        "text": "در سیستم تیلفونی گزینهٔ ۲ را انتخاب کردیم",
         "en": "We chose option 2 in the menu",
     }
 
@@ -103,7 +114,7 @@ def test_fact_text_is_looked_up_at_render_time(monkeypatch: pytest.MonkeyPatch) 
     )
     (item,) = _texts(client)
     assert item["text"] == {
-        "text": "Guardamos: Vives en el condado de Los Ángeles",
+        "text": "Guardamos: Vive en el condado de Los Ángeles",
         "en": "Saved: Lives in Los Angeles County",
     }
     assert item["deleted_at"] is None
@@ -116,9 +127,9 @@ def test_deleted_fact_renders_with_deleted_at_and_without_text(
     deleted = _event(EventType.FACT_DELETED, fact_id="fact_gone")
     client = _serve(monkeypatch, [saved, deleted])
     first, second = _texts(client)
-    assert first["text"]["text"] == "Guardamos un dato sobre ti"
+    assert first["text"]["text"] == "Guardamos un dato sobre usted"
     assert first["deleted_at"] == deleted.created_at.isoformat().replace("+00:00", "Z")
-    assert second["text"]["text"] == "Borraste un dato"
+    assert second["text"]["text"] == "Usted borró un dato"
     assert second["deleted_at"] is None
 
 
@@ -289,10 +300,10 @@ def test_a_language_without_templates_goes_through_the_translator(
         _event(EventType.CONSENT_GIVEN),
         _event(EventType.RESEARCH_SEARCH, query="USCIS phone"),
     ]
-    consent, search = _texts(_serve(monkeypatch, events), "?lang=fa&steps=true")
+    consent, search = _texts(_serve(monkeypatch, events), "?lang=ne&steps=true")
     assert consent["text"] == {
-        "text": "[fa] You said yes to the call",
+        "text": "[ne] You said yes to the call",
         "en": "You said yes to the call",
     }
-    assert search["step"]["action"]["text"] == "[fa] Searching"
+    assert search["step"]["action"]["text"] == "[ne] Searching"
     assert search["step"]["detail"] == '"USCIS phone"'
