@@ -16,12 +16,12 @@ Before each session: ngrok up, `PUBLIC_BASE_URL` matches it, backend stopped, an
 
 ## The bridge (Two phones)
 
-Every way to miss the ring (B2–B5) now rings the friend a second time first: you hear "I'm calling them again", and only a second miss gets the call-back line. B2–B5 test the join gate (`PHONE_JOIN_GATE=true`, the default); G1 tests the demo's `--no-gate`.
+The friend's phone rings for 15 s at most (C42). Every way to miss the ring (B2–B5) now rings the friend a second time first: you hear "I'm calling them again", and only a second miss gets the call-back line. B2–B5 test the join gate (`PHONE_JOIN_GATE=true`, the default); G1 tests the demo's `--no-gate`.
 
 | # | You (agency) | Friend (applicant) | Expect | Status |
 |---|---|---|---|---|
 | B1 | Greet like a rep | Answers, presses a key | Ring < 5 s after your greeting; you hear the intro; you're connected; the transcript shows `agency:` / `user:` lines | ✅ 2026-10-24 |
-| B2 | Greet like a rep | Declines | Within ~55 s you hear "the account holder will call back", then your call ends. Outcome `user_unreachable`, reason `no_key_press` (carrier voicemail took the call) or `busy` | |
+| B2 | Greet like a rep | Declines (both rings) | After the second missed ring (each 15 s at most) you hear "the account holder will call back", then your call ends. Outcome `user_unreachable`, reason `no_key_press` (carrier voicemail took the call) or `busy` | |
 | B3 | Greet like a rep | Lets it ring out | Same as B2. You never hear the friend's voicemail greeting | |
 | B4 | Greet like a rep | Answers, presses nothing | The prompt plays twice; ~15 s later the friend is hung up and you hear the call-back line. Reason `no_key_press` | |
 | B5 | Greet like a rep | Answers, then hangs up without a key | Same as B4, and sooner | |

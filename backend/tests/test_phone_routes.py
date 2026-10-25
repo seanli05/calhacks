@@ -26,7 +26,9 @@ class _Calls:
     def __init__(self) -> None:
         self.created = 0
 
-    async def create(self, *, to: str, twiml: str, status_callback: str) -> str:
+    async def create(
+        self, *, to: str, twiml: str, status_callback: str, ring_s: int = 30
+    ) -> str:
         self.created += 1
         return SID if self.created == 1 else USER_SID
 

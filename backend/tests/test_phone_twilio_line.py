@@ -39,10 +39,14 @@ class FakeCalls:
         self.on_update: list[object] = []
         self.fail_create = False
 
-    async def create(self, *, to: str, twiml: str, status_callback: str) -> str:
+    async def create(
+        self, *, to: str, twiml: str, status_callback: str, ring_s: int = 30
+    ) -> str:
         if self.fail_create:
             raise TimeoutError
-        self.created.append({"to": to, "twiml": twiml, "status": status_callback})
+        self.created.append(
+            {"to": to, "twiml": twiml, "status": status_callback, "ring_s": ring_s}
+        )
         return SID if len(self.created) == 1 else USER_SID
 
     async def update_twiml(self, sid: str, twiml: str) -> None:
@@ -344,6 +348,12 @@ async def test_ring_user_calls_the_users_own_number_with_a_join_gate() -> None:
     assert "record" not in twiml.lower()  # C29
 
 
+async def test_the_applicant_rings_for_15_s_and_the_agency_for_30() -> None:
+    line, _ = await Line().rung()
+    agency_leg, user_leg = line.calls.created
+    assert (agency_leg["ring_s"], user_leg["ring_s"]) == (30, 15)
+
+
 async def test_the_join_gate_speaks_the_users_language() -> None:
     line, _ = await Line(language="en").rung()
     assert JOIN_PROMPTS["en"].text in line.calls.created[1]["twiml"]
@@ -516,8 +526,12 @@ async def _rung_again(line: Line) -> None:
     created = len(line.calls.created)
     real_create = line.calls.create
 
-    async def create(*, to: str, twiml: str, status_callback: str) -> str:
-        await real_create(to=to, twiml=twiml, status_callback=status_callback)
+    async def create(
+        *, to: str, twiml: str, status_callback: str, ring_s: int = 30
+    ) -> str:
+        await real_create(
+            to=to, twiml=twiml, status_callback=status_callback, ring_s=ring_s
+        )
         return SECOND_SID
 
     line.calls.create = create  # type: ignore[method-assign]

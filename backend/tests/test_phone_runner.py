@@ -545,8 +545,8 @@ async def test_user_never_heard_from_hits_the_backstop() -> None:
     assert Said(call_lines.CALL_BACK) in call.actions
     rang = _sent_step(call, "rang the applicant")
     backstop = next(step for step in call.steps if step.input == "timer:user_backstop")
-    # Long enough for 30 s of ringing plus the join gate.
-    assert backstop.at_s - rang.at_s == pytest.approx(75)
+    # Long enough for 15 s of ringing plus the join gate.
+    assert backstop.at_s - rang.at_s == pytest.approx(45)
 
 
 async def test_no_key_at_the_join_gate_tells_the_rep_and_hangs_up() -> None:

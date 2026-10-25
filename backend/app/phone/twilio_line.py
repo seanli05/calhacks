@@ -64,6 +64,7 @@ from app.phone.listen_leg import ListenInResult, ListenLeg
 from app.phone.ports import LineClosed, NumberSource
 from app.phone.twilio_rest import (
     ENDED_STATUSES,
+    USER_RING_TIMEOUT_S,
     conference_twiml,
     hang_up_twiml,
     stream_twiml,
@@ -87,7 +88,9 @@ _REST_ERRORS = (TwilioRestException, ClientError, TimeoutError)
 class CallControl(Protocol):
     """Twilio's REST API for one account (`twilio_rest.TwilioCalls`)."""
 
-    async def create(self, *, to: str, twiml: str, status_callback: str) -> str: ...
+    async def create(
+        self, *, to: str, twiml: str, status_callback: str, ring_s: int = ...
+    ) -> str: ...
     async def update_twiml(self, sid: str, twiml: str) -> None: ...
     async def complete(self, sid: str) -> None: ...
     async def end(self, sid: str) -> None: ...
@@ -293,6 +296,7 @@ class TwilioTelephony:
                 to=number,
                 twiml=self._user_twiml(call_id),
                 status_callback=self._urls.user_status(call_id),
+                ring_s=USER_RING_TIMEOUT_S,
             )
         except _REST_ERRORS as exc:
             logger.warning(
