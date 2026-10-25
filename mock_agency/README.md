@@ -2,13 +2,24 @@
 
 A demo-only phone line, hosted on [Cartesia Line](https://docs.cartesia.ai/line/introduction), that our phone agent calls instead of a real agency. It plays a U.S. Citizenship and Immigration Services contact line for the demo case: an **I-797C asylum interview notice** (Form I-589). The greeting says it's a demonstration line.
 
-It is deliberately **English only**, because that's the barrier the project is about. There's no language menu and no interpreter option, the open steps need spoken English answers, the timeouts are short, and the officer is a brisk English-only rep who uses official terms and doesn't simplify. The officer stays polite: the barrier is the system, not the person.
+It is deliberately **English only**, because that's the barrier the project is about. There's no language menu and no interpreter option, the open steps need spoken English answers, and the timeouts are short. The officer speaks only English, but is otherwise easy to work with, so a test call can reach a full resolution.
 
-It has three phases:
+In the default `demo` mode it has three phases:
 
 1. **Phone tree.** Deterministic, so every demo take behaves the same. It mixes keypad menus with open questions that need a spoken answer.
 2. **Hold.** Timed hold announcements. Caller audio is ignored, so nothing cuts the hold short.
-3. **Live officer.** Claude plays "Officer Daniel Reyes", who verifies identity with the applicant directly and answers questions from the notice.
+3. **Live officer.** Claude plays "Officer Daniel Reyes", who resolves the caller's question from the notice.
+
+## Modes
+
+One per deploy, set with `MOCK_AGENCY_MODE`:
+
+| Mode | The call | Use it for |
+|---|---|---|
+| `demo` (default) | Full phone tree, hold, then the officer | The demo, and testing the menu and hold |
+| `quick` | A short greeting, then the officer picks up at once (no menu, no hold) | Testing live calling: human detection, the bridge, and what happens after the call is resolved |
+
+To keep both handy, deploy the folder as two Cartesia agents on two numbers, and point the backend's `DEMO_DIAL_NUMBER` at the one you want.
 
 ## The call
 
@@ -29,18 +40,18 @@ What each step tests in the phone agent:
 | Reason for calling | Open, **speech only** (keys get "please say your answer out loud") | Saying the call goal in plain words |
 | Attendance | Closed, but depends on what the user wants | The agent can't know this, so it should ask the user on WhatsApp |
 | Hold | Recorded announcements | Hold vs. human detection |
-| Officer | Live LLM | Intro, bringing in the user, never answering identity questions (rule 3) |
+| Officer | Live LLM | Intro, bringing in the user, getting the call goal resolved |
 
 Other behaviors:
 
 - Pressing 0 or asking for a "representative" gets: choose a menu option first.
 - After 12 s of silence the line reprompts. After 3 silent prompts in a row it hangs up.
-- The menu never asks for an identifier (receipt number, A-Number, date of birth). The phone agent may not give one (Plan.md C35), so only the officer asks, and the applicant answers in their own voice once bridged.
+- The menu never asks for an identifier (receipt number, A-Number, date of birth). The phone agent may not give one (Plan.md C35), and the officer doesn't ask either.
 - Saying "reschedule" at the reason step skips the attendance menu.
 
 The fictional case data (receipt number, A-number, name, date of birth, interview date and place) is in [agency/case_record.py](agency/case_record.py). The demo letter must use the same values.
 
-**Officer identity check:** the officer asks for the applicant's full name and date of birth. The demo user should answer "Ana Morales, March 14, 1988". If the AI tries to answer for them, the officer refuses.
+**The officer** never asks for a name, date of birth, or case number, takes answers at face value, and asks only simple questions one at a time. It works the call to a resolution: it confirms the interview, answers the interpreter question (bring another qualified interpreter, or request a reschedule in writing for good cause), notes requests on the case, gives a reference number, and ends the call.
 
 ## Layout
 
@@ -61,6 +72,7 @@ This folder deploys to Cartesia as its own project, with its own [pyproject.toml
 |---|---|---|---|
 | `ANTHROPIC_API_KEY` | yes | | For the officer |
 | `MOCK_AGENCY_OFFICER_MODEL` | yes | | LiteLLM string, e.g. `anthropic/claude-haiku-5-5` (fast model; it's a live voice turn) |
+| `MOCK_AGENCY_MODE` | no | `demo` | `demo` or `quick` (see [Modes](#modes)). Anything else fails at startup |
 | `MOCK_AGENCY_HOLD_SECONDS` | no | `45` | Total hold time. Keep it short for the video. |
 | `MOCK_AGENCY_HOLD_ANNOUNCE_EVERY_S` | no | `15` | Gap between hold announcements |
 | `MOCK_AGENCY_NO_INPUT_SECONDS` | no | `12` | Silence before a reprompt, counted only once the line stops talking |
@@ -75,7 +87,7 @@ cd mock_agency
 uv venv --python 3.12 && source .venv/bin/activate   # separate from the backend venv
 uv pip install -e .
 ANTHROPIC_API_KEY=... MOCK_AGENCY_OFFICER_MODEL=anthropic/claude-haiku-5-5 \
-  MOCK_AGENCY_HOLD_SECONDS=10 python main.py
+  MOCK_AGENCY_HOLD_SECONDS=10 python main.py   # add MOCK_AGENCY_MODE=quick to go straight to the officer
 cartesia chat 8000   # in another terminal: text chat; type "1", "two", "ZLA2690012345", ...
 ```
 
@@ -96,7 +108,7 @@ cartesia env set ANTHROPIC_API_KEY=... MOCK_AGENCY_OFFICER_MODEL=anthropic/claud
 cartesia deploy && cartesia status
 ```
 
-The menu and the officer use two different voices by default (Environment, above). If `MOCK_AGENCY_IVR_VOICE_ID` or `MOCK_AGENCY_OFFICER_VOICE_ID` was set on Cartesia earlier, it still wins: `cartesia env rm <name>` to use the defaults, then deploy again.
+The menu and the officer use two different voices by default (Environment, above). If `MOCK_AGENCY_IVR_VOICE_ID` or `MOCK_AGENCY_OFFICER_VOICE_ID` was set on Cartesia earlier, it still wins: `cartesia env rm <name>` to use the defaults, then deploy again. The line refuses to start if both are set to the same voice.
 
 Then attach a phone number to the agent in the [Cartesia dashboard](https://play.cartesia.ai). That number is the mock agency's number (`MOCK_AGENCY_NUMBER` in the backend `.env`). Test it by calling it from your own phone.
 

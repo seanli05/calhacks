@@ -4,6 +4,9 @@ The phone agent dials this line in the demo. Three phases:
     IVR     deterministic phone tree (agency/ivr.py), keys or speech
     HOLD    timed announcements; caller audio is ignored so it can't cut hold short
     OFFICER an LLM plays the asylum officer who picks up
+
+MOCK_AGENCY_MODE=quick skips IVR and HOLD: the officer picks up after a short
+greeting, for testing live calls and the bridge.
 """
 
 import asyncio
@@ -13,7 +16,7 @@ from enum import StrEnum
 
 from agency import prompts
 from agency.case_record import DEMO_CASE
-from agency.config import MockAgencySettings
+from agency.config import MockAgencySettings, Mode
 from agency.ivr import IvrTurn, PhoneTree
 from line.agent import TurnEnv
 from line.events import (
@@ -104,6 +107,12 @@ class MockAgencyLine:
 
         if isinstance(event, CallStarted):
             yield AgentUpdateCall(voice_id=self.settings.ivr_voice_id)
+            if self.settings.mode is Mode.QUICK:
+                logger.info(f"quick_mode call_id={self.call_id}")
+                yield AgentSendText(text=prompts.QUICK_GREETING, interruptible=False)
+                async for output in self._officer_picks_up(prompts.QUICK_IVR_SUMMARY):
+                    yield output
+                return
             turn = self.tree.start()
         elif isinstance(event, UserDtmfSent):
             turn = self.tree.press(event.button)
@@ -180,15 +189,19 @@ class MockAgencyLine:
                 announcement += 1
                 yield AgentSendText(text=text, interruptible=False)
 
-        self.officer = self._build_officer()
+        async for output in self._officer_picks_up(self.tree.info.summary()):
+            yield output
+
+    async def _officer_picks_up(self, ivr_summary: str) -> AsyncIterator[OutputEvent]:
+        self.officer = self._build_officer(ivr_summary)
         yield AgentUpdateCall(voice_id=self.settings.officer_voice_id)
         self.phase = Phase.OFFICER
-        logger.info(f"officer_joined call_id={self.call_id} info={self.tree.info}")
+        logger.info(f"officer_joined call_id={self.call_id} info={ivr_summary!r}")
         yield AgentSendText(
             text=prompts.OFFICER_INTRO.format(officer=self.settings.officer_name)
         )
 
-    def _build_officer(self) -> LlmAgent:
+    def _build_officer(self, ivr_summary: str) -> LlmAgent:
         reference_number = f"SR{secrets.randbelow(10**6):06d}"
         return LlmAgent(
             model=self.settings.officer_model,
@@ -199,7 +212,7 @@ class MockAgencyLine:
                     case=DEMO_CASE,
                     officer=self.settings.officer_name,
                     reference_number=reference_number,
-                    ivr_summary=self.tree.info.summary(),
+                    ivr_summary=ivr_summary,
                 ),
                 introduction="",
             ),

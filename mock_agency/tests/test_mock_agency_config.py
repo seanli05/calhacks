@@ -1,5 +1,6 @@
 import pytest
-from agency.config import IVR_VOICE_ID, OFFICER_VOICE_ID, MockAgencySettings
+from agency.config import IVR_VOICE_ID, OFFICER_VOICE_ID, MockAgencySettings, Mode
+from pydantic import ValidationError
 
 REQUIRED = {
     "ANTHROPIC_API_KEY": "test-key",
@@ -33,3 +34,27 @@ def test_env_vars_choose_other_voices(env: pytest.MonkeyPatch) -> None:
         "voice-menu",
         "voice-officer",
     )
+
+
+def test_mode_defaults_to_the_demo_path(env: pytest.MonkeyPatch) -> None:
+    env.delenv("MOCK_AGENCY_MODE", raising=False)
+    assert MockAgencySettings.from_env().mode is Mode.DEMO
+
+
+def test_env_var_picks_quick_mode(env: pytest.MonkeyPatch) -> None:
+    env.setenv("MOCK_AGENCY_MODE", "quick")
+    assert MockAgencySettings.from_env().mode is Mode.QUICK
+
+
+def test_unknown_mode_fails_at_startup(env: pytest.MonkeyPatch) -> None:
+    env.setenv("MOCK_AGENCY_MODE", "quik")
+    with pytest.raises(ValidationError):
+        MockAgencySettings.from_env()
+
+
+def test_same_voice_for_menu_and_officer_fails_at_startup(
+    env: pytest.MonkeyPatch,
+) -> None:
+    env.setenv("MOCK_AGENCY_IVR_VOICE_ID", OFFICER_VOICE_ID)
+    with pytest.raises(ValidationError):
+        MockAgencySettings.from_env()
