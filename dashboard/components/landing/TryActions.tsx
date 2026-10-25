@@ -4,7 +4,6 @@ import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 
 import { Icon } from "@/components/Icon";
-import type { DemoUser } from "@/lib/demoUsers";
 import { useStrings } from "@/lib/i18n";
 
 import type { TryLinks } from "./useTryLinks";
@@ -24,7 +23,6 @@ export function TryActions({
   qrSize,
   scan = true,
   example = true,
-  dashboards = [],
 }: {
   links: TryLinks;
   qrSize: number;
@@ -32,8 +30,6 @@ export function TryActions({
   scan?: boolean;
   /** False on the example tour itself, where the link would loop back to it. */
   example?: boolean;
-  /** The hero's "Already have a dashboard?": one link per demo account (lib/demoUsers.ts). */
-  dashboards?: DemoUser[];
 }) {
   const t = useStrings().landing;
   return (
@@ -58,19 +54,6 @@ export function TryActions({
           </Link>
         )}
       </div>
-      {dashboards.length > 0 && (
-        <details className={styles.dashboards}>
-          <summary>{t.dashboards.prompt}</summary>
-          <div className={styles.accounts}>
-            {dashboards.map((user) => (
-              <Link key={user.userId} href={`/u/${user.userId}`} className={styles.account}>
-                <span dir="auto">{user.label}</span>
-                <Icon name="arrow" size={15} />
-              </Link>
-            ))}
-          </div>
-        </details>
-      )}
       {scan && links.join && (
         <div className={styles.scan}>
           <div className={styles.qr}>

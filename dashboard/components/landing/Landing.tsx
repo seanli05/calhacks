@@ -7,6 +7,7 @@ import { useStrings } from "@/lib/i18n";
 
 import { ChatDemo } from "./ChatDemo";
 import { ClosingBand } from "./ClosingBand";
+import { DashboardMenu } from "./DashboardMenu";
 import { Mascot } from "./Mascot";
 import { Promises } from "./Promises";
 import { Reveal } from "./Reveal";
@@ -28,7 +29,7 @@ export function Landing() {
   return (
     <div className={styles.page}>
       <div className={styles.wrap}>
-        <Header />
+        <Header actions={<DashboardMenu users={demoUsers()} />} />
       </div>
       <main>
         <div className={styles.wrap}>
@@ -40,7 +41,7 @@ export function Landing() {
                 </span>
               </h1>
               <p className={styles.sub}>{t.sub}</p>
-              <TryActions links={links} qrSize={96} scan={false} dashboards={demoUsers()} />
+              <TryActions links={links} qrSize={96} scan={false} />
               <ul className={styles.perks}>
                 {t.perks.map((perk, i) => (
                   <li key={perk}>
