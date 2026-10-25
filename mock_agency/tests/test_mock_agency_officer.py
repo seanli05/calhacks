@@ -1,5 +1,6 @@
+import pytest
 from agency import prompts
-from agency.case_record import DEMO_CASE
+from agency.case_record import DEMO_CASE, SF_DEMO_CASE, MockCase
 
 
 def officer_prompt() -> str:
@@ -20,6 +21,22 @@ def test_officer_never_asks_the_caller_to_verify_identity():
 
 def test_officer_stays_english_only():
     assert "you speak only english" in officer_prompt()
+
+
+@pytest.mark.parametrize(
+    ("case", "office", "other_office"),
+    [
+        (DEMO_CASE, "Los Angeles Asylum Office", "San Francisco"),
+        (SF_DEMO_CASE, "San Francisco Asylum Office", "Los Angeles"),
+    ],
+)
+def test_officer_intro_names_the_selected_office(
+    case: MockCase, office: str, other_office: str
+) -> None:
+    intro = prompts.officer_intro(case, "Daniel Reyes")
+    assert office in intro
+    assert other_office not in intro
+    assert "Officer Daniel Reyes" in intro
 
 
 def test_officer_resolves_and_ends_the_call():

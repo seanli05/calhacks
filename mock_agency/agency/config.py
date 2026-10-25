@@ -7,6 +7,7 @@ the backend's settings object. Set these with `cartesia env set`.
 import os
 from enum import StrEnum
 
+from agency.case_record import DEMO_CASE, SF_DEMO_CASE, MockCase
 from pydantic import BaseModel, model_validator
 
 # Two clearly different voices, so the officer picking up sounds like a new person,
@@ -26,10 +27,23 @@ class Mode(StrEnum):
     """A short greeting, then the officer at once: for testing live calls."""
 
 
+class Case(StrEnum):
+    """Which fictional case the line knows. One per deploy, set with MOCK_AGENCY_CASE."""
+
+    DEMO = "demo"
+    """DEMO_CASE: Ana Morales, Los Angeles Asylum Office."""
+    SF_DEMO = "sf_demo"
+    """SF_DEMO_CASE: Mariam Namuna, San Francisco Asylum Office (the demo video)."""
+
+
+CASES: dict[Case, MockCase] = {Case.DEMO: DEMO_CASE, Case.SF_DEMO: SF_DEMO_CASE}
+
+
 class MockAgencySettings(BaseModel):
     anthropic_api_key: str
     officer_model: str
     mode: Mode = Mode.DEMO
+    case: Case = Case.DEMO
     officer_name: str = "Daniel Reyes"
     hold_seconds: float = 45.0
     hold_announce_every_s: float = 15.0
@@ -44,12 +58,17 @@ class MockAgencySettings(BaseModel):
             raise ValueError("the phone tree and the officer need different voices")
         return self
 
+    @property
+    def case_record(self) -> MockCase:
+        return CASES[self.case]
+
     @classmethod
     def from_env(cls) -> "MockAgencySettings":
         env = {
             "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY"),
             "officer_model": os.environ.get("MOCK_AGENCY_OFFICER_MODEL"),
             "mode": os.environ.get("MOCK_AGENCY_MODE"),
+            "case": os.environ.get("MOCK_AGENCY_CASE"),
             "officer_name": os.environ.get("MOCK_AGENCY_OFFICER_NAME"),
             "hold_seconds": os.environ.get("MOCK_AGENCY_HOLD_SECONDS"),
             "hold_announce_every_s": os.environ.get(
