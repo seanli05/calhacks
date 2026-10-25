@@ -2,17 +2,22 @@
 Fremont, with one finished case already on her account, a Medi-Cal renewal notice
 from Alameda County. All fictional.
 
-Her I-797C is not seeded: she sends the printed letter (demo/letters/) on camera,
-and the scam letter too. So the seed holds only what the video shows as history:
-the Medi-Cal case, explained and checked, with no question left open, so the
-orchestrator has nothing to pick up mid-demo; and a sensitive fact waiting for her
-OK, for the profile page.
+Her I-797C is not seeded: she sends the printed letter (demo/letters/) on camera.
+So the seed holds only what the video shows as history: the Medi-Cal case,
+explained and checked, with no question left open, so the orchestrator has nothing
+to pick up mid-demo; and a sensitive fact waiting for her OK, for the profile page.
+
+`--with-scam` adds the scam letter (demo/letters/scam_ar11_mariam_namuna.png) as a
+second finished case, flagged suspicious, for rehearsals and backup takes. Leave it
+off when the scam letter is sent live.
 
 The user's WhatsApp number is passed in at reset time (it's a real phone), so the
 live messages from that phone land on this user.
 """
 
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from app.contracts.common import (
     Component,
@@ -90,33 +95,50 @@ def medi_cal_fast_result(case_id: str) -> dict:
     }
 
 
-class MariamStory:
-    """Rows for Mariam and her Medi-Cal case, timed from `start` (the photo's
-    arrival). Returned, not written: the caller adds them in FK order."""
+class CaseRows:
+    """Rows for one finished case on `user`'s account, timed from `start` (the
+    photo's arrival): the letter, the case, its two research jobs, and helpers for
+    its events and messages. Returned, not written: the caller adds `rows()` in
+    order, since each list points at the ones before it."""
 
-    def __init__(self, whatsapp_number: str, start: datetime) -> None:
+    def __init__(
+        self,
+        user: tables.User,
+        start: datetime,
+        doc_type: str,
+        letter_png: bytes,
+        deadline: date | None = None,
+    ) -> None:
         self.start = start
-        self.user = tables.User(whatsapp_number=whatsapp_number, language=LANGUAGE)
+        self.user = user
         self.media = tables.Media(
-            user_id=self.user.id,
-            content_type="image/png",
-            data=placeholder_letter_png(),
+            user_id=user.id, content_type="image/png", data=letter_png
         )
         self.document = tables.Document(
-            user_id=self.user.id,
+            user_id=user.id,
             pages=[{"media_id": self.media.id, "added_at": start.isoformat()}],
             created_at=start,
         )
         self.case = tables.Case(
-            user_id=self.user.id,
+            user_id=user.id,
             document_ids=[self.document.id],
-            doc_type=DOC_TYPE,
-            deadline=RENEWAL_DUE,
+            doc_type=doc_type,
+            deadline=deadline,
             created_at=start,
         )
-        self.case.fast_result = medi_cal_fast_result(self.case.id)
         self.fast_job = self._job(JobType.RESEARCH_FAST, 0, 0.8)
         self.deep_job = self._job(JobType.RESEARCH_DEEP, 0.9, 2.6)
+
+    def rows(self) -> list[list[object]]:
+        return [
+            [self.case, self.media, self.document],
+            [self.fast_job, self.deep_job],
+            self.history(),
+        ]
+
+    def history(self) -> list[object]:
+        """The verdict, messages, events and anything else the case needs."""
+        raise NotImplementedError
 
     def at(self, minutes: float) -> datetime:
         return self.start + timedelta(minutes=minutes)
@@ -179,6 +201,25 @@ class MariamStory:
             language=LANGUAGE,
             media_ids=media_ids or [],
         )
+
+
+class MediCalCase(CaseRows):
+    """The renewal notice: explained, verified, thanked. Also carries Mariam's
+    profile and facts, which come from this letter."""
+
+    def __init__(self, user: tables.User, start: datetime) -> None:
+        super().__init__(
+            user, start, DOC_TYPE, placeholder_letter_png(), deadline=RENEWAL_DUE
+        )
+        self.case.fast_result = medi_cal_fast_result(self.case.id)
+
+    def history(self) -> list[object]:
+        return [
+            self.verification(),
+            *self.profile_and_facts(),
+            *self.messages(),
+            *self.research_events(),
+        ]
 
     def verification(self) -> tables.Verification:
         """Verified against the county's site. No official phone: no call was
@@ -351,6 +392,200 @@ class MariamStory:
         ]
 
 
-def build(whatsapp_number: str) -> MariamStory:
-    """The story, starting yesterday."""
-    return MariamStory(whatsapp_number, utcnow() - timedelta(days=1))
+SCAM_DOC_TYPE = "ice_ar11_violation"
+SCAM_LETTER = (
+    Path(__file__).resolve().parents[3]
+    / "demo"
+    / "letters"
+    / "scam_ar11_mariam_namuna.png"
+)
+SCAM_RED_FLAGS = [
+    # What scam_rules.py says for this letter's payment section and signature.
+    "This letter asks for payment by gift card. USCIS never asks for that.",
+    (
+        "This letter threatens arrest or deportation. USCIS does not threaten people "
+        "in letters to get payment or information."
+    ),
+    (
+        "This letter links to uscis-ar11-verify.com, which is not a .gov website. "
+        "Federal agencies use .gov websites."
+    ),
+    (
+        "This letter asks you to give card numbers, your Social Security number, or "
+        "bank details by phone or text. Do not share them."
+    ),
+]
+
+
+def scam_fast_result(case_id: str) -> dict:
+    return {
+        "case_id": case_id,
+        "status": "ok",
+        "image_issue": None,
+        "doc_type": SCAM_DOC_TYPE,
+        "issuer": "Immigration and Customs Enforcement (as the letter claims)",
+        "what_is_asked": (
+            "Call a phone number and pay a $500 fine in gift cards within 48 hours"
+        ),
+        "checklist_en": [],
+        "key_facts": [
+            {
+                "field": "form_id",
+                "value": "AR-11-V",
+                "quote": "Form AR-11-V 09/26",
+                "page": 1,
+            }
+        ],
+        "explanation_en": (
+            "This letter says you broke the law by not reporting a change of "
+            "address, and asks you to call a number and pay a fine in gift cards. "
+            "It has many signs of a scam."
+        ),
+        "urgency": "high",
+        "verification": "suspicious",
+        "proposed_facts": [],
+    }
+
+
+class ScamCase(CaseRows):
+    """The fake AR-11 violation notice: flagged by the scam rules and by the
+    checks against uscis.gov, and she was told not to pay. No call is offered."""
+
+    def __init__(self, user: tables.User, start: datetime) -> None:
+        png = SCAM_LETTER.read_bytes() if SCAM_LETTER.exists() else None
+        super().__init__(user, start, SCAM_DOC_TYPE, png or placeholder_letter_png())
+        self.case.fast_result = scam_fast_result(self.case.id)
+
+    def history(self) -> list[object]:
+        verification = tables.Verification(
+            case_id=self.case.id,
+            status=VerificationStatus.SUSPICIOUS,
+            official_phone=None,
+            result={
+                "status": "suspicious",
+                "official_phone": None,
+                "letter_phone_matches": False,
+                "evidence": [
+                    "https://www.uscis.gov/ar-11",
+                    "https://www.uscis.gov/contactcenter",
+                ],
+                "red_flags": SCAM_RED_FLAGS,
+            },
+            created_at=self.at(2.5),
+        )
+        return [verification, *self.messages(), *self.research_events()]
+
+    def messages(self) -> list[tables.Message]:
+        """Photo → "is this real?" → the warning → she didn't pay. Nothing open."""
+        inbound, out = MessageDirection.IN, MessageDirection.OUT
+        return [
+            self.message(0, inbound, "", None, [self.media.id]),
+            self.message(
+                0.1,
+                inbound,
+                "این نامه واقعی است؟ می‌ترسم",
+                "Is this letter real? I'm scared",
+            ),
+            self.message(
+                2.6,
+                out,
+                "این نامه به احتمال زیاد کلاه‌برداری است. ادارهٔ USCIS هرگز کارت تحفه "
+                "نمی‌خواهد و در نامه تهدید به گرفتاری نمی‌کند. به شماره‌ای که در نامه "
+                "است زنگ نزنید و هیچ پولی نپردازید. آدرس خود را می‌توانید رایگان در "
+                "uscis.gov تغییر دهید.",
+                "This letter is very likely a scam. USCIS never asks for gift cards or "
+                "threatens arrest in a letter. Don't call the number on it and don't "
+                "pay anything. You can change your address for free on uscis.gov.",
+            ),
+            self.message(3, inbound, "تشکر، پول ندادم", "Thanks, I didn't pay"),
+            self.message(
+                3.1,
+                out,
+                "خوب کردید. اگر نامهٔ دیگری گرفتید، عکس آن را بفرستید.",
+                "Good. If you get another letter, send a photo.",
+            ),
+        ]
+
+    def research_events(self) -> list[tables.Event]:
+        research = Component.RESEARCH_AGENT
+        fast, deep = self.fast_job, self.deep_job
+
+        def step(event_type: str, minutes: float, **data: object) -> tables.Event:
+            return self.event(event_type, research, minutes, event_type, deep, **data)
+
+        return [
+            self.event(
+                "case.created", Component.ORCHESTRATOR, 0, "Case created (seed)"
+            ),
+            self.event(
+                "research.fast_started", research, 0.05, "Reading the letter", fast
+            ),
+            self.event(
+                "research.check",
+                research,
+                0.7,
+                "Letter read",
+                fast,
+                check="letter_read",
+                status="ok",
+                doc_type=SCAM_DOC_TYPE,
+            ),
+            self.event("research.fast_done", research, 0.8, "Letter explained", fast),
+            self.event(
+                "research.deep_started", research, 0.9, "Verifying the letter", deep
+            ),
+            step("research.check", 0.95, check="scam_rules", red_flags=SCAM_RED_FLAGS),
+            step(
+                "research.search", 1.0, query="USCIS AR-11 change of address official"
+            ),
+            step("research.fetch", 1.3, url="https://www.uscis.gov/ar-11", status=200),
+            step(
+                "research.fetch",
+                1.5,
+                url="https://www.uscis.gov/contactcenter",
+                status=200,
+            ),
+            step(
+                "research.fetch",
+                1.7,
+                url="https://www.uscis-ar11-verify.com",
+                refused="not an official site",
+            ),
+            step("research.check", 1.9, check="issuer", state="conflict"),
+            step("research.check", 2.0, check="letter_phone", state="conflict"),
+            step("research.check", 2.1, check="url_domains", state="conflict"),
+            step(
+                "research.check",
+                2.4,
+                check="verdict",
+                status="suspicious",
+                official_phone_found=True,
+            ),
+            self.event(
+                "verification.suspicious",
+                research,
+                2.5,
+                "Letter flagged as suspicious (seed)",
+                deep,
+            ),
+            self.event(
+                "research.deep_done", research, 2.6, "Verification finished", deep
+            ),
+        ]
+
+
+@dataclass
+class MariamSeed:
+    user: tables.User
+    cases: list[CaseRows]
+
+
+def build(whatsapp_number: str, with_scam: bool = False) -> MariamSeed:
+    """Mariam and her Medi-Cal case from yesterday; with `with_scam`, also the scam
+    letter from this morning."""
+    user = tables.User(whatsapp_number=whatsapp_number, language=LANGUAGE)
+    now = utcnow()
+    cases: list[CaseRows] = [MediCalCase(user, now - timedelta(days=1))]
+    if with_scam:
+        cases.append(ScamCase(user, now - timedelta(hours=5)))
+    return MariamSeed(user, cases)

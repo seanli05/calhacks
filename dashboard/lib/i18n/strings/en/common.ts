@@ -11,6 +11,7 @@ export const common = {
   docTypes: {
     uscis_i797c_asylum_interview: "Asylum interview",
     medi_cal_renewal: "Medi-Cal renewal",
+    ice_ar11_violation: "Address violation notice",
   } as Record<string, string>,
   docTypeFallback: "Letter",
   stages: {

@@ -312,6 +312,18 @@ async def test_mariam_seed_is_a_finished_verified_case_in_dari() -> None:
     assert [f.category for f in pending] == ["health"]
 
 
+async def test_mariam_seed_with_scam_adds_a_flagged_case() -> None:
+    user_id = await reset.seed_mariam_story("+15105550143", with_scam=True)
+    stages = {
+        c.doc_type: await reads.case_progress(c.id)
+        for c in await reads.list_active_cases(user_id)
+    }
+    assert stages == {
+        "medi_cal_renewal": CaseStage.VERIFIED,
+        "ice_ar11_violation": CaseStage.SUSPICIOUS,
+    }
+
+
 async def test_seed_builds_a_case_awaiting_consent() -> None:
     case_id = await reset.seed()
     assert await reads.case_progress(case_id) == CaseStage.AWAITING_CONSENT

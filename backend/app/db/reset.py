@@ -7,7 +7,9 @@
 
 The default story is Ana (Spanish, an I-797C waiting for consent). `--story mariam`
 seeds the demo video's user instead (`seed_mariam.py`): pass her real phone as
-`--number`, so the letter she sends on camera lands on her seeded account.
+`--number`, so the letter she sends on camera lands on her seeded account. Add
+`--with-scam` to also seed the scam letter as a flagged case (rehearsals, backup
+takes); leave it off when the scam letter is sent live.
 
 The database is shared by the whole team, so this wipes everyone's data; it refuses
 to run without --yes. It's a dev tool, so seeding writes several owners' tables. The glossary
@@ -65,7 +67,14 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         "--number",
         help="with --story mariam: her WhatsApp number in E.164 (+1...)",
     )
+    parser.add_argument(
+        "--with-scam",
+        action="store_true",
+        help="with --story mariam: also seed the scam letter as a flagged case",
+    )
     args = parser.parse_args(argv)
+    if args.with_scam and args.story != "mariam":
+        parser.error("--with-scam is for --story mariam")
     if args.story == "mariam" and not (args.number or "").startswith("+"):
         parser.error("--story mariam needs --number in E.164, e.g. +15105550100")
     if args.story == "mariam" and args.after_call:
@@ -308,37 +317,33 @@ async def seed(after_call: bool = False) -> str:
     return case.id
 
 
-async def seed_mariam_story(whatsapp_number: str) -> str:
-    """Mariam and her finished Medi-Cal case. Returns her user ID."""
-    story = seed_mariam.build(whatsapp_number)
+async def seed_mariam_story(whatsapp_number: str, with_scam: bool = False) -> str:
+    """Mariam and her finished cases. Returns her user ID."""
+    seed = seed_mariam.build(whatsapp_number, with_scam)
     async with session() as db:
-        db.add(story.user)
+        db.add(seed.user)
         await db.flush()
-        db.add_all([story.case, story.media, story.document])
-        await db.flush()
-        db.add_all([story.fast_job, story.deep_job])
-        await db.flush()
-        db.add_all(
-            [
-                story.verification(),
-                *story.profile_and_facts(),
-                *story.messages(),
-                *story.research_events(),
-            ]
-        )
+        for case in seed.cases:
+            for rows in case.rows():
+                db.add_all(rows)
+                await db.flush()
         await db.commit()
-    return story.user.id
+    return seed.user.id
 
 
 async def reset(
-    empty: bool, after_call: bool, story: str = "ana", number: str | None = None
+    empty: bool,
+    after_call: bool,
+    story: str = "ana",
+    number: str | None = None,
+    with_scam: bool = False,
 ) -> None:
     try:
         await drop_all()
         await create_all()
         if not empty and story == "mariam":
             assert number is not None
-            user_id = await seed_mariam_story(number)
+            user_id = await seed_mariam_story(number, with_scam)
             print(f"Seeded Mariam ({user_id}).")
         elif not empty:
             case_id = await seed(after_call)
@@ -357,7 +362,9 @@ def main(argv: Sequence[str]) -> int:
     if not args.yes:
         print("This wipes every table on the shared database. Re-run with --yes.")
         return 2
-    asyncio.run(reset(args.empty, args.after_call, args.story, args.number))
+    asyncio.run(
+        reset(args.empty, args.after_call, args.story, args.number, args.with_scam)
+    )
     print("Done.")
     return 0
 

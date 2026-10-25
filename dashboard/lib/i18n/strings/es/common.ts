@@ -11,6 +11,7 @@ export const common: CommonStrings = {
   docTypes: {
     uscis_i797c_asylum_interview: "Entrevista de asilo",
     medi_cal_renewal: "Renovación de Medi-Cal",
+    ice_ar11_violation: "Aviso de violación de dirección",
   },
   docTypeFallback: "Carta",
   stages: {
