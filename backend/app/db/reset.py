@@ -11,7 +11,11 @@ seeds the demo video's story (`seed_mariam.py`) instead, once per account:
 `USER_ID=persona` keeps an existing account (its ID and WhatsApp number, read before
 the wipe), so a teammate's phone stays tied to it and every reset ends in the same
 state; `+1NUMBER=persona` makes a new account for that number (a test branch).
-Personas: `mariam` (Dari) and `ana` (English), with the same letters. Add
+Personas: `mariam` (Dari) and `ana` (English), with the same letters.
+`--keep-users` (between demo takes) empties every table but `users` and the glossary
+instead of rebuilding them, so every account stays exactly as it was apart from the
+demo accounts' language, which follows the persona; tables stay as they are, so
+after a schema change use a full reset. Add
 `--with-scam` to also seed the scam letter as a flagged case (rehearsals, backup
 takes); leave it off when the scam letter is sent live.
 
@@ -31,9 +35,9 @@ from datetime import date, timedelta
 from urllib.parse import urlsplit
 
 from app.contracts.common import VerificationStatus
-from app.db import seed_mariam, tables
+from app.db import reads, seed_mariam, tables
 from app.db.engine import get_engine, session
-from app.db.schema import create_all, drop_all
+from app.db.schema import clear_data, create_all, drop_all
 from app.db.seed_story import Story, placeholder_letter_png
 from app.db.tables import utcnow
 from app.db.writes import glossary as glossary_writes
@@ -41,6 +45,9 @@ from app.glossary import load as glossary_load
 from app.settings import get_settings
 
 DEMO_WHATSAPP_NUMBER = "+15555550100"
+KEPT_TABLES = ("users", "glossary")
+"""What `--keep-users` leaves alone: the accounts (ID, number, language) that
+teammates' phones are tied to, and the reference glossary."""
 DEMO_INTERVIEW_DATE = date(2026, 11, 12)
 DEMO_REFS = {
     "receipt_number": "ZLA2690012345",
@@ -76,6 +83,11 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         action="store_true",
         help="with --demo-user: also seed the scam letter as a flagged case",
     )
+    parser.add_argument(
+        "--keep-users",
+        action="store_true",
+        help="empty every table but users and the glossary, instead of rebuilding",
+    )
     args = parser.parse_args(argv)
     try:
         args.demo_users = [parse_demo_user(value) for value in args.demo_user]
@@ -85,6 +97,9 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("--with-scam is for --demo-user")
     if args.demo_users and args.after_call:
         parser.error("--after-call is for the default seed")
+    if args.keep_users and not (args.demo_users or args.empty):
+        # The default seed makes its own user, which a kept table may already hold.
+        parser.error("--keep-users is for --demo-user (or --empty)")
     return args
 
 
@@ -109,13 +124,15 @@ def parse_demo_user(value: str) -> DemoUser:
     raise ValueError(f"--demo-user {value}: start with user_... or +1...")
 
 
-async def demo_numbers(users: Sequence[DemoUser]) -> list[str]:
-    """Each account's WhatsApp number, read before the wipe. Fails, wiping nothing,
-    if an account to keep isn't there."""
-    numbers = []
+async def resolve_accounts(users: Sequence[DemoUser]) -> list[tuple[str | None, str]]:
+    """Each account's (user ID, WhatsApp number), read before the wipe. A new
+    number that already has an account reuses it. Fails, wiping nothing, if an
+    account to keep isn't there."""
+    accounts: list[tuple[str | None, str]] = []
     for user in users:
         if user.number:
-            numbers.append(user.number)
+            row = await reads.get_user_by_number(user.number)
+            accounts.append((row.id if row else None, user.number))
             continue
         assert user.user_id is not None
         async with session() as db:
@@ -124,8 +141,8 @@ async def demo_numbers(users: Sequence[DemoUser]) -> list[str]:
             raise SystemExit(
                 f"No account {user.user_id} on this database; nothing wiped."
             )
-        numbers.append(row.whatsapp_number)
-    return numbers
+        accounts.append((row.id, row.whatsapp_number))
+    return accounts
 
 
 def target_host() -> str:
@@ -369,12 +386,18 @@ async def seed_mariam_story(
     persona: str = "mariam",
     user_id: str | None = None,
 ) -> str:
-    """The demo story's account and its finished cases. Returns the user ID."""
+    """The demo story's account and its finished cases. Returns the user ID. An
+    account that's still there (`--keep-users`) is kept as is, apart from its
+    language, which follows the persona."""
     seed = seed_mariam.build(
         whatsapp_number, with_scam, seed_mariam.PERSONAS[persona], user_id
     )
     async with session() as db:
-        db.add(seed.user)
+        existing = await db.get(tables.User, seed.user.id)
+        if existing is None:
+            db.add(seed.user)
+        else:
+            existing.language = seed.user.language
         await db.flush()
         for case in seed.cases:
             for rows in case.rows():
@@ -389,15 +412,22 @@ async def reset(
     after_call: bool,
     demo_users: Sequence[DemoUser] = (),
     with_scam: bool = False,
+    keep_users: bool = False,
 ) -> None:
     try:
-        numbers = await demo_numbers(demo_users) if not empty else []
-        await drop_all()
-        await create_all()
+        accounts = await resolve_accounts(demo_users) if not empty else []
+        if keep_users:
+            # Creates any table that's missing, then empties all the rest.
+            await create_all()
+            cleared = await clear_data(keep=KEPT_TABLES)
+            print(f"Emptied {len(cleared)} tables; kept {', '.join(KEPT_TABLES)}.")
+        else:
+            await drop_all()
+            await create_all()
         if not empty and demo_users:
-            for user, number in zip(demo_users, numbers, strict=True):
+            for user, (user_id, number) in zip(demo_users, accounts, strict=True):
                 user_id = await seed_mariam_story(
-                    number, with_scam, user.persona, user.user_id
+                    number, with_scam, user.persona, user_id
                 )
                 print(f"Seeded {user.persona} on {user_id}.")
         elif not empty:
@@ -417,7 +447,15 @@ def main(argv: Sequence[str]) -> int:
     if not args.yes:
         print("This wipes every table on the shared database. Re-run with --yes.")
         return 2
-    asyncio.run(reset(args.empty, args.after_call, args.demo_users, args.with_scam))
+    asyncio.run(
+        reset(
+            args.empty,
+            args.after_call,
+            args.demo_users,
+            args.with_scam,
+            args.keep_users,
+        )
+    )
     print("Done.")
     return 0
 

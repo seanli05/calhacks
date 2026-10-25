@@ -25,7 +25,7 @@ from app.contracts import (
     Sensitivity,
     Verification,
 )
-from app.db import deletes, jobs, reads, reset, tables
+from app.db import deletes, jobs, reads, reset, schema, tables
 from app.db.engine import get_engine, session
 from app.db.errors import UnverifiedNumber
 from app.db.events import append_event
@@ -347,7 +347,9 @@ async def test_a_kept_account_gets_the_story_in_its_persona() -> None:
         db.add(kept)
         await db.commit()
     # The reset reads the number before it wipes, then seeds the same ID.
-    [number] = await reset.demo_numbers([reset.DemoUser("ana", user_id=kept.id)])
+    [(_, number)] = await reset.resolve_accounts(
+        [reset.DemoUser("ana", user_id=kept.id)]
+    )
     async with session() as db:
         await db.delete(await db.get(tables.User, kept.id))
         await db.commit()
@@ -366,7 +368,31 @@ async def test_a_kept_account_gets_the_story_in_its_persona() -> None:
 
 async def test_a_missing_account_stops_the_reset_before_the_wipe() -> None:
     with pytest.raises(SystemExit):
-        await reset.demo_numbers([reset.DemoUser("mariam", user_id="user_nobody")])
+        await reset.resolve_accounts([reset.DemoUser("mariam", user_id="user_nobody")])
+
+
+async def test_keep_users_empties_the_rest_and_reseeds_the_same_account() -> None:
+    kept = tables.User(id="user_kept_fa", whatsapp_number="+15105550145", language="es")
+    other = tables.User(whatsapp_number="+15105550146")
+    async with session() as db:
+        db.add_all([kept, other])
+        await db.flush()
+        db.add(tables.Case(user_id=kept.id, document_ids=[]))
+        await db.commit()
+
+    cleared = await schema.clear_data(keep=reset.KEPT_TABLES)
+    assert "cases" in cleared and "users" not in cleared
+    [(user_id, number)] = await reset.resolve_accounts(
+        [reset.DemoUser("mariam", user_id=kept.id)]
+    )
+    await reset.seed_mariam_story(number, False, "mariam", user_id)
+
+    user = await reads.get_user_by_number("+15105550145")
+    assert user is not None and user.id == kept.id and user.language == "fa"
+    assert user.created_at == kept.created_at
+    assert await reads.get_user_by_number("+15105550146") is not None
+    [case] = await reads.list_active_cases(kept.id)
+    assert case.doc_type == "medi_cal_renewal"
 
 
 async def test_seed_builds_a_case_awaiting_consent() -> None:

@@ -55,6 +55,7 @@ Startup creates any missing tables. To rebuild the database and seed the demo ca
 cd backend && python -m app.db.reset --yes           # add --empty to skip the seed; the glossary loads either way
 python -m app.db.reset --yes --after-call             # or: also a finished call, for the ended screens
 python -m app.db.reset --yes --demo-user user_...=mariam --demo-user user_...=ana  # or: the demo video's story (a finished Medi-Cal case) on those accounts, Dari and English; keeps their IDs and numbers
+# add --keep-users to empty everything but the accounts and the glossary instead of rebuilding (between demo takes; a few seconds)
 # add --with-scam to also seed the scam letter as a flagged case (rehearsals; leave off when it's sent live)
 ```
 
