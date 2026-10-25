@@ -129,6 +129,7 @@ async def _run_fast(
         await writes.put_ref(case_id, sv.field, sv.value)
     guard.check("cases row", r1.model_dump(mode="json"))
     await writes.save_fast_result(case_id, r1)
+    await _log_read_steps(log, output)
 
     if r1.proposed_facts:
         await _queue(
@@ -161,6 +162,30 @@ async def _run_fast(
         ev.FAST_DONE,
         f"Finished reading the letter: {r1.status}",
         {"status": r1.status, "doc_type": r1.doc_type},
+    )
+
+
+async def _log_read_steps(log: EventLog, output: FastPassOutput) -> None:
+    """The fast read's steps for the case view's activity: what the letter was read
+    as, how many private values were set aside, and how urgent it is. Counts and
+    codes only, never the values."""
+    r1 = output.r1
+    await log.emit(
+        ev.CHECK,
+        f"Read the letter as {r1.doc_type or 'unknown'}: {r1.status}",
+        {"check": "letter_read", "status": r1.status, "doc_type": r1.doc_type},
+    )
+    if r1.status != "ok":
+        return
+    await log.emit(
+        ev.CHECK,
+        f"Set aside {len(output.sensitive_values)} private value(s)",
+        {"check": "private_values", "count": len(output.sensitive_values)},
+    )
+    await log.emit(
+        ev.CHECK,
+        f"Urgency: {r1.urgency or 'unknown'}",
+        {"check": "urgency", "urgency": r1.urgency, "dates": len(r1.key_dates)},
     )
 
 

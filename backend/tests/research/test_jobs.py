@@ -94,7 +94,19 @@ async def test_fast_happy_path(store: FakeResearchDB) -> None:
         mode="json"
     )
     assert deep.created_by == "research_agent" and deep.user_id == "user_1"
-    assert store.event_types() == [ev.FAST_STARTED, ev.CASE_CREATED, ev.FAST_DONE]
+    assert store.event_types() == [
+        ev.FAST_STARTED,
+        ev.CASE_CREATED,
+        ev.CHECK,
+        ev.CHECK,
+        ev.CHECK,
+        ev.FAST_DONE,
+    ]
+    # The read's steps carry counts and codes, never the values themselves.
+    steps = [e.data for e in store.events if e.type == ev.CHECK]
+    assert [s["check"] for s in steps] == ["letter_read", "private_values", "urgency"]
+    assert steps[1]["count"] == 1
+    assert SECRET not in str(steps)
     assert store.events[-1].data == {
         "status": "ok",
         "doc_type": "generic_agency_notice",
@@ -172,6 +184,9 @@ async def test_slow_fast_pass_emits_fast_slow_then_succeeds(
         ev.FAST_STARTED,
         ev.FAST_SLOW,
         ev.CASE_CREATED,
+        ev.CHECK,
+        ev.CHECK,
+        ev.CHECK,
         ev.FAST_DONE,
     ]
 

@@ -19,12 +19,15 @@ const COLLAPSE_AFTER_MS = 1200;
  * The case feed with its work shown as it happens: each research check or call is
  * a card whose steps (searches, pages read, checks, menus heard) stream in while it
  * runs, then fold away behind the result. Newest at the bottom, like `FeedList`.
+ * "Show reasoning" adds each step's why (`step.reason`) under it, for every card.
  */
 export function ActivityFeed({ items, className = "" }: { items: FeedItem[]; className?: string }) {
   const t = useStrings().case.activity;
   const now = useNow(1000);
   const entries = useMemo(() => groupActivity(items, now), [items, now]);
   const busy = entries.some((e) => e.kind === "task" && e.task.running);
+  const hasReasons = items.some((item) => item.step?.reason);
+  const [showWhy, setShowWhy] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,12 +45,22 @@ export function ActivityFeed({ items, className = "" }: { items: FeedItem[]; cla
             {t.working}
           </span>
         )}
+        {hasReasons && (
+          <button
+            type="button"
+            className={styles.whyToggle}
+            aria-pressed={showWhy}
+            onClick={() => setShowWhy((on) => !on)}
+          >
+            {showWhy ? t.hideWhy : t.showWhy}
+          </button>
+        )}
       </div>
       <ol className={styles.feed} aria-live="polite">
         {entries.map((entry, index) =>
           entry.kind === "task" ? (
             <li key={entry.task.id} className={styles.taskItem}>
-              <TaskCard task={entry.task} now={now} />
+              <TaskCard task={entry.task} now={now} showWhy={showWhy} />
             </li>
           ) : (
             <PlainItem key={entry.item.id} item={entry.item} now={now} last={index === entries.length - 1} />
@@ -76,7 +89,7 @@ function PlainItem({ item, now, last }: { item: FeedItem; now: number; last: boo
   );
 }
 
-function TaskCard({ task, now }: { task: Task; now: number }) {
+function TaskCard({ task, now, showWhy }: { task: Task; now: number; showWhy: boolean }) {
   const { lang } = useLang();
   const t = useStrings().case.activity;
   const [open, setOpen] = useState(task.running);
@@ -128,7 +141,7 @@ function TaskCard({ task, now }: { task: Task; now: number }) {
       <div id={bodyId} className={styles.body}>
         <ol className={styles.steps}>
           {task.rows.map((row, i) => (
-            <StepRow key={row.id} row={row} active={task.running && i === task.rows.length - 1} />
+            <StepRow key={row.id} row={row} active={task.running && i === task.rows.length - 1} showWhy={showWhy} />
           ))}
         </ol>
       </div>
@@ -143,8 +156,9 @@ const STEP_ICONS: Record<string, IconName> = {
   "call.menu_heard": "wave",
 };
 
-function StepRow({ row, active }: { row: FeedItem; active: boolean }) {
+function StepRow({ row, active, showWhy }: { row: FeedItem; active: boolean; showWhy: boolean }) {
   const { lang } = useLang();
+  const t = useStrings().case.activity;
   const step = row.step;
   const icon = STEP_ICONS[row.type] ?? iconForEvent(row.type);
   if (!step) {
@@ -173,6 +187,11 @@ function StepRow({ row, active }: { row: FeedItem; active: boolean }) {
         <span className={styles.spin} aria-hidden="true" />
       ) : (
         step.result && <span className={`${styles.result} ${tone}`}>{step.result.text}</span>
+      )}
+      {showWhy && step.reason && (
+        <span className={styles.why} lang="en">
+          <b>{t.why}:</b> {step.reason}
+        </span>
       )}
     </li>
   );

@@ -303,6 +303,8 @@ async def test_happy_path_persists_each_state_and_logs_each_event() -> None:
         HungUp(),
     ]
     assert call.events_of(EventType.CALL_MENU_CHOICE)[0].data["digit"] == "2"
+    heard = call.events_of(EventType.CALL_MENU_HEARD)[0].data
+    assert heard["reading_reason_en"] and heard["reason_en"]
     assert call.events_of(EventType.CALL_HUMAN_DETECTED)[0].data["phase"] == "human"
     # Connected and ended normally: partial until the Phase 4 report reads it.
     assert report.outcome == CallOutcome.PARTIAL

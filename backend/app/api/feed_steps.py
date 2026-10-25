@@ -6,10 +6,15 @@ feed hides them by default (`feed_templates.HIDDEN`); `?steps=true` sends them w
 `step`: what the agent did (localized), what it did it to (`detail`, English as
 logged: a search query, a page, a check), and how it came out.
 
-Only fixed text and the logged query, page and check names reach the screen;
-`evidence` and model notes never do.
+Each step also carries `reason`, why it came out that way, in English. For research
+it's fixed text picked by the check's name and outcome (and the scam rules' own
+red-flag sentences, which the user is sent anyway); `evidence` and the model's notes
+still never reach the screen. For the call it's the phone agent's stated reasons,
+which its menu guard already checked. Every reason is masked again here for refs
+and digit runs.
 """
 
+import re
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -22,6 +27,10 @@ STEP_TYPES = frozenset(
 )
 
 MAX_DETAIL = 90
+MAX_REASON = 280
+
+_DIGIT_RUN = re.compile(r"\d[\d\s-]{5,}\d")
+_REF = re.compile(r"<ref:[^>]*>")
 
 Pair = tuple[str, str]
 """(English, Spanish). Other languages go through the translation cache, like the
@@ -60,6 +69,12 @@ CHECKS: dict[str, str] = {
     "seed_snapshot": "saved copy of the official site",
     "submission": "what the search found",
     "discovery": "web search",
+    "letter_read": "what kind of letter",
+    "private_values": "private details",
+    "urgency": "how urgent",
+    "asylum_gate": "is it about the asylum claim?",
+    "quote_on_page": "quote on the source page",
+    "question_loop": "web search",
 }
 PHASES: dict[str, str] = {
     "menu": "phone menu",
@@ -72,6 +87,77 @@ ACTIONS: dict[str, Pair] = {
     "say": ("answer", "responder"),
     "wait": ("wait", "esperar"),
     "ask_user": ("ask you", "preguntarte"),
+}
+
+LETTER_READ: dict[str, tuple[Pair, bool | None]] = {
+    "ok": (("read", "leída"), True),
+    "needs_better_image": (("needs a better photo", "necesita otra foto"), False),
+    "needs_user_input": (("needs your answer", "necesita tu respuesta"), None),
+}
+URGENCY: dict[str, Pair] = {
+    "high": ("high", "alta"),
+    "medium": ("medium", "media"),
+    "low": ("low", "baja"),
+}
+
+NO_RED_FLAGS = (
+    "No payment demands, threats, notario offers, or links outside official sites."
+)
+VERDICT_REASONS: dict[str, str] = {
+    "verified": "The letter's details matched the issuer's official site.",
+    "suspicious": "Red flags, or details that conflict with the official site.",
+    "unknown": "Not enough could be confirmed against official sites, either way.",
+}
+PHONE_FOUND = "The official phone number was found there too."
+DISCOVERY_STOPS: dict[str, str] = {
+    "refusal": "The model declined to keep searching.",
+    "max_tokens": "The search ran out of room before it finished.",
+}
+QUESTION_STOPS = DISCOVERY_STOPS
+CACHE_REJECTED = "A saved copy from an earlier check failed the checks again; not used."
+QUOTE_MISSING = "The quoted text wasn't on the page, so this source was dropped."
+SIGNAL_REASONS: dict[tuple[str, str], str] = {
+    ("url_domains", "match"): "Every web address on the letter is .gov, the issuer's "
+    "own site, or linked from an official page.",
+    ("url_domains", "conflict"): "A web address on the letter isn't official, or "
+    "imitates an official one.",
+    ("url_domains", "uncertain"): "A web address on the letter looks close to an "
+    "official one.",
+    ("url_domains", "not_found"): "The letter has no web address, or one that couldn't "
+    "be tied to an official site.",
+    ("case_number_format", "match"): "The case number has the letters and digits this "
+    "kind of letter uses.",
+    ("case_number_format", "uncertain"): "The case number didn't have the expected "
+    "shape; it may have been misread.",
+    ("case_number_format", "not_found"): "No case number format could be read from "
+    "the letter.",
+    ("form_id", "match"): "The form number is on an official page or the known form "
+    "list.",
+    ("form_id", "not_found"): "No form number on the letter could be confirmed.",
+    ("issuer", "match"): "The sender was found on its official site or in a "
+    "government registry.",
+    ("issuer", "not_found"): "The sender couldn't be confirmed on an official site.",
+    ("return_address", "match"): "The return address is on an official page.",
+    ("return_address", "not_found"): "The return address wasn't found on an official "
+    "page.",
+    ("letter_phone", "match"): "The phone number on the letter is listed for the "
+    "issuer on an official page.",
+    ("letter_phone", "conflict"): "The phone number on the letter appears on a site "
+    "that isn't the issuer's.",
+    ("letter_phone", "not_found"): "The letter has no phone number, or one that wasn't "
+    "found on an official page.",
+}
+FIXED_REASONS: dict[str, str] = {
+    "submission": "What the search found is not trusted yet: the code checks it "
+    "against the pages it actually read.",
+    "verify_cache": "The live check couldn't finish, so a saved copy of the official "
+    "page from an earlier check was used.",
+    "seed_snapshot": "The official site couldn't be reached, so a saved copy of it "
+    "was used.",
+    "private_values": "Names, numbers and addresses are stored apart and replaced "
+    "with placeholders before anything else sees the letter.",
+    "asylum_gate": "Questions about the asylum claim itself are never researched.",
+    "quote_on_page": "The quoted text was found on the official page.",
 }
 
 
@@ -118,26 +204,88 @@ def _check(data: dict[str, Any], lang: str) -> FeedStep:
         result, ok = (("used", "usada"), True) if used else (("none", "no hay"), None)
     elif name == "submission":
         result, ok = ("received", "recibido"), None
+    elif name == "letter_read" and data.get("status") in LETTER_READ:
+        result, ok = LETTER_READ[data["status"]]
+    elif name == "private_values" and isinstance(data.get("count"), int):
+        count = data["count"]
+        result, ok = (f"{count} set aside", f"{count} apartados"), None
+    elif name == "urgency" and data.get("urgency") in URGENCY:
+        result, ok = URGENCY[data["urgency"]], None
+    elif name == "asylum_gate":
+        result, ok = ("declined", "no se investiga"), None
+    elif name == "quote_on_page" and isinstance(data.get("passed"), bool):
+        passed = data["passed"]
+        result = ("found", "encontrada") if passed else ("not found", "no aparece")
+        ok = passed
+    elif name == "question_loop":
+        result, ok = ("stopped", "se detuvo"), False
     elif data.get("state") in STATES:
         result, ok = STATES[data["state"]]
-    return _step(CHECKING, detail, result, ok, lang)
+    return _step(CHECKING, detail, result, ok, lang, _check_reason(name, data))
+
+
+def _check_reason(name: str, data: dict[str, Any]) -> str | None:
+    """Why the check came out as it did: its own notes, or fixed text."""
+    if name == "scam_rules" and isinstance(data.get("red_flags"), list):
+        flags = [f for f in data["red_flags"] if isinstance(f, str)]
+        return " ".join(flags) or NO_RED_FLAGS
+    if name == "verdict":
+        reason = VERDICT_REASONS.get(_text(data.get("status")) or "")
+        if reason and data.get("official_phone_found") is True:
+            reason += " " + PHONE_FOUND
+        return reason
+    if name == "discovery":
+        return DISCOVERY_STOPS.get(_text(data.get("stop_reason")) or "")
+    if name == "question_loop":
+        return QUESTION_STOPS.get(_text(data.get("stop_reason")) or "")
+    if name == "letter_read":
+        doc_type = _text(data.get("doc_type"))
+        return f"Read as: {doc_type.replace('_', ' ')}." if doc_type else None
+    if name == "urgency" and isinstance(data.get("dates"), int):
+        dates = data["dates"]
+        return f"Based on {dates} date{'' if dates == 1 else 's'} on the letter."
+    if name in FIXED_REASONS:
+        if name == "verify_cache" and data.get("ok") is False:
+            return CACHE_REJECTED
+        if name == "quote_on_page" and data.get("passed") is False:
+            return QUOTE_MISSING
+        return FIXED_REASONS[name]
+    return SIGNAL_REASONS.get((name, _text(data.get("state")) or ""))
 
 
 def _menu_heard(data: dict[str, Any], lang: str) -> FeedStep:
     detail = PHASES.get(_text(data.get("phase")) or "", "the line")
     action = ACTIONS.get(_text(data.get("action")) or "")
-    return _step(LISTENING, detail, action, None, lang)
+    reasons = [_text(data.get("reading_reason_en")), _text(data.get("reason_en"))]
+    reason = " ".join(r if r.endswith(".") else r + "." for r in reasons if r)
+    return _step(LISTENING, detail, action, None, lang, reason or None)
 
 
 def _step(
-    action: Pair, detail: str | None, result: Pair | None, ok: bool | None, lang: str
+    action: Pair,
+    detail: str | None,
+    result: Pair | None,
+    ok: bool | None,
+    lang: str,
+    reason: str | None = None,
 ) -> FeedStep:
     return FeedStep(
         action=_localized(action, lang),
         detail=detail[:MAX_DETAIL] if detail else None,
         result=_localized(result, lang) if result else None,
         ok=ok,
+        reason=_masked(reason),
     )
+
+
+def _masked(reason: str | None) -> str | None:
+    """A second check at the edge: no refs, no runs of digits, a bounded length."""
+    if not reason:
+        return None
+    reason = _DIGIT_RUN.sub("[number]", _REF.sub("[hidden]", reason))
+    if len(reason) > MAX_REASON:
+        reason = reason[: MAX_REASON - 1].rstrip() + "…"
+    return reason
 
 
 def _localized(pair: Pair, lang: str) -> Localized:

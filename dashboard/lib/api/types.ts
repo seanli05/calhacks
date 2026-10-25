@@ -95,6 +95,8 @@ export interface FeedStep {
   result: Localized | null;
   /** False: the step went wrong. Null: neither good nor bad. */
   ok: boolean | null;
+  /** Why it came out that way, English as written by the backend. */
+  reason?: string | null;
 }
 
 /** GET /api/users/{user_id}/cases?lang=xx: active cases, newest first. */
