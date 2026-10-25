@@ -120,8 +120,6 @@ export const caseView: CaseStrings = {
     show: "ver pasos",
     hide: "ocultar pasos",
     why: "Por qué",
-    showWhy: "ver razonamiento",
-    hideWhy: "ocultar razonamiento",
   },
   close: "Cerrar",
 };
