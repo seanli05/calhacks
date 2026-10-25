@@ -45,25 +45,6 @@ NOT_ASYLUM_INFO = (
     "your online account. To reschedule, sign in at u s c i s dot gov."
 )
 
-RECEIPT_PROMPT = (
-    "Please say your 13-character receipt number, found in the top left corner of "
-    "your notice. It starts with three letters. "
-    "Or, using your keypad, enter just the 10 digits, then press pound."
-)
-
-RECEIPT_CONFIRM = (
-    "I heard {spelled}. If that's correct, say yes or press 1. "
-    "To try again, say no or press 2."
-)
-
-RECEIPT_NOT_HEARD = "Sorry, I didn't catch a receipt number."
-
-RECEIPT_NOT_FOUND = "I'm sorry, I couldn't find a case with that receipt number."
-
-RECEIPT_FOUND = "Thank you. I found your asylum interview."
-
-RECEIPT_GIVE_UP = "Let's continue, and an officer can look up your case."
-
 REASON_PROMPT = (
     "In a few words, please tell me why you're calling about your interview. "
     "For example, you can say, I need to reschedule, or, I have a question about "
