@@ -15,6 +15,10 @@ Tree:
     REASON          open    say why you're calling (speech only)
     ATTENDANCE      closed  1 attending as scheduled, 2 needs a new date
     -> transfer to hold, then a live officer
+
+The short tree (MOCK_AGENCY_MODE=short) keeps one keypad menu and one open
+question: APPOINTMENT (opens the call, no star to a main menu), then REASON,
+then the transfer.
 """
 
 from enum import StrEnum
@@ -71,9 +75,12 @@ class CallerInfo(BaseModel):
 
 
 class PhoneTree:
-    def __init__(self, case: MockCase) -> None:
+    def __init__(self, case: MockCase, *, short: bool = False) -> None:
         self.case = case
-        self.node = Node.MAIN_MENU
+        self.short = short
+        self.home = Node.APPOINTMENT if short else Node.MAIN_MENU
+        """Where the call opens, and where a dead-end branch returns to."""
+        self.node = self.home
         self.info = CallerInfo()
         self._no_input_count = 0
         self._reason_attempts = 0
@@ -81,7 +88,7 @@ class PhoneTree:
     # --- inputs -------------------------------------------------------------
 
     def start(self) -> IvrTurn:
-        return IvrTurn(lines=[prompts.GREETING, prompts.MAIN_MENU])
+        return IvrTurn(lines=[prompts.GREETING, self._prompt()])
 
     def press(self, key: str) -> IvrTurn:
         """Handle one DTMF key press."""
@@ -133,7 +140,7 @@ class PhoneTree:
                 return self._info_then_main(prompts.NOT_ASYLUM_INFO)
             case Node.APPOINTMENT, "2":
                 return self._go(Node.REASON)
-            case Node.APPOINTMENT, "*":
+            case Node.APPOINTMENT, "*" if not self.short:
                 return self._go(Node.MAIN_MENU)
 
             case Node.ATTENDANCE, "1" | "2":
@@ -189,6 +196,8 @@ class PhoneTree:
         self.info.reason_said = text.strip()
         self.info.topic = topic
         ack = prompts.REASON_ACKS[topic]
+        if self.short:
+            return self._transfer(before=[ack])
         if topic is Topic.RESCHEDULE:
             self.info.wants_reschedule = True
             return self._transfer(before=[ack])
@@ -199,7 +208,9 @@ class PhoneTree:
     def _prompt(self) -> str:
         return {
             Node.MAIN_MENU: prompts.MAIN_MENU,
-            Node.APPOINTMENT: prompts.APPOINTMENT_MENU,
+            Node.APPOINTMENT: (
+                prompts.APPOINTMENT_OPTIONS if self.short else prompts.APPOINTMENT_MENU
+            ),
             Node.REASON: prompts.REASON_PROMPT,
             Node.ATTENDANCE: prompts.ATTENDANCE_MENU,
         }[self.node]
@@ -209,6 +220,8 @@ class PhoneTree:
         return IvrTurn(lines=[*(before or []), self._prompt()])
 
     def _info_then_main(self, info: str) -> IvrTurn:
+        if self.short:
+            return self._go(self.home, before=[info])
         return self._go(Node.MAIN_MENU, before=[info, prompts.RETURNING_TO_MAIN])
 
     def _invalid(self) -> IvrTurn:

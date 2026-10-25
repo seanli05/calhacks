@@ -25,6 +25,8 @@ class Mode(StrEnum):
     """The full phone tree, hold, then the officer: the demo path."""
     QUICK = "quick"
     """A short greeting, then the officer at once: for testing live calls."""
+    SHORT = "short"
+    """One keypad menu, one open question, a short hold, then the officer."""
 
 
 class Case(StrEnum):
@@ -46,6 +48,8 @@ class MockAgencySettings(BaseModel):
     case: Case = Case.DEMO
     officer_name: str = "Daniel Reyes"
     hold_seconds: float = 45.0
+    short_hold_seconds: float = 15.0
+    """The hold in short mode; hold_seconds is the demo tree's."""
     hold_announce_every_s: float = 15.0
     no_input_seconds: float = 12.0
     ivr_voice_id: str = IVR_VOICE_ID
@@ -62,6 +66,11 @@ class MockAgencySettings(BaseModel):
     def case_record(self) -> MockCase:
         return CASES[self.case]
 
+    @property
+    def call_hold_seconds(self) -> float:
+        """How long this deploy's calls wait on hold."""
+        return self.short_hold_seconds if self.mode is Mode.SHORT else self.hold_seconds
+
     @classmethod
     def from_env(cls) -> "MockAgencySettings":
         env = {
@@ -71,6 +80,7 @@ class MockAgencySettings(BaseModel):
             "case": os.environ.get("MOCK_AGENCY_CASE"),
             "officer_name": os.environ.get("MOCK_AGENCY_OFFICER_NAME"),
             "hold_seconds": os.environ.get("MOCK_AGENCY_HOLD_SECONDS"),
+            "short_hold_seconds": os.environ.get("MOCK_AGENCY_SHORT_HOLD_SECONDS"),
             "hold_announce_every_s": os.environ.get(
                 "MOCK_AGENCY_HOLD_ANNOUNCE_EVERY_S"
             ),

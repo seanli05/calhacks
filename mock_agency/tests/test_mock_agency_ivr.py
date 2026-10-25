@@ -140,3 +140,41 @@ def test_spoken_digit(text, digit):
 )
 def test_classify_reason(text, topic):
     assert classify_reason(text) is topic
+
+
+def test_short_tree_opens_on_the_appointment_menu_without_a_main_menu():
+    tree = PhoneTree(DEMO_CASE, short=True)
+    turn = tree.start()
+    assert turn.lines == [prompts.GREETING, prompts.APPOINTMENT_OPTIONS]
+    assert "star" not in prompts.APPOINTMENT_OPTIONS
+    assert tree.node is Node.APPOINTMENT
+
+
+def test_short_tree_goes_from_asylum_to_reason_to_transfer():
+    tree = PhoneTree(DEMO_CASE, short=True)
+    tree.start()
+    assert tree.press("2").lines == [prompts.REASON_PROMPT]
+    turn = tree.hear("I have a question about interpreters for my interview")
+    assert turn.transfer
+    assert turn.lines == [prompts.REASON_ACKS[Topic.INTERPRETER]]
+    assert tree.info.topic is Topic.INTERPRETER
+
+
+def test_short_tree_skips_attendance_even_for_a_non_reschedule_reason():
+    tree = PhoneTree(DEMO_CASE, short=True)
+    tree.start()
+    tree.press("2")
+    assert tree.hear("where is my interview").transfer
+    assert tree.info.wants_reschedule is None
+
+
+def test_short_tree_wrong_branch_returns_to_the_appointment_menu():
+    tree = PhoneTree(DEMO_CASE, short=True)
+    tree.start()
+    turn = tree.press("1")
+    assert turn.lines == [prompts.NOT_ASYLUM_INFO, prompts.APPOINTMENT_OPTIONS]
+    assert tree.node is Node.APPOINTMENT
+    assert tree.press("*").lines == [
+        prompts.INVALID_OPTION,
+        prompts.APPOINTMENT_OPTIONS,
+    ]
