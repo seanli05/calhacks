@@ -43,7 +43,7 @@ S = CallState
 
 _LIVE_STATES = frozenset({S.BRIDGING, S.CONNECTED})
 """While the applicant is joining or on the call, the dashboard follows the
-transcript live (docs/phone-live-transcript.md)."""
+transcript live (docs/specs/phone-ports.md → The runner)."""
 
 
 class RunnerBase:
