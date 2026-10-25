@@ -41,7 +41,7 @@ from app.orchestrator.research_questions import ResearchQuestions
 from app.orchestrator.tools import CaseTools, build_tools
 from app.relay.outbound import send_template, send_text
 from app.relay.whatsapp import WhatsApp, WhatsAppSendError
-from app.translation.translate import Translator
+from app.translation.translate import LANGUAGE_NAMES, Translator
 
 if TYPE_CHECKING:
     from app.orchestrator.fact_consent import FactConsent
@@ -118,16 +118,20 @@ class OrchestratorTurn:
         open_questions: OpenQuestions | None = None,
         quiet_moment: QuietMoment | None = None,
         letters_in_progress: LettersInProgress | None = None,
+        language_guessed: bool = False,
     ) -> None:
         """Reply to the user's latest message (`message_id`), which the pipe has
         already logged; then queue the memory writer on it (Goal 6.5).
         `open_questions` is what the user hasn't answered yet; with `quiet_moment`,
-        a plain reply may end with "may I save this?"."""
+        a plain reply may end with "may I save this?". With `language_guessed`, the
+        user's language was just read from this message (C44), and the reply says
+        so in passing."""
         await self._reply(
             user,
             open_questions or OpenQuestions(),
             quiet_moment,
             letters_in_progress or LettersInProgress(),
+            language_guessed,
         )
         await _queue_memory_write(user, message_id)
 
@@ -137,6 +141,7 @@ class OrchestratorTurn:
         open_questions: OpenQuestions,
         quiet_moment: QuietMoment | None,
         letters_in_progress: LettersInProgress,
+        language_guessed: bool,
     ) -> None:
         tools = CaseTools(
             user,
@@ -147,7 +152,12 @@ class OrchestratorTurn:
             fact_consent=self._fact_consent,
             open_questions=open_questions,
         )
-        context = await build_context(user, open_questions, letters_in_progress)
+        context = await build_context(
+            user,
+            open_questions,
+            letters_in_progress,
+            language_guessed=language_guessed,
+        )
         try:
             async with asyncio.timeout(self._turn_timeout_s):
                 reply_en = await self._ask_claude(tools, context)
@@ -254,10 +264,13 @@ async def build_context(
     user: tables.User,
     open_questions: OpenQuestions | None = None,
     letters_in_progress: LettersInProgress | None = None,
+    *,
+    language_guessed: bool = False,
 ) -> str:
     """The turn's user message: recent conversation in English, open cases, letters
-    not read yet, and the questions waiting for the user's answer. Built from stored
-    rows only; refs are never resolved."""
+    not read yet, the questions waiting for the user's answer, and whether the
+    language was just guessed. Built from stored rows only; refs are never
+    resolved."""
     messages = (await reads.list_messages(user.id))[-HISTORY_MESSAGES:]
     lines = [_history_line(message) for message in messages]
     cases = [
@@ -274,9 +287,25 @@ async def build_context(
         "</open_cases>",
         *(letters_in_progress or LettersInProgress()).render(),
         *(open_questions or OpenQuestions()).render(),
+        *(_language_note(user) if language_guessed else []),
         "Reply to the user's latest message.",
     ]
     return "\n".join(parts)
+
+
+def _language_note(user: tables.User) -> list[str]:
+    """C44: the language was read from this first message, not picked."""
+    name = LANGUAGE_NAMES.get(user.language or "en", user.language or "English")
+    return [
+        "<language_note>",
+        (
+            f"This is the user's first message. We read it as {name} and will write "
+            f"in {name}; nobody asked them. Answer their message, then end with one "
+            "short, light line saying they can write in another language if that's "
+            "easier."
+        ),
+        "</language_note>",
+    ]
 
 
 def _history_line(message: tables.Message) -> str:

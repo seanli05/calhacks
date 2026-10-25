@@ -40,9 +40,9 @@ from app.orchestrator.fact_consent import FactConsent
 from app.orchestrator.job_watch import get_job_watcher
 from app.orchestrator.language import (
     LanguageStep,
-    answer_to_prompt,
+    language_step,
     last_language_prompt,
-    prompt_for,
+    picked,
 )
 from app.orchestrator.letter_result import LetterResults
 from app.orchestrator.letters import Letters
@@ -86,6 +86,7 @@ class TurnRunner(Protocol):
         open_questions: OpenQuestions | None = None,
         quiet_moment: QuietMoment | None = None,
         letters_in_progress: LettersInProgress | None = None,
+        language_guessed: bool = False,
     ) -> None: ...
 
 
@@ -251,7 +252,12 @@ class InboundPipe:
         yes_no = parse_yes_no(message.text) if message.text else None
         turn = None
         if step is not None:
-            await self._apply_language_step(user, step, pages)
+            user = await self._apply_language_step(user, step, pages)
+            if step.guessed and not pages and self._turn is not None:
+                # Answer what they wrote, in the language they wrote it in.
+                turn = partial(
+                    self._orchestrator_turn, user, inbound.id, language_guessed=True
+                )
         elif pages:
             await self._letter_pages(user, pages)
         elif same_or_new is not None and (n := parse_choice(message.text, 2)):
@@ -313,36 +319,39 @@ class InboundPipe:
     ) -> tuple[LanguageStep, LanguageCode]:
         """The next language-pick step, and the language to log the message in."""
         last_prompt = await last_language_prompt(user_id)
-        step = answer_to_prompt(message.text, last_prompt) if message.text else None
         detected = None
-        if step is None:
-            detected = await self._detect(message.text) if message.text else None
-            step = prompt_for(
-                detected,
-                has_text=bool(message.text),
-                prompt_pending=last_prompt is not None,
-            )
-        prompt_language = last_prompt.language if last_prompt else None
-        return step, step.chosen or detected or prompt_language or _FALLBACK_LANGUAGE
+        if message.text and picked(message.text) is None:
+            detected = await self._detect(message.text)
+        step = language_step(
+            message.text, detected, prompt_pending=last_prompt is not None
+        )
+        return step, step.chosen or detected or _FALLBACK_LANGUAGE
 
     async def _apply_language_step(
         self, user: tables.User, step: LanguageStep, pages: list[MediaId]
-    ) -> None:
+    ) -> tables.User:
+        """Set or ask for the language; returns the user as it now stands. A guessed
+        language with no photos sends nothing here: the turn answers the message
+        and confirms the language in passing."""
         if pages:
             # No research before the language is known; the batch waits for it.
             self.photos.add(user.id, pages, hold=True)
         if step.chosen is not None:
             user = await writes.set_language(user.id, step.chosen)
-            logger.info("Language set user_id=%s language=%s", user.id, step.chosen)
+            logger.info(
+                "Language set user_id=%s language=%s guessed=%s",
+                user.id,
+                step.chosen,
+                step.guessed,
+            )
             if self.photos.is_open(user.id):
                 self.photos.release(user.id)
                 await send_template(self._whatsapp, user, "language.set_letter")
-            else:
+            elif not step.guessed or self._turn is None:
                 await send_template(self._whatsapp, user, "language.set")
         elif step.prompt is not None:
-            await send_template(
-                self._whatsapp, user, step.prompt, language=step.prompt_language
-            )
+            await send_template(self._whatsapp, user, step.prompt)
+        return user
 
     async def _letter_pages(self, user: tables.User, pages: list[MediaId]) -> None:
         if self.photos.is_open(user.id):
@@ -440,7 +449,11 @@ class InboundPipe:
         await self.letters.start(user_id, document.id)
 
     async def _orchestrator_turn(
-        self, user: tables.User, message_id: MessageId
+        self,
+        user: tables.User,
+        message_id: MessageId,
+        *,
+        language_guessed: bool = False,
     ) -> None:
         assert self._turn is not None
         # "Typing…" from the start, even while a proactive message holds the lock.
@@ -458,6 +471,7 @@ class InboundPipe:
                             photos_arriving=self.photos.is_open(user.id),
                             reading_case_id=self.letters.reading_case(user.id),
                         ),
+                        language_guessed=language_guessed,
                     )
                 finally:
                     self.conversation.done_typing(user.id, "turn")

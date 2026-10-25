@@ -108,7 +108,7 @@ To run the whole flow (photo → research → consent → call → summary): [do
 
 The webhook returns empty TwiML at once and handles the message in a background task (`orchestrator/pipe.py`); every reply goes out through the Twilio REST API (`relay/whatsapp.py`) and is logged to `messages`. The pipe needs `DATABASE_URL`; without `ANTHROPIC_API_KEY`, language detection is skipped and first contact always gets the language menu. What a new number sees:
 
-- **Language pick:** a text first message gets a one-tap confirm in the detected language; a photo-only one gets the menu (1 Español, 2 English, 3 دری). Dari (`fa`) is the demo language; replies in Persian digits (`۱`) work too.
+- **Language pick:** a clear first message sets the language and gets an answer, with one line saying they can switch (Plan.md C44); an unclear one ("ok", a photo with no text) gets a multilingual question (Español · English · دری) that takes a language's name, a number, or a sentence in it. Dari (`fa`) is the demo language; Persian digits (`۱`) work too.
 - **Photos:** photos sent within 6 s of each other become one letter (`documents` row), and the orchestrator queues the research fast pass for it. Once research has started, a new photo gets "same letter or new?".
 - **Results:** when research finishes, the explanation (interview date and time, checklist), then the verdict. A verified letter gets a numbered consent question; only the user's `1` queues a call. After the call, a summary with the reference number and next steps.
 - **Other text:** answered by the orchestrator's Claude turn (it explains letters, never gives legal advice). Replies are written in English and translated into the user's language. Without `ANTHROPIC_API_KEY`, text is echoed back instead.

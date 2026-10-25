@@ -14,13 +14,13 @@ from app.translation.script import for_display, local_digits
 LANGUAGES: tuple[LanguageCode, ...] = ("es", "en", "fa")
 """Supported languages, in the order the language menu lists them."""
 
+# No numbers to pick from (C44): the user writes the language, or just writes to us
+# in it. A number still works, in this order (decision 20 in whatsapp-pipe.md).
 _MENU = (
     "Hola 👋 Hello 👋 سلام\n"
     "¿En qué idioma prefiere que le escriba? / Which language would you like?\n"
     "به کدام زبان برایتان بنویسم؟\n"
-    "1 Español\n"
-    "2 English\n"
-    "3 دری"
+    "Español · English · دری"
 )
 
 # The end of every consent request: how the call works, then the choice.
@@ -60,17 +60,6 @@ _WANT_CALL_GENERIC = {
 _LEGAL_HELP_FA = "یک وکیل یا یک نمایندهٔ معتبر وزارت عدلیهٔ امریکا (DOJ)"
 
 TEMPLATES: dict[str, dict[LanguageCode, str]] = {
-    "language.confirm": {
-        "es": "Parece que habla español. ¿Seguimos en español?\n1 Sí\n2 Otro idioma",
-        "en": (
-            "It looks like you're writing in English. Shall we continue in English?\n"
-            "1 Yes\n2 Another language"
-        ),
-        "fa": (
-            "معلوم می‌شود که شما به دری می‌نویسید. به دری ادامه بدهیم؟\n"
-            "۱ بلی\n۲ زبان دیگر"
-        ),
-    },
     "language.menu": {"es": _MENU, "en": _MENU, "fa": _MENU},
     "language.set": {
         "es": (
@@ -86,18 +75,20 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "یا سوال خود را برایم بنویسید."
         ),
     },
+    # Also after a language read from the first message (C44), so it says in passing
+    # how to change it.
     "language.set_letter": {
         "es": (
-            "Perfecto, seguimos en español. Recibí su carta. Si tiene más páginas, "
-            "envíelas ahora."
+            "Gracias, recibí su carta. Le escribo en español; si le resulta más fácil "
+            "otro idioma, solo dígamelo. Si la carta tiene más páginas, envíelas ahora."
         ),
         "en": (
-            "Great, we'll continue in English. I got your letter. If it has more "
-            "pages, send them now."
+            "Thanks, I got your letter. I'll write in English; if another language is "
+            "easier, just tell me. If it has more pages, send them now."
         ),
         "fa": (
-            "خوب، به دری ادامه می‌دهیم. نامهٔ شما را گرفتم. اگر صفحه‌های بیشتر دارد، "
-            "حالا بفرستید."
+            "تشکر، نامهٔ شما را گرفتم. به دری برایتان می‌نویسم؛ اگر زبان دیگری برایتان "
+            "آسان‌تر است، فقط بگویید. اگر نامه صفحه‌های بیشتر دارد، حالا بفرستید."
         ),
     },
     # No question mark: a question invites a "no, that's it" that needs a turn.
