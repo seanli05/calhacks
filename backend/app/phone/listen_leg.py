@@ -1,10 +1,12 @@
 """The listen leg: the user sits in on the call before a representative answers.
 
 The user asks over WhatsApp (`control.request_listen_in`), and the line rings
-their own number (C6) on a call of its own. It has a join gate like the bridge's,
-because carrier voicemail answers unpicked calls and would record the agency (C29).
-A key press puts the leg on a media stream that only plays the call to them
-(`listen_audio.py`).
+their own number (C6) on a call of its own. With the join gate on
+(`PHONE_JOIN_GATE`), it has a gate like the bridge's, because carrier voicemail
+answers unpicked calls and would record the agency (C29): a key press puts the leg
+on a media stream that only plays the call to them (`listen_audio.py`). With the
+gate off (the demo), picking up starts the stream at once, like the bridge; the
+voicemail risk is accepted the same way.
 
 It's a separate call from the agency leg, so the user hanging up ends only this
 leg: the agent's call goes on, and they can ask again. If a person picks up while
@@ -67,11 +69,13 @@ class ListenLeg:
         emit: Callable[[LineEvent], None],
         *,
         language: LanguageCode,
+        gate: bool = True,
     ) -> None:
         self._calls = calls
         self._urls = urls
         self._emit = emit
         self._language = language
+        self._gate = gate
         self.stage: ListenStage = "none"
         self.sid: str | None = None
         self._retired: set[str] = set()
@@ -96,11 +100,7 @@ class ListenLeg:
         try:
             sid = await self._calls.create(
                 to=number,
-                twiml=user_gate_twiml(
-                    listen_prompt(self._language),
-                    self._urls.listen_joined(call_id),
-                    self._urls.listen_missed(call_id),
-                ),
+                twiml=self._ring_twiml(call_id),
                 status_callback=self._urls.listen_status(call_id),
                 ring_s=USER_RING_TIMEOUT_S,
             )
@@ -119,6 +119,19 @@ class ListenLeg:
             return
         self.sid = self.sid or sid
         logger.info("rang the listener (call_id=%s sid=%s)", call_id, sid)
+
+    def _ring_twiml(self, call_id: CallId) -> str:
+        """What the leg runs on pick-up: the listen gate, or with no gate the
+        stream itself."""
+        if not self._gate:
+            return listen_stream_twiml(
+                self._urls.listen_stream(call_id), listening_now(self._language)
+            )
+        return user_gate_twiml(
+            listen_prompt(self._language),
+            self._urls.listen_joined(call_id),
+            self._urls.listen_missed(call_id),
+        )
 
     async def _cancel(self, call_id: CallId, sid: str) -> None:
         try:
@@ -140,7 +153,9 @@ class ListenLeg:
             return
         self.sid = self.sid or call_sid
         if self.stage == "ringing":
-            if status in _NOT_REACHED or status == "canceled":
+            if status == "in-progress" and not self._gate:
+                self._picked_up(call_sid)
+            elif status in _NOT_REACHED or status == "canceled":
                 self.end(_NOT_REACHED.get(status, "failed"))
             elif status == "completed":
                 self.end("no_key_press")  # picked up, put down before a key
@@ -153,12 +168,22 @@ class ListenLeg:
                 "listen key press too late (call_id=%s stage=%s)", call_id, self.stage
             )
             return hang_up_twiml()
-        self.sid = self.sid or call_sid
-        self.stage = "listening"
-        self._emit(ListenStarted())
+        self._start(call_sid)
         return listen_stream_twiml(
             self._urls.listen_stream(call_id), listening_now(self._language)
         )
+
+    def _picked_up(self, call_sid: str) -> None:
+        """No gate: the leg answered, so the user is listening. Called by whichever
+        comes first, the callback or the stream."""
+        if self._gate or self.stage != "ringing" or not self._matches(call_sid):
+            return
+        self._start(call_sid)
+
+    def _start(self, call_sid: str) -> None:
+        self.sid = self.sid or call_sid
+        self.stage = "listening"
+        self._emit(ListenStarted())
 
     def missed_gate(self, call_sid: str) -> str:
         if self._matches(call_sid) and self.stage == "ringing":
@@ -166,6 +191,7 @@ class ListenLeg:
         return hang_up_twiml()
 
     def attach(self, sink: ListenSink, call_sid: str) -> bool:
+        self._picked_up(call_sid)
         if self.stage != "listening" or call_sid != self.sid:
             return False
         self._sink = sink

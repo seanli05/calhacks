@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 from app.phone import control
-from app.phone.call_lines import LISTEN_PROMPTS
+from app.phone.call_lines import LISTEN_PROMPTS, LISTENING_NOW
 from app.phone.fakes import FakeNumberSource
 from app.phone.line import (
     AgencyAnswered,
@@ -210,12 +210,8 @@ async def test_the_sink_sends_twilio_media_and_drops_when_behind() -> None:
 # The listen leg on the line
 
 
-@pytest.mark.parametrize("join_gate", [True, False])
-async def test_a_request_rings_the_users_own_number_behind_a_gate(
-    join_gate: bool,
-) -> None:
-    """Even with no join gate for the bridge, listening in keeps its gate (C29)."""
-    line = await Line(join_gate=join_gate).ringing()
+async def test_a_request_rings_the_users_own_number_behind_a_gate() -> None:
+    line = await Line().ringing()
 
     listen = line.calls.created[1]
     assert listen["to"] == APPLICANT
@@ -225,6 +221,56 @@ async def test_a_request_rings_the_users_own_number_behind_a_gate(
     assert listen["ring_s"] == 15
     assert line.line.request_listen_in() == "already_listening"
     assert await line.events() == [AgencyAnswered(), ListenRequested()]
+
+
+async def test_with_no_gate_the_listen_leg_is_the_stream_itself() -> None:
+    line = await Line(join_gate=False).ringing()
+
+    twiml = line.calls.created[1]["twiml"]
+    assert "<Gather" not in twiml and LISTEN_PROMPTS["es"].text not in twiml
+    assert LISTENING_NOW["es"].text in twiml
+    assert "wss://agent.example.app/phone/calls/call_1/listen/stream" in twiml
+    assert line.calls.created[1]["ring_s"] == 15
+
+
+async def test_with_no_gate_picking_up_starts_listening_once() -> None:
+    """Whichever comes first, the callback or the stream."""
+    by_callback = await Line(join_gate=False).ringing()
+    by_callback.line.on_listen_status(LISTEN_SID, "in-progress")
+    sink = RecordingSink()
+    assert by_callback.line.attach_listener(sink, LISTEN_SID)  # type: ignore[arg-type]
+    by_callback.line.on_listen_status(LISTEN_SID, "in-progress")
+
+    by_stream = await Line(join_gate=False).ringing()
+    other = RecordingSink()
+    assert not by_stream.line.attach_listener(other, "CA999")  # type: ignore[arg-type]
+    assert by_stream.line.attach_listener(other, LISTEN_SID)  # type: ignore[arg-type]
+    by_stream.line.on_listen_status(LISTEN_SID, "in-progress")
+
+    by_callback.line.listen_mixer.agency_audio(_pcm(3, 3))
+    assert sink.chunks == [_pcm(3, 3)]
+    for line in (by_callback, by_stream):
+        events = await line.events()
+        assert events[1:3] == [ListenRequested(), ListenStarted()]
+        assert events.count(ListenStarted()) == 1
+
+
+async def test_with_no_gate_a_listener_who_picked_up_moves_into_the_bridge() -> None:
+    line = await Line(join_gate=False).ringing()
+    line.line.on_listen_status(LISTEN_SID, "in-progress")
+    await line.line.ring_user("call_1", "user_9")
+
+    assert len(line.calls.created) == 2  # no second ring
+    assert line.calls.updates[-1][0] == LISTEN_SID
+    assert UserAnswered() in await line.events()
+
+
+async def test_with_the_gate_picking_up_alone_doesnt_start_listening() -> None:
+    line = await Line().ringing()
+    line.line.on_listen_status(LISTEN_SID, "in-progress")
+    sink = RecordingSink()
+    assert not line.line.attach_listener(sink, LISTEN_SID)  # type: ignore[arg-type]
+    assert ListenStarted() not in await line.events()
 
 
 async def test_a_key_press_streams_the_call_to_the_user() -> None:

@@ -86,7 +86,7 @@ LISTEN_PROMPTS: dict[LanguageCode, JoinPrompt] = {
 }
 """What the user hears on picking up the listen-only leg (`listen_leg.py`), when they
 asked to sit in. The key press keeps carrier voicemail from recording the call
-(C29)."""
+(C29). Unused when the line has no gate (`PHONE_JOIN_GATE=false`)."""
 
 LISTENING_NOW: dict[LanguageCode, JoinPrompt] = {
     "en": JoinPrompt(
@@ -100,7 +100,8 @@ LISTENING_NOW: dict[LanguageCode, JoinPrompt] = {
         "Polly.Lupe",
     ),
 }
-"""Said right after the listen leg's key press, before the call plays: without it,
+"""Said right after the listen leg's key press (or on pick-up with no gate), before
+the call plays: without it,
 a quiet moment on the call (the agent waiting for a menu) sounded like nothing
 happened."""
 

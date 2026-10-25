@@ -12,7 +12,8 @@ Three things feed one call's line, all in this one process:
   `AudioStream` and emits speech events through `emit`. After the bridge, each
   leg's listen-only fork emits `Overheard` lines the same way;
 - the listen leg, when the user sits in before the bridge (`listen_leg.py`): its
-  callbacks and its stream (`listen_audio.py`) come through here to its `ListenLeg`.
+  callbacks and its stream (`listen_audio.py`) come through here to its `ListenLeg`,
+  which follows the same `join_gate`.
 
 The bridge (spikes/bridge/README.md): `ring_user` calls the applicant with a join
 gate, because carrier voicemail picks up unanswered calls and Twilio reports that
@@ -192,7 +193,9 @@ class TwilioTelephony:
         self._user_stage: UserStage = "none"
         self._bridged = False
         """The agency leg was moved into the conference."""
-        self._listen = ListenLeg(calls, urls, self.emit, language=user_language)
+        self._listen = ListenLeg(
+            calls, urls, self.emit, language=user_language, gate=join_gate
+        )
 
     def __repr__(self) -> str:
         return f"TwilioTelephony(call_id={self._call_id})"
