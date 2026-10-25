@@ -148,13 +148,10 @@ def consent(
 def verdicts(
     whatsapp: FakeWhatsApp,
     translator: FakeTranslator,
-    consent: ConsentGate,
     conversation: Conversation,
 ) -> Verdicts:
     fake: Any = translator
-    return Verdicts(
-        whatsapp, fake, consent, poll_interval_s=0.01, conversation=conversation
-    )
+    return Verdicts(whatsapp, fake, poll_interval_s=0.01, conversation=conversation)
 
 
 @pytest.fixture
