@@ -160,7 +160,7 @@ export const landing: LandingStrings = {
       { title: "Tu carta, explicada", body: "Avocado lee la carta, te la explica en tu idioma y revisa en el sitio oficial que sea real. Luego te pregunta si quieres que llame." },
       { title: "Dices que sí y Avocado llama", body: "Con tu permiso, Avocado llama al número oficial y pasa el menú telefónico por ti." },
       { title: "Avocado espera en la línea", body: "No tienes que esperar junto al teléfono. Puedes ver lo que pasa en vivo." },
-      { title: "Tu teléfono suena", body: "Cuando contesta una persona, Avocado te llama para que te unas, con traducción en vivo y qué puedes decir." },
+      { title: "Tu teléfono suena", body: "Cuando contesta una persona, Avocado te llama para que te unas y traduce lo que dice, en vivo." },
       { title: "Recibes un resumen", body: "Después de la llamada, recibes lo que se dijo y tus próximos pasos, en tu idioma." },
     ],
   },
