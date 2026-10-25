@@ -107,10 +107,12 @@ QUICK_IVR_SUMMARY = (
     "- The caller came straight through to an officer, so the menu collected nothing."
 )
 
-OFFICER_INTRO = (
-    "Hi, thanks for holding. This is Officer {officer} with U S C I S, "
-    "Los Angeles Asylum Office. Who am I speaking with?"
-)
+
+def officer_intro(case: MockCase, officer: str) -> str:
+    return (
+        f"Hi, thanks for holding. This is Officer {officer} with U S C I S, "
+        f"{case.interview_office}. Who am I speaking with?"
+    )
 
 
 def officer_system_prompt(
