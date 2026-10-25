@@ -63,6 +63,13 @@ class TurnTiming:
     nonspeech_every_s: float = 5.0
 
 
+FORK_TIMING = TurnTiming(merge_gap_s=0.0)
+"""For the listen-only forks after the bridge, which only feed the transcript and
+the dashboard's live translation: each fragment speech-to-text finalizes is a line
+of its own, so the live view follows the call phrase by phrase. Nothing decides on
+these turns, so a menu-sized turn isn't needed."""
+
+
 class TurnAssembler:
     """Turns voice activity, transcripts, and loudness into line events. Every
     method takes `now` (monotonic seconds) and returns the events to emit."""

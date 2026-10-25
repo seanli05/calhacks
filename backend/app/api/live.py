@@ -55,13 +55,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-POLL_S = 0.5
+POLL_S = 0.25
 HEARTBEAT_S = 15.0
 MAX_STREAM_S = 3 * 60 * 60
 STREAM_TIMEOUT_S = 15.0
 ANSWER_SKEW = timedelta(seconds=1)
 """Lines a moment before the answer event still count: clocks differ a little."""
 MAX_CACHED = 5000
+CONTEXT_LINES = 2
+"""Lines before each one, sent with it for context: lines are short phrases, and a
+phrase alone can translate wrong (word order, a pronoun)."""
 
 _DEFAULT_REGISTER = "Write simple, polite language. Short sentences."
 
@@ -125,7 +128,10 @@ async def follow(
             answered_at = await _answered_at(user_id, call_id)
         lines = _since(await reads.get_transcript(call_id), answered_at)
         for index in range(sent, len(lines)):
-            async for event in _line_events(call_id, index, lines[index], lang, tips):
+            context = lines[max(index - CONTEXT_LINES, 0) : index]
+            async for event in _line_events(
+                call_id, index, lines[index], lang, tips, context
+            ):
                 yield event
             last_sent = time.monotonic()
         sent = max(sent, len(lines))
@@ -143,13 +149,14 @@ async def _line_events(
     line: TranscriptLine,
     lang: LanguageCode,
     tips: live_tips.Tips,
+    context: list[TranscriptLine],
 ) -> AsyncIterator[LiveCallEvent]:
     line_id = f"{call_id}_line{index}"
     yield LiveLineHeard(id=line_id, at=line.at, speaker=line.speaker, en=line.text)
     if line.speaker == "user":
         for tip_id in tips.after_user(line.text):
             yield LiveTipUsed(id=tip_id)
-    async for piece in _translate(line_id, line, lang):
+    async for piece in _translate(line_id, line, lang, context):
         yield LiveDelta(id=line_id, text=piece)
     yield LiveLineDone(id=line_id)
     if line.speaker == "agency":
@@ -158,7 +165,10 @@ async def _line_events(
 
 
 async def _translate(
-    line_id: str, line: TranscriptLine, lang: LanguageCode
+    line_id: str,
+    line: TranscriptLine,
+    lang: LanguageCode,
+    context: list[TranscriptLine],
 ) -> AsyncIterator[str]:
     """The line's translation in pieces. English, or no way to translate, sends the
     line as heard in one piece; so does a failure before the first token."""
@@ -176,7 +186,9 @@ async def _translate(
     parts: list[str] = []
     try:
         async with asyncio.timeout(STREAM_TIMEOUT_S):
-            async for piece in streamer.stream(line.text, line.speaker, lang):
+            async for piece in streamer.stream(
+                line.text, line.speaker, lang, context=context
+            ):
                 parts.append(piece)
                 yield piece
     except (anthropic.APIError, TimeoutError) as exc:
@@ -260,7 +272,12 @@ class LineStreamer:
         self._glossary = glossary
 
     async def stream(
-        self, text_en: str, speaker: str, language: LanguageCode
+        self,
+        text_en: str,
+        speaker: str,
+        language: LanguageCode,
+        *,
+        context: list[TranscriptLine] | None = None,
     ) -> AsyncIterator[str]:
         system = LIVE_LINE_SYSTEM.format(
             language=LANGUAGE_NAMES.get(
@@ -276,11 +293,20 @@ class LineStreamer:
             model=self._model,
             max_tokens=1024,
             system=system,
-            messages=[{"role": "user", "content": text_en}],
+            messages=[{"role": "user", "content": _with_context(text_en, context)}],
             timeout=STREAM_TIMEOUT_S,
         ) as stream:
             async for piece in stream.text_stream:
                 yield piece
+
+
+def _with_context(text_en: str, context: list[TranscriptLine] | None) -> str:
+    if not context:
+        return text_en
+    earlier = "\n".join(
+        f"{SPEAKERS.get(line.speaker, line.speaker)}: {line.text}" for line in context
+    )
+    return f"<earlier>\n{earlier}\n</earlier>\n<line>\n{text_en}\n</line>"
 
 
 @lru_cache
