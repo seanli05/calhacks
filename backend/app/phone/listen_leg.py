@@ -5,8 +5,8 @@ their own number (C6) on a call of its own. With the join gate on
 (`PHONE_JOIN_GATE`), it has a gate like the bridge's, because carrier voicemail
 answers unpicked calls and would record the agency (C29): a key press puts the leg
 on a media stream that only plays the call to them (`listen_audio.py`). With the
-gate off (the demo), picking up starts the stream at once, like the bridge; the
-voicemail risk is accepted the same way.
+gate off (the demo), picking up starts the stream at once with nothing said first,
+like the bridge; the voicemail risk is accepted the same way.
 
 It's a separate call from the agency leg, so the user hanging up ends only this
 leg: the agent's call goes on, and they can ask again. If a person picks up while
@@ -122,11 +122,9 @@ class ListenLeg:
 
     def _ring_twiml(self, call_id: CallId) -> str:
         """What the leg runs on pick-up: the listen gate, or with no gate the
-        stream itself."""
+        stream itself, so the user is in the call at once."""
         if not self._gate:
-            return listen_stream_twiml(
-                self._urls.listen_stream(call_id), listening_now(self._language)
-            )
+            return listen_stream_twiml(self._urls.listen_stream(call_id))
         return user_gate_twiml(
             listen_prompt(self._language),
             self._urls.listen_joined(call_id),

@@ -354,10 +354,12 @@ class _CallRunner(MenuSteps):
             case ListenRequested():
                 await self._listen_in()
             case ListenStarted():
+                self.listening_in = True
                 self.step.sent.append("the user is listening in")
                 logger.info("user listening in (%s)", self._ids())
             case ListenEnded(reason=reason):
                 # Only their leg: the call with the agency goes on.
+                self.listening_in = False
                 self.step.flags.append(f"listen_ended:{reason}")
                 logger.info("listen-in ended: %s (%s)", reason, self._ids())
             case NonSpeech():
@@ -418,8 +420,15 @@ class _CallRunner(MenuSteps):
 
     async def _on_human(self) -> None:
         """Ring the applicant at once (< 5 s) and introduce the agent meanwhile. The
-        intro plays in the background, so the applicant joining never waits on it."""
-        self._speak_meanwhile(call_lines.INTRO)
+        intro plays in the background, so the applicant joining never waits on it.
+        A user listening in is moved straight into the call instead, with no intro:
+        they're already there to speak for themselves. Ringing takes the listen leg
+        either way, so it no longer counts."""
+        listening, self.listening_in = self.listening_in, False
+        if listening:
+            self.step.flags.append("listener_joins_without_intro")
+        else:
+            self._speak_meanwhile(call_lines.INTRO)
         await self._ring_user()
 
     async def _ring_user(self) -> None:

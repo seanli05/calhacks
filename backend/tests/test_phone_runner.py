@@ -455,6 +455,27 @@ async def test_listening_in_runs_beside_the_call_and_never_ends_it() -> None:
     assert report.outcome == CallOutcome.PARTIAL
     ended = next(step for step in call.steps if step.input == "listen_ended")
     assert "listen_ended:hung_up" in ended.flags
+    # They'd stopped listening, so the rep hears the intro as usual.
+    assert Said(call_lines.INTRO) in call.actions
+
+
+async def test_a_user_listening_when_a_person_answers_joins_with_no_intro() -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2", "appointments")}))
+    to_rep = _to_rep(Said("two"), user=Step(0.5, UserAnswered()))
+
+    def tree(action: Action) -> list[Step]:
+        if isinstance(action, RangListener):
+            return [Step(5, ListenStarted())]
+        return to_rep(action)
+
+    script = [*_opening(), Step(0.5, ListenRequested())]
+    call, _ = await _run(llm, script, tree)
+
+    assert Said(call_lines.INTRO) not in call.actions
+    assert ConnectedUser() in call.actions
+    assert EventType.CALL_USER_JOINED in call.log.types
+    flags = [flag for step in call.steps for flag in step.flags]
+    assert "listener_joins_without_intro" in flags
 
 
 async def test_hang_up_now_on_hold_cancels_the_call_without_a_word() -> None:

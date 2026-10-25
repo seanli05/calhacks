@@ -111,6 +111,9 @@ class RunnerBase:
         self.hold_overdue = False
         self.holding_said = 0
         self.user_rings = 0
+        self.listening_in = False
+        """The user is on the listen leg (`ListenStarted`, until it ends or the
+        bridge takes it)."""
         self.last_holding_s: float | None = None
         self.speaking: asyncio.Future[None] | None = None
         """A fixed line playing to the rep in the background while the applicant's

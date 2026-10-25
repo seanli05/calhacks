@@ -13,7 +13,8 @@ INTRO = (
     "The applicant is joining the call now and will speak with you directly. "
     "One moment, please."
 )
-"""Said once, the moment a person is detected, while the applicant's phone rings."""
+"""Said once, the moment a person is detected, while the applicant's phone rings.
+Not said when the user is listening in: they're moved straight into the call."""
 
 HOLDING = (
     "The applicant is joining now and will answer for themselves. One moment, please."
@@ -100,8 +101,8 @@ LISTENING_NOW: dict[LanguageCode, JoinPrompt] = {
         "Polly.Lupe",
     ),
 }
-"""Said right after the listen leg's key press (or on pick-up with no gate), before
-the call plays: without it,
+"""Said right after the listen leg's key press, before the call plays (not with no
+gate, where picking up starts the call at once): without it,
 a quiet moment on the call (the agent waiting for a menu) sounded like nothing
 happened."""
 

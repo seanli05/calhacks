@@ -54,7 +54,7 @@ Files: `runner.py` (lifecycle, dispatch, hold, the person, the bridge), `runner_
 | Music in a menu | ≥ 5 s → `HOLD_STARTED` with no model call |
 | Hold limit | From the first hold, never reset. If it passes in a menu or with a person, it fires on the next hold |
 | Menu gives up | Over 8 min in menus, or "representative" a 4th time in one menu stretch → `AGENT_ABORTED` |
-| Person | Ring the applicant at once (< 5 s) and say the intro meanwhile; `USER_DIALED` once ringing. So `FALSE_HUMAN` almost never fires: 1c's thresholds are the defense, and after the ring a transfer just means the applicant waits on hold too |
+| Person | Ring the applicant at once (< 5 s) and say the intro meanwhile (no intro when the user is listening in: they're moved straight into the call); `USER_DIALED` once ringing. So `FALSE_HUMAN` almost never fires: 1c's thresholds are the defense, and after the ring a transfer just means the applicant waits on hold too |
 | Bridging | The intro and holding lines play in the background, so the applicant joining (or not) is acted on at once and cuts them short. Rep speech gets one fixed holding line, at most twice, ≥ 8 s apart, never over a line still playing. `UserUnreachable` (or the 45 s backstop per ring: 15 s ringing, `USER_RING_TIMEOUT_S`, plus the join gate) on the first ring → the fixed `RINGING_AGAIN` line and a second ring (`user_ring_attempts`, 2), logged as another `call.user_dialed` with `data.attempt`, which messages the user. On the last ring → the call-back line, then hang up. The line ends a first leg still ringing and ignores its late callbacks |
 | Connected | `Overheard` lines from the forks go into the transcript as `agency` / `user`, saved as they arrive; nothing else is decided |
 | Blocked identifier | Nothing sent, flagged; a second in a row says "representative" instead |
@@ -133,7 +133,7 @@ The flow: `request_listen_in` → the line emits `ListenRequested` → the runne
 |---|---|
 | Audio | Two `ListenTap`s on the agency stream feed a `ListenMixer` on the line: the agency's frames as they arrive, and the agent's TTS buffered and laid over them. The agency's real-time frames set the pace, so TTS that comes faster than it plays doesn't run ahead. A `ListenSink` writes μ-law `media` messages from its own task and drops audio rather than slow the agency pipeline. About 2 s of silence during each `press_keys` stream swap |
 | Hanging up | Ends only the listen leg (a separate call). The agent keeps its line, and the user can ask again |
-| A person picks up | `ring_user` sees a listening leg and moves it into the conference (with its user fork) instead of ringing: `UserAnswered` follows at once, with no second ring and no gate, and the rest of the bridge is unchanged. They hear the intro live. A leg still at its gate is ended and the user is rung as usual. A failed move ends the leg and rings |
+| A person picks up | `ring_user` sees a listening leg and moves it into the conference (with its user fork) instead of ringing: `UserAnswered` follows at once, with no second ring and no gate, and the rest of the bridge is unchanged. The runner skips the intro for a listening user (`listening_in`, set by `ListenStarted`), so they're in the call at once. With no gate (`PHONE_JOIN_GATE=false`), the listen leg has no gate either and says nothing on pick-up. A leg still at its gate is ended and the user is rung as usual. A failed move ends the leg and rings |
 | Gate | Voicemail would otherwise record the agency (C29) |
 | `hang_up` | Also ends a listen leg that's ringing or listening |
 

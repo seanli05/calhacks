@@ -224,11 +224,11 @@ async def test_a_request_rings_the_users_own_number_behind_a_gate() -> None:
 
 
 async def test_with_no_gate_the_listen_leg_is_the_stream_itself() -> None:
+    """Picking up puts the user in the call at once, with nothing said first."""
     line = await Line(join_gate=False).ringing()
 
     twiml = line.calls.created[1]["twiml"]
-    assert "<Gather" not in twiml and LISTEN_PROMPTS["es"].text not in twiml
-    assert LISTENING_NOW["es"].text in twiml
+    assert "<Gather" not in twiml and "<Say" not in twiml
     assert "wss://agent.example.app/phone/calls/call_1/listen/stream" in twiml
     assert line.calls.created[1]["ring_s"] == 15
 
@@ -277,6 +277,7 @@ async def test_a_key_press_streams_the_call_to_the_user() -> None:
     line = await Line().ringing()
     twiml = line.line.listen_pressed_key(LISTEN_SID)
 
+    assert LISTENING_NOW["es"].text in twiml
     assert "wss://agent.example.app/phone/calls/call_1/listen/stream" in twiml
     sink = RecordingSink()
     assert not line.line.attach_listener(sink, "CA999")  # type: ignore[arg-type]

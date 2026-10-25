@@ -64,12 +64,13 @@ def user_gate_twiml(prompt: JoinPrompt, joined_url: str, missed_url: str) -> str
     return str(response)
 
 
-def listen_stream_twiml(stream_url: str, confirm: JoinPrompt) -> str:
-    """The listen leg after its key press: `confirm` says they're listening, then a
+def listen_stream_twiml(stream_url: str, confirm: JoinPrompt | None = None) -> str:
+    """The listen leg: `confirm` (after a key press) says they're listening, then a
     media stream we only write to. Nothing the user says goes anywhere
     (`listen_audio.run_listener` ignores it)."""
     response = VoiceResponse()
-    response.say(confirm.text, language=confirm.say_language, voice=confirm.voice)
+    if confirm is not None:
+        response.say(confirm.text, language=confirm.say_language, voice=confirm.voice)
     connect = Connect()
     connect.stream(url=stream_url)
     response.append(connect)
