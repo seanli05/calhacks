@@ -9,6 +9,7 @@ import { useFeed, useLiveCall, usePoll } from "@/lib/api/hooks";
 import type { GlossaryEntry } from "@/lib/api/types";
 import { findTerms } from "@/lib/glossary";
 import { stringsFor, useLang, useStrings } from "@/lib/i18n";
+import { isHumanMoment } from "@/lib/stage";
 
 import { ActivityFeed } from "./ActivityFeed";
 import { CallHero } from "./CallHero";
@@ -22,7 +23,7 @@ import styles from "./CaseLiveView.module.css";
 
 /**
  * The screen on camera for the whole call segment of the demo:
- * letter | live call (hero + feed) | assistant. Once the user is bridged, the feed
+ * letter | live call (hero + feed) | assistant. Once a person answers, the feed
  * gives way to the live translation, the letter shrinks above the translation book
  * (a resizable split), and the assistant rail gets tips for what to say.
  */
@@ -37,11 +38,10 @@ export function CaseLiveView({ userId, caseId }: { userId: string; caseId: strin
   const notFound = error instanceof ApiError && error.status === 404;
 
   const call = detail?.calls.length ? detail.calls[detail.calls.length - 1] : null;
-  const connected = detail?.stage === "connected" && call?.state === "connected";
-  const live = useLiveCall(call?.id ?? null, connected);
-  // The live layout waits for the first line, so a call whose transcript isn't
-  // saved as it goes keeps the feed instead of an empty transcript.
-  const bridged = connected && live.lines.length > 0;
+  // The live layout opens as soon as a person answers, while the user's phone
+  // rings to join, not only once they're on.
+  const bridged = detail?.stage === "connected" && isHumanMoment(call?.state);
+  const live = useLiveCall(call?.id ?? null, bridged);
   const userLang = usePoll(() => api.user(userId), userId, 60_000).data?.language ?? null;
   const glossary = usePoll(() => api.glossary(userLang ?? "en"), `glossary:${userLang}`, 300_000).data ?? [];
   const [query, setQuery] = useState("");

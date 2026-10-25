@@ -48,7 +48,7 @@ Conventions:
 
 ### Live call
 
-`api/live.py`. Follows the call's transcript (the phone agent's `transcripts` row) every 0.5 s from the `call.user_joined` event until the call is `ended`; nothing is sent before the user joins, and `agent` lines are left out.
+`api/live.py`. Follows the call's transcript (the phone agent's `transcripts` row) every 0.5 s from the last `call.human_detected` event until the call is `ended`, so the view is up while the user's phone rings to join; nothing is sent before a person answers, and the agent's lines holding the line are included.
 
 - Each new agency or user line: `line` (the English as heard), then `delta`s with its translation streamed from `MODEL_FAST` (prompt in `live_prompts.py`, grounded in the glossary terms it uses), then `done`. English, no key, or a failure before the first token sends the line as heard in one `delta`.
 - Tips (`live_tips.py`) are rule-based, no model call, so rule 1 holds: `ask` is the next of the brief's `questions_to_ask`, one open at a time, after an agency line; `yourself` follows an agency line that asks about the applicant's identity and never carries an answer (rule 3). `tip_used` when the user's line says most of the question's words (any reply, for `yourself`).

@@ -68,14 +68,14 @@ def call_world(monkeypatch: pytest.MonkeyPatch) -> Iterator[tables.Call]:
         state=CallState.ENDED,
     )
     transcript = tables.Transcript(call_id=call.id, lines=LINES)
-    joined = Event(
+    answered = Event(
         event_id="event_1",
-        created_at=JOINED,
-        type=EventType.CALL_USER_JOINED,
+        created_at=JOINED - timedelta(seconds=45),
+        type=EventType.CALL_HUMAN_DETECTED,
         source=Component.PHONE_AGENT,
         user_id=user.id,
         call_id=call.id,
-        summary_en="joined",
+        summary_en="answered",
     )
     values = {
         "get_call": call,
@@ -83,7 +83,7 @@ def call_world(monkeypatch: pytest.MonkeyPatch) -> Iterator[tables.Call]:
         "get_brief": brief,
         "get_user": user,
         "get_transcript": transcript,
-        "list_events": [joined],
+        "list_events": [answered],
     }
     for name, value in values.items():
 
@@ -112,9 +112,11 @@ async def test_follow_streams_bridged_lines_with_translation_and_tips(
     events = await _collect(call_world, "es")
 
     heard = [e for e in events if e.type == "line"]
-    # Menu prompts and the agent's own lines before the join are left out.
-    assert [e.en for e in heard] == [line["text"] for line in LINES[2:]]
-    first = heard[0].id
+    # Menu prompts before a person answered are left out; the agent holding the
+    # line while the user's phone rings is in.
+    assert [e.en for e in heard] == [line["text"] for line in LINES[1:]]
+    assert heard[0].speaker == "agent"
+    first = heard[1].id
     deltas = "".join(e.text for e in events if e.type == "delta" and e.id == first)
     assert deltas.strip() == f"[es] {LINES[2]['text']}"
     assert [e.type for e in events[:2]] == ["line", "delta"]
@@ -139,7 +141,7 @@ async def test_follow_is_english_without_a_model(
     events = await _collect(call_world, "en")
     assert streamer.calls == 0
     assert [e.text for e in events if e.type == "delta"] == [
-        line["text"] for line in LINES[2:]
+        line["text"] for line in LINES[1:]
     ]
 
 
@@ -149,7 +151,7 @@ async def test_follow_falls_back_to_the_line_when_translation_fails(
     monkeypatch.setattr(live, "get_streamer", lambda: FakeStreamer(fail=True))
     events = await _collect(call_world, "es")
     assert [e.text for e in events if e.type == "delta"] == [
-        line["text"] for line in LINES[2:]
+        line["text"] for line in LINES[1:]
     ]
 
 
@@ -166,7 +168,7 @@ async def test_a_replay_reuses_finished_translations(
     assert joined(first) == joined(second)
 
 
-async def test_nothing_is_sent_before_the_user_joins(
+async def test_nothing_is_sent_before_a_person_answers(
     call_world: tables.Call, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async def no_events(*_: Any, **__: Any) -> list[Event]:
@@ -192,7 +194,7 @@ def test_live_route_sends_server_sent_events(
         if chunk.startswith("data: ")
     ]
     assert events[0]["type"] == "line"
-    assert events[0]["speaker"] == "agency"
+    assert events[0]["speaker"] == "agent"
     assert events[-1]["type"] in {"done", "tip"}
 
 

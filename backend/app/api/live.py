@@ -1,8 +1,8 @@
 """The live call view: the translation book, and the bridged call as a stream.
 
 `GET /api/calls/{call_id}/live?lang=xx` is server-sent events. It follows the call's
-transcript (written by the phone agent) from the moment the user joined: each new
-agency or user line is sent as heard, then its translation streams in token by token
+transcript (written by the phone agent) from the moment a person answered, so the
+view is up while the user's phone rings to join: each new line is sent as heard, then its translation streams in token by token
 from the model, grounded in the glossary like every other translation. Rule-based
 tips (`live_tips.py`) follow the lines that prompt them. The stream ends when the
 call does.
@@ -59,8 +59,8 @@ POLL_S = 0.5
 HEARTBEAT_S = 15.0
 MAX_STREAM_S = 3 * 60 * 60
 STREAM_TIMEOUT_S = 15.0
-JOIN_SKEW = timedelta(seconds=1)
-"""Lines a moment before the join event still count: clocks differ a little."""
+ANSWER_SKEW = timedelta(seconds=1)
+"""Lines a moment before the answer event still count: clocks differ a little."""
 MAX_CACHED = 5000
 
 _DEFAULT_REGISTER = "Write simple, polite language. Short sentences."
@@ -110,18 +110,18 @@ async def follow(
     questions: list[str],
     disconnected: Callable[[], Awaitable[bool]],
 ) -> AsyncIterator[LiveCallEvent | None]:
-    """The call's events from the user joining until it ends; None is a heartbeat."""
+    """The call's events from a person answering until it ends; None is a heartbeat."""
     tips = live_tips.Tips(call_id, questions)
-    joined_at: datetime | None = None
+    answered_at: datetime | None = None
     sent = 0
     started = last_sent = time.monotonic()
     while time.monotonic() - started < MAX_STREAM_S and not await disconnected():
         # Read the state first: a line saved during wrap-up is still sent below.
         call = await reads.get_call(call_id)
         over = call is None or call.state == CallState.ENDED
-        if joined_at is None:
-            joined_at = await _joined_at(user_id, call_id)
-        lines = _bridged(await reads.get_transcript(call_id), joined_at)
+        if answered_at is None:
+            answered_at = await _answered_at(user_id, call_id)
+        lines = _since(await reads.get_transcript(call_id), answered_at)
         for index in range(sent, len(lines)):
             async for event in _line_events(call_id, index, lines[index], lang, tips):
                 yield event
@@ -209,20 +209,23 @@ def _live_tip(tip: live_tips.Tip, lang: LanguageCode) -> LiveTip:
     )
 
 
-async def _joined_at(user_id: str, call_id: str) -> datetime | None:
-    joined = [
+async def _answered_at(user_id: str, call_id: str) -> datetime | None:
+    """The last time a person answered: a false alarm goes back to hold, and the
+    next answer starts the view again."""
+    answered = [
         e.created_at
         for e in await reads.list_events(user_id)
-        if e.type == EventType.CALL_USER_JOINED and e.call_id == call_id
+        if e.type == EventType.CALL_HUMAN_DETECTED and e.call_id == call_id
     ]
-    return joined[-1] if joined else None
+    return answered[-1] if answered else None
 
 
-def _bridged(
-    row: tables.Transcript | None, joined_at: datetime | None
+def _since(
+    row: tables.Transcript | None, answered_at: datetime | None
 ) -> list[TranscriptLine]:
-    """The agency and user lines since the user joined; none before they have."""
-    if row is None or joined_at is None:
+    """Every line since a person answered, the agent's included (it holds the line
+    while the user's phone rings); none before."""
+    if row is None or answered_at is None:
         return []
     lines = []
     for raw in row.lines:
@@ -231,7 +234,7 @@ def _bridged(
         except ValidationError as exc:
             logger.warning("transcript %s: skipping invalid line (%s)", row.id, exc)
             continue
-        if line.speaker != "agent" and line.at >= joined_at - JOIN_SKEW:
+        if line.at >= answered_at - ANSWER_SKEW:
             lines.append(line)
     return lines
 
