@@ -1,12 +1,14 @@
 """The WhatsApp pipe: what happens to each inbound message after the webhook acks.
 
-Order per message: user row → media saved → inbound logged → routed. Routing order:
-a reply to an ask_user question (the call is waiting), then the language pick, photo
-grouping, a "same letter or new?" answer, an answer to research's question about the
-letter (C39), an answer to a consent request, an answer to "may I save this?" (C15),
-or an orchestrator turn. After a turn, the user is asked about facts waiting for their
-OK, but only at a quiet moment: no other numbered question open or waiting, research
-done with their letters, and no call running.
+Order per message: user row → media saved → inbound logged → routed. Code answers
+what's instant and certain: a bare number to an ask_user question (the call is
+waiting), the language pick, photo grouping, a bare 1/2 to "same letter or new?", an
+answer to research's question about the letter (C39, any text), and a 1/2 or yes/no
+word to a consent request or to "may I save this?" (C15). Everything else goes to the
+orchestrator turn, with what's open (open_questions.py), so the model answers it
+through guarded tools: hear, decide, act. A turn's plain reply may end with "may I
+save this?", but only at a quiet moment: no other numbered question open or waiting,
+research done with their letters, and no call running.
 
 One number's messages are routed one at a time, under a per-number lock. An
 orchestrator turn (slow: a Claude call) runs after that lock is released, under the
@@ -26,9 +28,9 @@ from typing import Protocol
 from anthropic import AsyncAnthropic
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.contracts import MessageDirection, MessageSender
+from app.contracts import MessageDirection, MessageSender, QuestionStatus
 from app.contracts.common import LanguageCode, MediaId, MessageId, UserId
-from app.db import reads, tables
+from app.db import tables
 from app.db.messages import append_message
 from app.db.writes import orchestrator as writes
 from app.orchestrator.call_status import get_call_status
@@ -44,9 +46,17 @@ from app.orchestrator.language import (
 )
 from app.orchestrator.letter_result import LetterResults
 from app.orchestrator.letters import Letters
+from app.orchestrator.open_questions import (
+    CONSENT_OPTIONS_EN,
+    SAME_OR_NEW_OPTIONS_EN,
+    SAVE_FACTS_OPTIONS_EN,
+    OpenQuestion,
+    OpenQuestions,
+    QuestionKind,
+)
 from app.orchestrator.photos import PHOTO_QUIET_WINDOW_S, PendingPages, PhotoBatcher
 from app.orchestrator.research_questions import ResearchQuestions
-from app.orchestrator.turn import OrchestratorTurn
+from app.orchestrator.turn import OrchestratorTurn, QuietMoment
 from app.orchestrator.verdicts import Verdicts
 from app.relay.ask_user import AskUser, get_ask_user
 from app.relay.inbound import InboundMedia, InboundMessage
@@ -73,8 +83,8 @@ class TurnRunner(Protocol):
         user: tables.User,
         message_id: MessageId,
         *,
-        same_or_new_pending: bool = False,
-        consent_pending: bool = False,
+        open_questions: OpenQuestions | None = None,
+        quiet_moment: QuietMoment | None = None,
     ) -> None: ...
 
 
@@ -100,10 +110,11 @@ class InboundPipe:
         conversation: Conversation | None = None,
     ) -> None:
         """Without `to_english`, non-English messages are logged with no `body_en`;
-        without `turn`, free text is echoed (no Anthropic key); without `consent`,
-        nothing is routed to a consent request; without `fact_consent`, pending
-        facts are never asked about. `conversation` must be the one the consent
-        gate and the letter results share."""
+        without `turn`, free text is echoed or re-asked for a number (no Anthropic
+        key); without `consent`, nothing is routed to a consent request; without
+        `fact_consent`, no "may I save this?" answer is routed. `conversation` must
+        be the one the consent gate and the letter results share; `fact_consent`
+        the one the turn asks with."""
         self._whatsapp = whatsapp
         self._detect = detect
         self._ask_user = ask_user
@@ -144,6 +155,38 @@ class InboundPipe:
             or await self._ask_user.question_for_reply(user_id) is not None
         )
 
+    async def open_questions(self, user_id: UserId) -> OpenQuestions:
+        """The numbered questions waiting for the user, for the turn."""
+        questions = []
+        call_question = await self._ask_user.question_for_reply(user_id)
+        if call_question is not None and call_question.status == QuestionStatus.OPEN:
+            questions.append(
+                OpenQuestion(
+                    QuestionKind.CALL_QUESTION,
+                    call_question.id,
+                    tuple(call_question.options_en),
+                )
+            )
+        if self._consent is not None and (consent := self._consent.pending(user_id)):
+            questions.append(
+                OpenQuestion(
+                    QuestionKind.CALL_CONSENT, consent.case_id, CONSENT_OPTIONS_EN
+                )
+            )
+        same_or_new = self.photos.pending(user_id) is not None
+        if same_or_new:
+            questions.append(
+                OpenQuestion(QuestionKind.SAME_OR_NEW, None, SAME_OR_NEW_OPTIONS_EN)
+            )
+        if self._fact_consent is not None and self._fact_consent.pending(user_id):
+            questions.append(
+                OpenQuestion(QuestionKind.SAVE_FACTS, None, SAVE_FACTS_OPTIONS_EN)
+            )
+        return OpenQuestions(
+            tuple(questions),
+            settle_same_or_new=self._settle_same_or_new if same_or_new else None,
+        )
+
     async def _guarded[T](
         self, message: InboundMessage, work: Awaitable[T]
     ) -> T | None:
@@ -170,55 +213,72 @@ class InboundPipe:
         elif message.text:
             question = await self._ask_user.question_for_reply(user.id)
 
+        answers_call = question is not None and (
+            parse_choice(message.text, len(question.options_en)) is not None
+        )
         inbound = await append_message(
             user.id,
             MessageDirection.IN,
             MessageSender.USER,
             message.body,
             language,
-            body_en=await self._english(message, language, answers_question=question),
+            body_en=await self._english(message, language),
             media_ids=[media_id for media_id, _ in saved],
-            question_id=question.id if question else None,
+            question_id=question.id if question and answers_call else None,
             twilio_sid=message.message_sid,
         )
         if failed:
             await send_template(self._whatsapp, user, "media.download_failed")
         if question is not None and await self._ask_user.handle_reply(
-            user, question, message.text
+            user, question, message.text, reprompt=self._turn is None
         ):
             return user.id, None
 
         pages = [media_id for media_id, item in saved if item.is_letter_page]
+        same_or_new = self.photos.pending(user.id)
+        consent_open = (
+            self._consent is not None and self._consent.pending(user.id) is not None
+        )
+        facts_open = (
+            self._fact_consent is not None
+            and self._fact_consent.pending(user.id) is not None
+        )
+        yes_no = parse_yes_no(message.text) if message.text else None
         turn = None
         if step is not None:
             await self._apply_language_step(user, step, pages)
         elif pages:
             await self._letter_pages(user, pages)
-        elif (pending := self.photos.pending(user.id)) is not None:
-            turn = await self._same_or_new_answer(user, message, inbound, pending)
-        elif message.text and self.letters.question_pending(user.id):
+        elif same_or_new is not None and (n := parse_choice(message.text, 2)):
+            await self._settle_same_or_new(user, n)
+        elif (
+            message.text
+            and same_or_new is None
+            and self.letters.question_pending(user.id)
+        ):
             await self._letter_answer(user, message, inbound)
-        elif self._consent is not None and self._consent.pending(user.id) is not None:
-            turn = await self._consent_answer(user, message, inbound)
-        elif self._fact_consent is not None and self._fact_consent.pending(user.id):
-            turn = await self._fact_consent_answer(user, message, inbound)
+        elif consent_open and yes_no is not None:
+            # Rule 4: a bare 1/yes is answered in code, never by the model.
+            assert self._consent is not None
+            await self._consent.answer(user, inbound, yes_no)
+        elif facts_open and yes_no is not None:
+            assert self._fact_consent is not None
+            await self._fact_consent.answer(user, yes_no)
+        elif self._turn is None:
+            await self._without_turn(user, message, same_or_new, consent_open)
         else:
-            turn = partial(self._orchestrator_turn, user, message, inbound.id)
+            turn = partial(self._orchestrator_turn, user, inbound.id)
         return user.id, turn
 
     async def _english(
-        self,
-        message: InboundMessage,
-        language: LanguageCode,
-        *,
-        answers_question: tables.Question | None,
+        self, message: InboundMessage, language: LanguageCode
     ) -> str | None:
-        """The English for the log (rule 6). Skipped for a reply to an open ask_user
-        question, which must not wait on a model call; a bare number is the same in
-        English."""
+        """The English for the log and the turn (rule 6). A bare number is the same
+        in English, so a reply to an ask_user question never waits on a model
+        call."""
         if language == "en" or parse_choice(message.text, 99) is not None:
             return message.body
-        if not message.text or answers_question is not None or self._to_english is None:
+        if not message.text or self._to_english is None:
             return None
         return await self._to_english(message.text, language)
 
@@ -296,28 +356,12 @@ class InboundPipe:
         self.photos.add(user.id, pages)
         await send_template(self._whatsapp, user, "letter.received")
 
-    async def _same_or_new_answer(
-        self,
-        user: tables.User,
-        message: InboundMessage,
-        inbound: tables.Message,
-        pending: PendingPages,
-    ) -> Turn | None:
-        """A "1" or "2" settles it; other text goes to the orchestrator turn, which
-        answers and reminds the user to pick (or re-asks, without a turn)."""
-        choice = parse_choice(message.text, 2)
-        if choice is None:
-            if self._turn is not None and message.text:
-                return partial(
-                    self._orchestrator_turn,
-                    user,
-                    message,
-                    inbound.id,
-                    same_or_new_pending=True,
-                )
-            await send_template(self._whatsapp, user, "letter.same_or_new")
-            return None
-        self.photos.take_pending(user.id)
+    async def _settle_same_or_new(self, user: tables.User, choice: int) -> bool:
+        """1: the held photos join the letter; 2: they start a new one. False if no
+        "same letter or new?" is open (the turn's tool, a stale snapshot)."""
+        pending = self.photos.take_pending(user.id)
+        if pending is None:
+            return False
         if choice == 1:
             await writes.add_pages(pending.document_id, pending.media_ids)
             logger.info(
@@ -331,7 +375,25 @@ class InboundPipe:
         else:
             self.photos.add(user.id, pending.media_ids)
             await send_template(self._whatsapp, user, "letter.received")
-        return None
+        return True
+
+    async def _without_turn(
+        self,
+        user: tables.User,
+        message: InboundMessage,
+        same_or_new: PendingPages | None,
+        consent_open: bool,
+    ) -> None:
+        """No Anthropic key: re-ask an open question for its number, or echo, so
+        the pipe can still be tried on a phone."""
+        if same_or_new is not None:
+            await send_template(self._whatsapp, user, "letter.same_or_new")
+        elif consent_open and message.text:
+            await send_template(self._whatsapp, user, "consent.reprompt")
+        elif message.text:
+            if self._fact_consent is not None:
+                self._fact_consent.drop(user.id)
+            await send_text(self._whatsapp, user, f"Echo: {message.text}")
 
     async def _letter_answer(
         self, user: tables.User, message: InboundMessage, inbound: tables.Message
@@ -342,59 +404,17 @@ class InboundPipe:
         if await self.letters.answer_question(user, answer_en):
             await send_template(self._whatsapp, user, "letter.reading_again")
 
-    async def _consent_answer(
-        self, user: tables.User, message: InboundMessage, inbound: tables.Message
-    ) -> Turn | None:
-        """A 1/yes or 2/no answers the consent request in code (rule 4: the model
-        never starts a call); other text goes to the turn, which reminds the user."""
-        assert self._consent is not None
-        choice = parse_yes_no(message.text) if message.text else None
-        if choice is not None:
-            await self._consent.answer(user, inbound, choice)
-            return None
-        if self._turn is not None and message.text:
-            return partial(
-                self._orchestrator_turn,
-                user,
-                message,
-                inbound.id,
-                consent_pending=True,
-            )
-        if message.text:
-            await send_template(self._whatsapp, user, "consent.reprompt")
-        return None
-
-    async def _fact_consent_answer(
-        self, user: tables.User, message: InboundMessage, inbound: tables.Message
-    ) -> Turn | None:
-        """A 1/yes or 2/no answers "may I save this?"; anything else closes the
-        question unanswered (the facts stay pending) and goes to the turn."""
-        assert self._fact_consent is not None
-        choice = parse_yes_no(message.text) if message.text else None
-        if choice is not None:
-            await self._fact_consent.answer(user, choice)
-            return None
-        self._fact_consent.drop(user.id)
-        return partial(self._orchestrator_turn, user, message, inbound.id)
-
-    async def _ask_about_facts(self, user_id: UserId) -> None:
-        """C15: after a turn, ask about facts waiting for the user's OK, at a quiet
-        moment only. Not while another numbered question is open or waiting (its
-        "1" must not be read as this one's), and not while research or a call will
-        soon send the user something else: the question would get lost among it."""
-        if self._fact_consent is None:
-            return
-        if (
+    async def _quiet_moment(self, user_id: UserId) -> bool:
+        """C15: "may I save this?" only at a quiet moment. Not while another
+        numbered question is open or waiting (its "1" must not be read as this
+        one's), and not while research or a call will soon send the user something
+        else: the question would get lost among it."""
+        return not (
             await self.question_open(user_id)
             or self.conversation.is_waiting(user_id)
             or self.letters.researching(user_id)
             or (self._consent is not None and self._consent.calling(user_id))
-        ):
-            return
-        # Re-read: the turn may have switched the user's language.
-        user = await reads.get_user(user_id)
-        if user is not None:
-            await self._fact_consent.ask(user)
+        )
 
     async def _letter_ready(self, user_id: UserId, media_ids: list[MediaId]) -> None:
         document = await writes.create_document(user_id, media_ids)
@@ -407,32 +427,31 @@ class InboundPipe:
         await self.letters.start(user_id, document.id)
 
     async def _orchestrator_turn(
-        self,
-        user: tables.User,
-        message: InboundMessage,
-        message_id: MessageId,
-        *,
-        same_or_new_pending: bool = False,
-        consent_pending: bool = False,
+        self, user: tables.User, message_id: MessageId
     ) -> None:
-        if self._turn is not None:
-            # "Typing…" from the start, even while a proactive message holds the
-            # lock; it stops before "may I save this?", so it can't show after it.
-            with self.conversation.typing_while(user.id, "turn", TURN_TYPING_S):
-                async with self.conversation.speaking(user.id):
-                    try:
-                        await self._turn(
-                            user,
-                            message_id,
-                            same_or_new_pending=same_or_new_pending,
-                            consent_pending=consent_pending,
-                        )
-                    finally:
-                        self.conversation.done_typing(user.id, "turn")
-                    await self._ask_about_facts(user.id)
-        elif message.text:
-            # No Anthropic key: echo, so the pipe can still be tried on a phone.
-            await send_text(self._whatsapp, user, f"Echo: {message.text}")
+        assert self._turn is not None
+        # "Typing…" from the start, even while a proactive message holds the lock.
+        with self.conversation.typing_while(user.id, "turn", TURN_TYPING_S):
+            async with self.conversation.speaking(user.id):
+                facts = self._fact_consent
+                facts_asked = facts.pending(user.id) if facts is not None else None
+                try:
+                    await self._turn(
+                        user,
+                        message_id,
+                        open_questions=await self.open_questions(user.id),
+                        quiet_moment=self._quiet_moment,
+                    )
+                finally:
+                    self.conversation.done_typing(user.id, "turn")
+                if (
+                    facts is not None
+                    and facts_asked is not None
+                    and facts.pending(user.id) is facts_asked
+                ):
+                    # Not answered: it stays open one more message, then
+                    # closes; the facts stay pending (C15).
+                    facts.unanswered(user.id)
 
 
 async def _no_detection(text: str) -> None:
@@ -460,6 +479,8 @@ def get_pipe() -> InboundPipe:
             conversation=conversation,
         )
     client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+    ask_user = get_ask_user()
+    fact_consent = FactConsent(whatsapp, translator)
     turn = OrchestratorTurn(
         client,
         settings.model_default,
@@ -469,16 +490,18 @@ def get_pipe() -> InboundPipe:
         research_questions=ResearchQuestions(
             whatsapp, translator, get_job_watcher(), conversation=conversation
         ),
+        ask_user=ask_user,
+        fact_consent=fact_consent,
     )
     return InboundPipe(
         whatsapp,
         partial(detect_language, client, settings.model_fast),
-        get_ask_user(),
+        ask_user,
         letters,
         to_english=translator.to_english,
         turn=turn.run,
         consent=consent,
-        fact_consent=FactConsent(whatsapp, translator),
+        fact_consent=fact_consent,
         conversation=conversation,
     )
 

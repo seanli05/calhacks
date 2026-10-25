@@ -438,10 +438,14 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "لطفاً اگر می‌خواهید با ادارهٔ USCIS تماس بگیرم، ۱ را بفرستید، و اگر نه، ۲ را."
         ),
     },
+    # Says we're calling, so no call.dialing follows it (pacing: one message).
     "consent.given": {
-        "es": "Gracias. Preparo la llamada y le aviso cuando esté marcando.",
-        "en": "Thank you. I'm setting up the call and will let you know when I'm dialing.",
-        "fa": "تشکر. تماس را آماده می‌کنم و وقتی شماره را گرفتم، به شما خبر می‌دهم.",
+        "es": "Gracias. Estoy llamando a USCIS ahora; le aviso cuando conteste una persona.",
+        "en": "Thank you. I'm calling USCIS now and will let you know when a person answers.",
+        "fa": (
+            "تشکر. حالا با ادارهٔ USCIS تماس می‌گیرم و وقتی یک شخص جواب داد، به شما "
+            "خبر می‌دهم."
+        ),
     },
     "consent.declined": {
         "es": "De acuerdo, no voy a llamar. Si cambia de opinión, escríbame.",
@@ -618,6 +622,22 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         "en": "All right, I didn't save it.",
         "fa": "خوب، نگه نداشتم.",
     },
+}
+
+# A failed call's summary and the new consent request (C21) in one message.
+TEMPLATES["summary.call_failed_retry"] = {
+    lang: TEMPLATES["summary.call_failed"][lang]
+    + "\n"
+    + _WANT_CALL[lang]
+    + _CALL_ASK[lang]
+    for lang in LANGUAGES
+}
+TEMPLATES["summary.call_failed_retry_generic"] = {
+    lang: TEMPLATES["summary.call_failed"][lang]
+    + "\n"
+    + _WANT_CALL_GENERIC[lang]
+    + _CALL_ASK[lang]
+    for lang in LANGUAGES
 }
 
 

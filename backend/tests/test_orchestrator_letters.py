@@ -305,10 +305,10 @@ async def test_ask_user_reply_does_not_wait_behind_a_slow_turn(
     call = db.add_call(user)
     release = asyncio.Event()
 
-    async def slow_turn(*_: object) -> None:
+    async def slow_turn(*_: object, **__: object) -> None:
         await release.wait()
 
-    monkeypatch.setattr(pipe, "_orchestrator_turn", slow_turn)
+    monkeypatch.setattr(pipe, "_turn", slow_turn)
     turn = asyncio.create_task(pipe.handle(inbound("¿qué dice mi carta?")))
     await asyncio.sleep(0.01)
 

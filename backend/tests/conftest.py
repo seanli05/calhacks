@@ -4,16 +4,26 @@ import os
 from typing import Any
 
 import pytest
+from app.contracts import CallReport, CaseBrief, FastResult, Verification
+from app.db import tables
 from app.orchestrator.call_status import CallStatusWatcher
 from app.orchestrator.consent import ConsentGate
 from app.orchestrator.conversation import Conversation
+from app.orchestrator.fact_consent import FactConsent
 from app.orchestrator.job_watch import JobWatcher
 from app.orchestrator.letter_result import LetterResults
 from app.orchestrator.letters import Letters
 from app.orchestrator.pipe import InboundPipe
+from app.orchestrator.turn import OrchestratorTurn
 from app.orchestrator.verdicts import Verdicts
 from app.relay.ask_user import AskUser
-from whatsapp_fakes import QUIET_S, FakeDB, FakeTranslator, FakeWhatsApp
+from whatsapp_fakes import (
+    QUIET_S,
+    FakeDB,
+    FakeRunnerClient,
+    FakeTranslator,
+    FakeWhatsApp,
+)
 
 # A developer's .env may set the demo dial override (C40); tests that want it set
 # it themselves. Env vars win over .env files.
@@ -189,3 +199,148 @@ def pipe(
         consent=consent,
         conversation=conversation,
     )
+
+
+@pytest.fixture
+def fact_consent(whatsapp: FakeWhatsApp, translator: FakeTranslator) -> FactConsent:
+    fake: Any = translator
+    return FactConsent(whatsapp, fake)
+
+
+@pytest.fixture
+def runner() -> FakeRunnerClient:
+    """The fake model behind `agent_pipe`; `runner.queue` scripts its turns."""
+    return FakeRunnerClient(reply="Of course.")
+
+
+@pytest.fixture
+def agent_pipe(
+    whatsapp: FakeWhatsApp,
+    ask_user: AskUser,
+    letters: Letters,
+    consent: ConsentGate,
+    fact_consent: FactConsent,
+    runner: FakeRunnerClient,
+    conversation: Conversation,
+    translator: FakeTranslator,
+) -> InboundPipe:
+    """The pipe with the real orchestrator turn, on a fake model."""
+    client: Any = runner
+    fake: Any = translator
+    turn = OrchestratorTurn(
+        client,
+        "model",
+        whatsapp,
+        fake,
+        consent,
+        ask_user=ask_user,
+        fact_consent=fact_consent,
+    )
+
+    async def detect(text: str) -> None:
+        return None
+
+    return InboundPipe(
+        whatsapp,
+        detect,
+        ask_user,
+        letters,
+        quiet_window_s=QUIET_S,
+        to_english=translator.to_english,
+        turn=turn.run,
+        consent=consent,
+        fact_consent=fact_consent,
+        conversation=conversation,
+    )
+
+
+@pytest.fixture
+def research_db(db: FakeDB, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """Fakes for the research writes (the fake research agent's); returns what was
+    written. The verification and brief also land in `db`, so the consent gate
+    reads them as it would research's rows."""
+    written: dict[str, Any] = {"refs": {}, "verifications": [], "briefs": []}
+
+    async def create_case(case_id: str, user_id: str, docs: list) -> tables.Case:
+        case = tables.Case(id=case_id, user_id=user_id, document_ids=list(docs))
+        db.cases.append(case)
+        return case
+
+    async def put_ref(case_id: str, name: str, value: str) -> None:
+        written["refs"][name] = value
+
+    async def save_fast_result(case_id: str, result: FastResult) -> None:
+        case = next(c for c in db.cases if c.id == case_id)
+        case.fast_result = result.model_dump(mode="json")
+
+    async def save_verification(case_id: str, verification: Verification) -> None:
+        written["verifications"].append(verification)
+        db.verifications[case_id] = tables.Verification(
+            case_id=case_id,
+            status=verification.status,
+            official_phone=verification.official_phone,
+            result=verification.model_dump(mode="json"),
+        )
+
+    async def save_brief(
+        case_id: str, brief: CaseBrief, note: str | None = None
+    ) -> tables.CaseBrief:
+        row = tables.CaseBrief(
+            id=brief.brief_id,
+            case_id=case_id,
+            brief=brief.model_dump(mode="json"),
+            handoff_note=note or brief.handoff_note,
+        )
+        written["briefs"].append(row)
+        db.briefs[case_id] = row
+        return row
+
+    for name, fake in [
+        ("create_case", create_case),
+        ("put_ref", put_ref),
+        ("save_fast_result", save_fast_result),
+        ("save_verification", save_verification),
+        ("save_brief", save_brief),
+    ]:
+        monkeypatch.setattr(f"app.db.writes.research.{name}", fake)
+    for name in ("claim_next", "finish", "fail"):
+        monkeypatch.setattr(f"app.db.jobs.{name}", getattr(db, name))
+    monkeypatch.setattr("app.dev.fake_research.append_event", db.append_event)
+    return written
+
+
+@pytest.fixture
+def phone_db(db: FakeDB, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """Fakes for the phone writes (the fake phone worker's); returns what was
+    written."""
+    written: dict[str, Any] = {"reports": [], "transcripts": []}
+
+    async def create_call(case_id: str, *ids: str) -> tables.Call:
+        call = tables.Call(
+            case_id=case_id, job_id=ids[0], brief_id=ids[1], consent_message_id=ids[2]
+        )
+        db.calls[call.id] = call
+        return call
+
+    async def set_call_state(call_id: str, state: str) -> None:
+        db.calls[call_id].state = state
+
+    async def save_transcript(call_id: str, lines: list) -> tables.Transcript:
+        transcript = tables.Transcript(call_id=call_id, lines=lines)
+        written["transcripts"].append(transcript)
+        return transcript
+
+    async def save_call_report(call_id: str, report: CallReport) -> None:
+        written["reports"].append(report)
+
+    for name, fake in [
+        ("create_call", create_call),
+        ("set_call_state", set_call_state),
+        ("save_transcript", save_transcript),
+        ("save_call_report", save_call_report),
+    ]:
+        monkeypatch.setattr(f"app.db.writes.phone.{name}", fake)
+    for name in ("claim_next", "finish", "fail"):
+        monkeypatch.setattr(f"app.db.jobs.{name}", getattr(db, name))
+    monkeypatch.setattr("app.dev.fake_call.append_event", db.append_event)
+    return written

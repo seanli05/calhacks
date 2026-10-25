@@ -5,14 +5,19 @@ a model; `build_tools` wraps it for the SDK's tool runner. Results are JSON in
 English. Sensitive values stay `<ref:...>` placeholders: nothing here resolves a ref
 (C11, C34).
 
-`request_consent` only asks: there's no `start_call` tool, because a call starts
-only from the user's own numbered YES, in code (consent.py, rule 4). Research starts
-from photos, so there's no `start_research` tool.
+`request_consent` only asks: there's no `start_call` tool. A call starts only from
+the user's own YES (rule 4): a bare "1" in code, or words the `answer_call_consent`
+tool relays, which the consent gate checks against the user's latest message
+(consent.py, C43). Research starts from photos, so there's no `start_research` tool.
+
+The `answer_*` tools answer whatever numbered question is open (open_questions.py)
+when the user answers in words. Each refuses, with the reason, when the move isn't
+legal right now.
 """
 
 import json
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from anthropic import beta_async_tool
 from anthropic.lib.tools import BetaAsyncFunctionTool
@@ -35,6 +40,7 @@ from app.db.ids import new_id
 from app.db.tables import utcnow
 from app.db.writes import orchestrator as writes
 from app.orchestrator.consent import ConsentGate
+from app.orchestrator.open_questions import OpenQuestions, QuestionKind
 from app.phone.control import (
     HangUpResult,
     ListenInResult,
@@ -46,7 +52,9 @@ from app.relay.templates import LANGUAGES
 from app.relay.whatsapp import WhatsApp
 
 if TYPE_CHECKING:
+    from app.orchestrator.fact_consent import FactConsent
     from app.orchestrator.research_questions import ResearchQuestions
+    from app.relay.ask_user import AskUser
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +75,11 @@ _LISTEN_NOTES: dict[ListenInResult, str] = {
     "(or is already on) to speak with them.",
     "call_over": "The call has ended.",
 }
+# After an answer tool that sent its own confirmation.
+_CONFIRMED = (
+    "The user was sent a confirmation. Reply only to the rest of their message; if "
+    "there's nothing else in it, reply with no text at all."
+)
 _HANG_UP_NOTES: dict[HangUpResult, str] = {
     "ending": "The call is being ended now. Tell the user in a few words; a short "
     "message confirming it follows on its own.",
@@ -81,13 +94,22 @@ class CaseTools:
         whatsapp: WhatsApp,
         consent: ConsentGate | None = None,
         research_questions: "ResearchQuestions | None" = None,
+        *,
+        ask_user: "AskUser | None" = None,
+        fact_consent: "FactConsent | None" = None,
+        open_questions: OpenQuestions | None = None,
     ) -> None:
         self.user = user
         self._whatsapp = whatsapp
         self._consent = consent
         self._research_questions = research_questions
+        self._ask_user = ask_user
+        self._fact_consent = fact_consent
+        self._open = open_questions or OpenQuestions()
         self.language_switched = False
         self.consent_requested = False
+        # An answer tool sent the user its own confirmation.
+        self.answer_confirmed = False
 
     async def list_active_cases(self) -> str:
         cases = []
@@ -185,6 +207,80 @@ class CaseTools:
                 "reply further.",
             }
         )
+
+    async def answer_call_question(self, question_id: str, choice: int) -> str:
+        open_question = self._open.of(QuestionKind.CALL_QUESTION)
+        if (
+            self._ask_user is None
+            or open_question is None
+            or open_question.ref != question_id
+        ):
+            return _json({"error": f"No call question {question_id} is open."})
+        question = await reads.get_open_question(self.user.id)
+        if question is None or question.id != question_id:
+            return _json({"error": "That question has closed; the call moved on."})
+        if not 1 <= choice <= len(question.options_en):
+            return _json(
+                {"error": f"Choose a number from 1 to {len(question.options_en)}."}
+            )
+        if not await self._ask_user.answer(self.user, question, choice):
+            self.answer_confirmed = True
+            return _json(
+                {
+                    "error": "The question had already timed out, and the default "
+                    "was taken. The user was told which.",
+                    "note": _CONFIRMED,
+                }
+            )
+        logger.info(
+            "Call question answered by the turn user_id=%s question_id=%s",
+            self.user.id,
+            question_id,
+        )
+        return _json(
+            {
+                "answered": question_id,
+                "choice": choice,
+                "note": "The call goes on with that option. Tell the user in a few "
+                "words, and answer the rest of their message.",
+            }
+        )
+
+    async def answer_call_consent(
+        self, case_id: CaseId, answer: Literal["yes", "no"], user_words: str
+    ) -> str:
+        if self._consent is None:
+            return _json({"error": "Calls aren't available right now."})
+        if answer not in ("yes", "no"):
+            return _json({"error": 'answer must be "yes" or "no".'})
+        refusal = await self._consent.answer_in_words(
+            self.user, case_id, 1 if answer == "yes" else 2, user_words
+        )
+        if refusal is not None:
+            return _json({"error": refusal})
+        self.answer_confirmed = True
+        return _json({"answered": case_id, "answer": answer, "note": _CONFIRMED})
+
+    async def answer_same_or_new(
+        self, choice: Literal["same_letter", "new_letter"]
+    ) -> str:
+        settle = self._open.settle_same_or_new
+        if settle is None or choice not in ("same_letter", "new_letter"):
+            return _json({"error": 'No "same letter or new?" question is open.'})
+        if not await settle(self.user, 1 if choice == "same_letter" else 2):
+            return _json({"error": 'No "same letter or new?" question is open.'})
+        self.answer_confirmed = True
+        return _json({"answered": choice, "note": _CONFIRMED})
+
+    async def answer_save_facts(self, answer: Literal["yes", "no"]) -> str:
+        facts = self._fact_consent
+        if facts is None or facts.pending(self.user.id) is None:
+            return _json({"error": 'No "may I save this?" question is open.'})
+        if answer not in ("yes", "no"):
+            return _json({"error": 'answer must be "yes" or "no".'})
+        await facts.answer(self.user, 1 if answer == "yes" else 2)
+        self.answer_confirmed = True
+        return _json({"answered": answer, "note": _CONFIRMED})
 
     async def ask_official_source(self, question: str, case_id: str | None) -> str:
         if self._research_questions is None:
@@ -327,6 +423,56 @@ def build_tools(tools: CaseTools) -> list[BetaAsyncFunctionTool[Any]]:
         return await tools.hang_up_call(case_id)
 
     @beta_async_tool
+    async def answer_call_question(question_id: str, choice: int) -> str:
+        """Answer the call's open question (call_question in <open_questions>) for
+        the user, when their latest message picks one of its options in words
+        ("the first one", "about my appointment"). The call is waiting on it.
+
+        Args:
+            question_id: The question_id from <open_questions>.
+            choice: The option's number, from 1.
+        """
+        return await tools.answer_call_question(question_id, choice)
+
+    @beta_async_tool
+    async def answer_call_consent(
+        case_id: str, answer: Literal["yes", "no"], user_words: str
+    ) -> str:
+        """Record the user's answer to the open call question (call_consent in
+        <open_questions>), when their latest message clearly agrees to this call
+        or clearly declines it in words. Never for a hedge or a question ("maybe",
+        "what will you say?"), and never from an earlier message.
+
+        Args:
+            case_id: The case_id from <open_questions>.
+            answer: "yes" to make the call, "no" not to.
+            user_words: The words in the user's latest message that give the
+                answer, copied exactly as they appear in it.
+        """
+        return await tools.answer_call_consent(case_id, answer, user_words)
+
+    @beta_async_tool
+    async def answer_same_or_new(choice: Literal["same_letter", "new_letter"]) -> str:
+        """Answer "same letter or new?" (same_or_new in <open_questions>) when the
+        user says in words whether their latest photos are more pages of the same
+        letter or a new letter.
+
+        Args:
+            choice: "same_letter" or "new_letter".
+        """
+        return await tools.answer_same_or_new(choice)
+
+    @beta_async_tool
+    async def answer_save_facts(answer: Literal["yes", "no"]) -> str:
+        """Answer "may I save this?" (save_facts in <open_questions>) when the
+        user clearly says in words whether we may remember those facts.
+
+        Args:
+            answer: "yes" to save them, "no" not to.
+        """
+        return await tools.answer_save_facts(answer)
+
+    @beta_async_tool
     async def set_language(language: str) -> str:
         """Switch the language the user is written to in, when they ask for it.
 
@@ -345,6 +491,10 @@ def build_tools(tools: CaseTools) -> list[BetaAsyncFunctionTool[Any]]:
         ask_official_source,
         listen_to_call,
         hang_up_call,
+        answer_call_question,
+        answer_call_consent,
+        answer_same_or_new,
+        answer_save_facts,
         set_language,
     ]
 

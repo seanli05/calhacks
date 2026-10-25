@@ -6,15 +6,12 @@ from typing import Any
 
 import pytest
 from app.contracts import (
-    CaseBrief,
     DeepResult,
     EventType,
     FastResult,
     JobStatus,
     JobType,
-    Verification,
 )
-from app.db import tables
 from app.dev.fake_research import FakeResearch, Pacing
 from app.main import app
 from app.orchestrator.letters import Letters
@@ -25,52 +22,6 @@ from whatsapp_fakes import FakeDB, inbound, use_spanish, wait_for_batches
 
 MOCK_AGENCY = "+15005550006"
 FIXTURE_PHONE = "+18003755283"
-
-
-@pytest.fixture
-def research_db(db: FakeDB, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    """Fakes for the research writes; returns what was written."""
-    written: dict[str, Any] = {"refs": {}, "verifications": [], "briefs": []}
-
-    async def create_case(case_id: str, user_id: str, docs: list) -> tables.Case:
-        case = tables.Case(id=case_id, user_id=user_id, document_ids=list(docs))
-        db.cases.append(case)
-        return case
-
-    async def put_ref(case_id: str, name: str, value: str) -> None:
-        written["refs"][name] = value
-
-    async def save_fast_result(case_id: str, result: FastResult) -> None:
-        case = next(c for c in db.cases if c.id == case_id)
-        case.fast_result = result.model_dump(mode="json")
-
-    async def save_verification(case_id: str, verification: Verification) -> None:
-        written["verifications"].append(verification)
-
-    async def save_brief(
-        case_id: str, brief: CaseBrief, note: str | None = None
-    ) -> tables.CaseBrief:
-        row = tables.CaseBrief(
-            id=brief.brief_id,
-            case_id=case_id,
-            brief=brief.model_dump(mode="json"),
-            handoff_note=note or brief.handoff_note,
-        )
-        written["briefs"].append(row)
-        return row
-
-    for name, fake in [
-        ("create_case", create_case),
-        ("put_ref", put_ref),
-        ("save_fast_result", save_fast_result),
-        ("save_verification", save_verification),
-        ("save_brief", save_brief),
-    ]:
-        monkeypatch.setattr(f"app.db.writes.research.{name}", fake)
-    for name in ("claim_next", "finish", "fail"):
-        monkeypatch.setattr(f"app.db.jobs.{name}", getattr(db, name))
-    monkeypatch.setattr("app.dev.fake_research.append_event", db.append_event)
-    return written
 
 
 async def until(condition: Callable[[], bool]) -> None:

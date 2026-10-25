@@ -5,8 +5,11 @@ install them are in conftest.py."""
 import asyncio
 from collections.abc import Sequence
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Any
 
+import anthropic
+import httpx2
 from app.contracts import (
     AskUserRequest,
     CaseBrief,
@@ -437,6 +440,51 @@ class FakeTranslator:
 
     async def to_english(self, text: str, language: str) -> str | None:
         return None if self.fail else f"[en] {text}"
+
+
+class FakeRunnerClient:
+    """Stands in for `client.beta.messages.tool_runner`: optionally calls tools the
+    way the model would, then yields one final message. `queue` scripts the next
+    turns; past the script, each turn uses the constructor's tools and reply."""
+
+    def __init__(
+        self,
+        reply: str | None = "Your interview is on 2026-11-18 at 08:30.",
+        tool_calls: list[tuple[str, dict[str, Any]]] | None = None,
+        fail: bool = False,
+        stop_reason: str = "end_turn",
+    ) -> None:
+        self.beta = SimpleNamespace(messages=self)
+        self.requests: list[dict[str, Any]] = []
+        self.tool_results: list[str] = []
+        self._reply = reply
+        self._tool_calls = tool_calls or []
+        self._fail = fail
+        self._stop_reason = stop_reason
+        self._script: list[tuple[list[tuple[str, dict[str, Any]]], str | None]] = []
+
+    def queue(
+        self, tool_calls: list[tuple[str, dict[str, Any]]], reply: str | None
+    ) -> None:
+        self._script.append((tool_calls, reply))
+
+    def tool_runner(self, **request: Any) -> Any:
+        self.requests.append(request)
+        return self._run(request)
+
+    async def _run(self, request: dict[str, Any]) -> Any:
+        if self._fail:
+            raise anthropic.APITimeoutError(
+                request=httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
+            )
+        tool_calls, reply = (
+            self._script.pop(0) if self._script else (self._tool_calls, self._reply)
+        )
+        tools = {tool.name: tool for tool in request["tools"]}
+        for name, tool_input in tool_calls:
+            self.tool_results.append(await tools[name].call(tool_input))
+        content = [SimpleNamespace(type="text", text=reply)] if reply else []
+        yield SimpleNamespace(stop_reason=self._stop_reason, content=content)
 
 
 def _copy(question: tables.Question) -> tables.Question:
