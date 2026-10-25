@@ -98,12 +98,12 @@ export const landing: LandingStrings = {
     },
     memory: {
       lead: "Tus datos, tu decisión.",
-      rest: " Mira lo que sabemos. Borra lo que quieras.",
+      rest: " Mira lo que se guarda. Quita lo que quieras.",
       facts: ["Prefiere español", "Tiene dos hijos", "Entrevista el 12 de nov.", "Necesita intérprete", "Pidió llamadas después de las 5 p. m."],
-      deleteAll: "Borrar todo",
-      delete: "Borrar",
-      deleted: "(borrado)",
-      cta: "Lo que sabemos de ti",
+      deleteAll: "Borrar mi perfil",
+      delete: "Quitar",
+      deleted: "(quitado)",
+      cta: "Ver tu perfil",
     },
   },
 

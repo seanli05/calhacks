@@ -82,7 +82,7 @@ Full guide, with per-component recipes: [docs/data-layer-guide.md](docs/data-lay
 | `app.db.reads` | Anyone. Includes `case_progress`, `official_dial_number` (the only way to get a number to dial), `resolve_ref`, `list_events` |
 | `app.db.jobs` | `enqueue` (creator); `claim_next`, `finish`, `fail` (handler) |
 | `app.db.events` / `app.db.messages` | `append_event` (everyone); `append_message` (orchestrator, relay) |
-| `app.db.deletes` | The "What we know about you" page (through the dashboard API) |
+| `app.db.deletes` | The Profile page (through the dashboard API) |
 
 `case_progress(case_id)` returns one of `received`, `explaining`, `needs_better_image`, `needs_answer`, `checking`, `suspicious`, `unknown`, `awaiting_consent`, `calling`, `on_hold`, `connected`, `call_ended`, `closed`.
 

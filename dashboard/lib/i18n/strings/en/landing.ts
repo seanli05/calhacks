@@ -99,12 +99,12 @@ export const landing = {
     },
     memory: {
       lead: "Your data, your call.",
-      rest: " See what we know. Delete anything.",
+      rest: " See what's saved. Remove anything.",
       facts: ["Prefers Spanish", "Has two children", "Interview on Nov 12", "Needs an interpreter", "Asked to be called after 5 PM"],
-      deleteAll: "Delete everything",
-      delete: "Delete",
-      deleted: "(deleted)",
-      cta: "What we know about you",
+      deleteAll: "Clear my profile",
+      delete: "Remove",
+      deleted: "(removed)",
+      cta: "See your profile",
     },
   },
 

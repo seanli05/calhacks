@@ -43,7 +43,7 @@ Each component imports **only its own writer module**, plus the shared modules. 
 | `app.db.messages` | orchestrator, relay | `messages` (append-only) |
 | `app.db.events` | everyone | `events` (append-only) |
 | `app.db.jobs` | job creators (`enqueue`) and handlers (`claim_next`, `finish`, `fail`) | `jobs` |
-| `app.db.deletes` | dashboard (the "What we know about you" page) | deletes across tables (C26) |
+| `app.db.deletes` | dashboard (the Profile page) | deletes across tables (C26) |
 | `app.db.reads` | everyone | nothing |
 
 Need a read that doesn't exist? Add a small one to `app.db.reads` (one query, explicit args, returns table rows) and tell person 1. Need a new write? Ask person 1 first.

@@ -5,7 +5,7 @@ export const common: CommonStrings = {
   appName: "Avocado",
   nav: {
     cases: "دوسیه‌های من",
-    memory: "معلوماتی که از شما داریم",
+    memory: "پروفایل",
     back: "→ دوسیه‌های من",
   },
   languageSwitch: "زبان",

@@ -4,7 +4,7 @@ export const common = {
   appName: "Avocado",
   nav: {
     cases: "My cases",
-    memory: "What we know about you",
+    memory: "Profile",
     back: "← My cases",
   },
   languageSwitch: "Language",
