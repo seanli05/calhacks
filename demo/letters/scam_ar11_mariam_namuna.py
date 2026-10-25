@@ -15,7 +15,8 @@ i797c_mariam_namuna.py. From the repo root:
 
     python demo/letters/scam_ar11_mariam_namuna.py
 
-writes scam_ar11_mariam_namuna.png next to this file.
+writes scam_ar11_mariam_namuna.png next to this file, and the same letter for the
+English demo account, scam_ar11_ana_morales.png.
 """
 
 from pathlib import Path
@@ -23,7 +24,7 @@ from typing import NamedTuple
 
 from PIL import Image, ImageDraw, ImageFont
 
-APPLICANT_NAME = "MARIAM NAMUNA"
+NAMES = {"mariam_namuna": "MARIAM NAMUNA", "ana_morales": "ANA MORALES"}
 MAILING_ADDRESS = ("1234 EXAMPLE AVE APT 5", "FREMONT CA 94536")
 
 PAGE_SIZE = (1700, 2200)
@@ -45,83 +46,84 @@ class Line(NamedTuple):
     """Text right-aligned on the same line."""
 
 
-# An int is extra space, in pixels, before the next line.
-LAYOUT: list[Line | int] = [
-    Line(SMALL, "U.S. Department of Homeland Security"),
-    Line(
-        BODY,
-        "Immigration and Customs Enforcement",
-        right="NOTICE OF VIOLATION",
-    ),
-    Line(TITLE, "FINAL NOTICE - IMMEDIATE ACTION REQUIRED"),
-    30,
-    Line(BODY, "Case Number: US16INAR11-0472", right="Notice Date: 10/21/2026"),
-    Line(BODY, "Subject: Alien's Change of Address (AR-11)", right="Page 1 of 1"),
-    BLOCK_GAP,
-    Line(BODY, APPLICANT_NAME),
-    *(Line(BODY, address_line) for address_line in MAILING_ADDRESS),
-    BLOCK_GAP,
-    Line(HEADING, "Notice of Violation"),
-    Line(
-        BODY,
-        "Our records show that you FAILED to file Form AR-11, Alien's Change of "
-        "Address, within 10 days of moving.",
-    ),
-    Line(
-        BODY,
-        "An investigation has been registered on your immigration documents with "
-        "the Department of Justice.",
-    ),
-    Line(
-        BODY,
-        "Failure to report a change of address is punishable by a fine, "
-        "imprisonment, and removal from the United States.",
-    ),
-    BLOCK_GAP,
-    Line(HEADING, "HOW TO CLOSE YOUR CASE"),
-    Line(
-        BODY,
-        "1. Call the USCIS Verification Unit IMMEDIATELY at (201) 555-0148, within "
-        "48 hours of this notice.",
-    ),
-    Line(
-        BODY,
-        "2. Pay the $500 compliance fine with Google Play or Apple gift cards. Read "
-        "the card numbers to the officer",
-    ),
-    Line(BODY, "    by phone. Do not send cash or checks."),
-    Line(
-        BODY,
-        "3. Confirm your new address at www.uscis-ar11-verify.com to complete your "
-        "background check.",
-    ),
-    BLOCK_GAP,
-    Line(
-        BODY,
-        "If you do not pay the fine within 48 hours, a warrant will be issued and "
-        "you will be arrested by federal",
-    ),
-    Line(BODY, "officers and placed in deportation proceedings."),
-    BLOCK_GAP,
-    Line(
-        BODY,
-        "This notice is confidential. Sharing it with a lawyer or any third party "
-        "is a federal offense.",
-    ),
-    BLOCK_GAP,
-    Line(BODY, "Officer R. Daniels"),
-    Line(BODY, "USCIS Verification Unit, Enforcement Division"),
-    Line(BODY, "Phone: (201) 555-0148"),
-    BLOCK_GAP,
-    Line(SMALL, "Form AR-11-V 09/26"),
-]
+def layout(applicant_name: str) -> list[Line | int]:
+    """The page, line by line. An int is extra space, in pixels, before the next line."""
+    return [
+        Line(SMALL, "U.S. Department of Homeland Security"),
+        Line(
+            BODY,
+            "Immigration and Customs Enforcement",
+            right="NOTICE OF VIOLATION",
+        ),
+        Line(TITLE, "FINAL NOTICE - IMMEDIATE ACTION REQUIRED"),
+        30,
+        Line(BODY, "Case Number: US16INAR11-0472", right="Notice Date: 10/21/2026"),
+        Line(BODY, "Subject: Alien's Change of Address (AR-11)", right="Page 1 of 1"),
+        BLOCK_GAP,
+        Line(BODY, applicant_name),
+        *(Line(BODY, address_line) for address_line in MAILING_ADDRESS),
+        BLOCK_GAP,
+        Line(HEADING, "Notice of Violation"),
+        Line(
+            BODY,
+            "Our records show that you FAILED to file Form AR-11, Alien's Change of "
+            "Address, within 10 days of moving.",
+        ),
+        Line(
+            BODY,
+            "An investigation has been registered on your immigration documents with "
+            "the Department of Justice.",
+        ),
+        Line(
+            BODY,
+            "Failure to report a change of address is punishable by a fine, "
+            "imprisonment, and removal from the United States.",
+        ),
+        BLOCK_GAP,
+        Line(HEADING, "HOW TO CLOSE YOUR CASE"),
+        Line(
+            BODY,
+            "1. Call the USCIS Verification Unit IMMEDIATELY at (201) 555-0148, within "
+            "48 hours of this notice.",
+        ),
+        Line(
+            BODY,
+            "2. Pay the $500 compliance fine with Google Play or Apple gift cards. Read "
+            "the card numbers to the officer",
+        ),
+        Line(BODY, "    by phone. Do not send cash or checks."),
+        Line(
+            BODY,
+            "3. Confirm your new address at www.uscis-ar11-verify.com to complete your "
+            "background check.",
+        ),
+        BLOCK_GAP,
+        Line(
+            BODY,
+            "If you do not pay the fine within 48 hours, a warrant will be issued and "
+            "you will be arrested by federal",
+        ),
+        Line(BODY, "officers and placed in deportation proceedings."),
+        BLOCK_GAP,
+        Line(
+            BODY,
+            "This notice is confidential. Sharing it with a lawyer or any third party "
+            "is a federal offense.",
+        ),
+        BLOCK_GAP,
+        Line(BODY, "Officer R. Daniels"),
+        Line(BODY, "USCIS Verification Unit, Enforcement Division"),
+        Line(BODY, "Phone: (201) 555-0148"),
+        BLOCK_GAP,
+        Line(SMALL, "Form AR-11-V 09/26"),
+    ]
 
 
-def render() -> Image.Image:
+def render(applicant_name: str) -> Image.Image:
     page = Image.new("RGB", PAGE_SIZE, "white")
     draw = ImageDraw.Draw(page)
     y = TOP
-    for item in LAYOUT:
+    for item in layout(applicant_name):
         if isinstance(item, int):
             y += item
             continue
@@ -134,6 +136,7 @@ def render() -> Image.Image:
 
 
 if __name__ == "__main__":
-    out = Path(__file__).with_suffix(".png")
-    render().save(out)
-    print(f"wrote {out}")
+    for slug, name in NAMES.items():
+        out = Path(__file__).with_name(f"scam_ar11_{slug}.png")
+        render(name).save(out)
+        print(f"wrote {out}")

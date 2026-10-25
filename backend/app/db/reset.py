@@ -3,11 +3,15 @@
     python -m app.db.reset --yes               # rebuild and seed (awaiting consent)
     python -m app.db.reset --yes --after-call  # ...plus a finished call
     python -m app.db.reset --yes --empty       # rebuild, no seed
-    python -m app.db.reset --yes --story mariam --number +1...  # the demo video
+    python -m app.db.reset --yes --demo-user user_abc=mariam --demo-user user_def=ana
+                                               # the demo video's accounts
 
-The default story is Ana (Spanish, an I-797C waiting for consent). `--story mariam`
-seeds the demo video's user instead (`seed_mariam.py`): pass her real phone as
-`--number`, so the letter she sends on camera lands on her seeded account. Add
+The default seed is Ana (Spanish, an I-797C waiting for consent). `--demo-user`
+seeds the demo video's story (`seed_mariam.py`) instead, once per account:
+`USER_ID=persona` keeps an existing account (its ID and WhatsApp number, read before
+the wipe), so a teammate's phone stays tied to it and every reset ends in the same
+state; `+1NUMBER=persona` makes a new account for that number (a test branch).
+Personas: `mariam` (Dari) and `ana` (English), with the same letters. Add
 `--with-scam` to also seed the scam letter as a flagged case (rehearsals, backup
 takes); leave it off when the scam letter is sent live.
 
@@ -22,6 +26,7 @@ import argparse
 import asyncio
 import sys
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date, timedelta
 from urllib.parse import urlsplit
 
@@ -59,28 +64,68 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         help="also seed a finished call, to check the ended screens",
     )
     parser.add_argument(
-        "--story",
-        choices=["ana", "mariam"],
-        default="ana",
-        help="which demo user to seed (mariam: the demo video)",
-    )
-    parser.add_argument(
-        "--number",
-        help="with --story mariam: her WhatsApp number in E.164 (+1...)",
+        "--demo-user",
+        action="append",
+        default=[],
+        metavar="USER_ID=PERSONA",
+        help="seed the demo video's story on this account (repeatable): "
+        "user_...=mariam keeps an existing account, +1...=ana makes a new one",
     )
     parser.add_argument(
         "--with-scam",
         action="store_true",
-        help="with --story mariam: also seed the scam letter as a flagged case",
+        help="with --demo-user: also seed the scam letter as a flagged case",
     )
     args = parser.parse_args(argv)
-    if args.with_scam and args.story != "mariam":
-        parser.error("--with-scam is for --story mariam")
-    if args.story == "mariam" and not (args.number or "").startswith("+"):
-        parser.error("--story mariam needs --number in E.164, e.g. +15105550100")
-    if args.story == "mariam" and args.after_call:
-        parser.error("--after-call is for the ana story")
+    try:
+        args.demo_users = [parse_demo_user(value) for value in args.demo_user]
+    except ValueError as exc:
+        parser.error(str(exc))
+    if args.with_scam and not args.demo_users:
+        parser.error("--with-scam is for --demo-user")
+    if args.demo_users and args.after_call:
+        parser.error("--after-call is for the default seed")
     return args
+
+
+@dataclass(frozen=True)
+class DemoUser:
+    """One account for the demo story: an existing ID to keep, or a new number."""
+
+    persona: str
+    user_id: str | None = None
+    number: str | None = None
+
+
+def parse_demo_user(value: str) -> DemoUser:
+    who, _, persona = value.partition("=")
+    if persona not in seed_mariam.PERSONAS:
+        names = ", ".join(seed_mariam.PERSONAS)
+        raise ValueError(f"--demo-user {value}: the persona must be one of {names}")
+    if who.startswith("user_"):
+        return DemoUser(persona, user_id=who)
+    if who.startswith("+"):
+        return DemoUser(persona, number=who)
+    raise ValueError(f"--demo-user {value}: start with user_... or +1...")
+
+
+async def demo_numbers(users: Sequence[DemoUser]) -> list[str]:
+    """Each account's WhatsApp number, read before the wipe. Fails, wiping nothing,
+    if an account to keep isn't there."""
+    numbers = []
+    for user in users:
+        if user.number:
+            numbers.append(user.number)
+            continue
+        assert user.user_id is not None
+        async with session() as db:
+            row = await db.get(tables.User, user.user_id)
+        if row is None:
+            raise SystemExit(
+                f"No account {user.user_id} on this database; nothing wiped."
+            )
+        numbers.append(row.whatsapp_number)
+    return numbers
 
 
 def target_host() -> str:
@@ -318,9 +363,16 @@ async def seed(after_call: bool = False) -> str:
     return case.id
 
 
-async def seed_mariam_story(whatsapp_number: str, with_scam: bool = False) -> str:
-    """Mariam and her finished cases. Returns her user ID."""
-    seed = seed_mariam.build(whatsapp_number, with_scam)
+async def seed_mariam_story(
+    whatsapp_number: str,
+    with_scam: bool = False,
+    persona: str = "mariam",
+    user_id: str | None = None,
+) -> str:
+    """The demo story's account and its finished cases. Returns the user ID."""
+    seed = seed_mariam.build(
+        whatsapp_number, with_scam, seed_mariam.PERSONAS[persona], user_id
+    )
     async with session() as db:
         db.add(seed.user)
         await db.flush()
@@ -335,17 +387,19 @@ async def seed_mariam_story(whatsapp_number: str, with_scam: bool = False) -> st
 async def reset(
     empty: bool,
     after_call: bool,
-    story: str = "ana",
-    number: str | None = None,
+    demo_users: Sequence[DemoUser] = (),
     with_scam: bool = False,
 ) -> None:
     try:
+        numbers = await demo_numbers(demo_users) if not empty else []
         await drop_all()
         await create_all()
-        if not empty and story == "mariam":
-            assert number is not None
-            user_id = await seed_mariam_story(number, with_scam)
-            print(f"Seeded Mariam ({user_id}).")
+        if not empty and demo_users:
+            for user, number in zip(demo_users, numbers, strict=True):
+                user_id = await seed_mariam_story(
+                    number, with_scam, user.persona, user.user_id
+                )
+                print(f"Seeded {user.persona} on {user_id}.")
         elif not empty:
             case_id = await seed(after_call)
             print(f"Seeded demo case {case_id}.")
@@ -363,9 +417,7 @@ def main(argv: Sequence[str]) -> int:
     if not args.yes:
         print("This wipes every table on the shared database. Re-run with --yes.")
         return 2
-    asyncio.run(
-        reset(args.empty, args.after_call, args.story, args.number, args.with_scam)
-    )
+    asyncio.run(reset(args.empty, args.after_call, args.demo_users, args.with_scam))
     print("Done.")
     return 0
 

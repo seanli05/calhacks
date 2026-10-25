@@ -99,3 +99,17 @@ def test_call_outranks_verdict() -> None:
         fast_result="ok",
     )
     assert stage == CaseStage.ON_HOLD
+
+
+def test_demo_users_keep_an_account_or_make_one() -> None:
+    from app.db import reset
+
+    assert reset.parse_demo_user("user_abc=mariam") == reset.DemoUser(
+        "mariam", user_id="user_abc"
+    )
+    assert reset.parse_demo_user("+15105550100=ana") == reset.DemoUser(
+        "ana", number="+15105550100"
+    )
+    for bad in ("user_abc=bob", "abc=ana", "user_abc"):
+        with pytest.raises(ValueError):
+            reset.parse_demo_user(bad)

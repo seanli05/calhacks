@@ -1,6 +1,7 @@
-"""The demo video's seed (`reset --story mariam`): Mariam Namuna, a Dari speaker in
+"""The demo video's seed (`reset --demo-user`): Mariam Namuna, a Dari speaker in
 Fremont, with one finished case already on her account, a Medi-Cal renewal notice
-from Alameda County. All fictional.
+from Alameda County. All fictional. The `ana` persona is the same story in English
+under the name Ana Morales, for an English-speaking account.
 
 Her I-797C is not seeded: she sends the printed letter (demo/letters/) on camera.
 So the seed holds only what the video shows as history: the Medi-Cal case,
@@ -34,7 +35,21 @@ from app.db import tables
 from app.db.seed_story import placeholder_letter_png
 from app.db.tables import utcnow
 
-LANGUAGE = "fa"
+LETTERS = Path(__file__).resolve().parents[3] / "demo" / "letters"
+
+
+@dataclass(frozen=True)
+class Persona:
+    """Who the seeded account is: the same story, told in their language."""
+
+    name: str
+    language: str
+    scam_letter: Path
+
+
+MARIAM = Persona("Mariam Namuna", "fa", LETTERS / "scam_ar11_mariam_namuna.png")
+ANA = Persona("Ana Morales", "en", LETTERS / "scam_ar11_ana_morales.png")
+PERSONAS = {"mariam": MARIAM, "ana": ANA}
 RENEWAL_DUE = date(2026, 12, 1)
 DOC_TYPE = "medi_cal_renewal"
 ISSUER = "Alameda County Social Services Agency"
@@ -104,6 +119,7 @@ class CaseRows:
     def __init__(
         self,
         user: tables.User,
+        persona: Persona,
         start: datetime,
         doc_type: str,
         letter_png: bytes,
@@ -111,6 +127,7 @@ class CaseRows:
     ) -> None:
         self.start = start
         self.user = user
+        self.persona = persona
         self.media = tables.Media(
             user_id=user.id, content_type="image/png", data=letter_png
         )
@@ -185,6 +202,8 @@ class CaseRows:
         body_en: str | None,
         media_ids: list[str] | None = None,
     ) -> tables.Message:
+        """`body` is the Dari text; an English persona gets `body_en` instead."""
+        english = self.persona.language == "en"
         sender = (
             MessageSender.USER
             if direction == MessageDirection.IN
@@ -196,9 +215,9 @@ class CaseRows:
             case_id=self.case.id,
             direction=direction,
             sender=sender,
-            body_original=body,
+            body_original=body_en or "" if english else body,
             body_en=body_en,
-            language=LANGUAGE,
+            language=self.persona.language,
             media_ids=media_ids or [],
         )
 
@@ -207,9 +226,14 @@ class MediCalCase(CaseRows):
     """The renewal notice: explained, verified, thanked. Also carries Mariam's
     profile and facts, which come from this letter."""
 
-    def __init__(self, user: tables.User, start: datetime) -> None:
+    def __init__(self, user: tables.User, persona: Persona, start: datetime) -> None:
         super().__init__(
-            user, start, DOC_TYPE, placeholder_letter_png(), deadline=RENEWAL_DUE
+            user,
+            persona,
+            start,
+            DOC_TYPE,
+            placeholder_letter_png(),
+            deadline=RENEWAL_DUE,
         )
         self.case.fast_result = medi_cal_fast_result(self.case.id)
 
@@ -241,7 +265,11 @@ class MediCalCase(CaseRows):
     def profile_and_facts(self) -> list[object]:
         profile = tables.Profile(
             user_id=self.user.id,
-            fields={"name": "Mariam Namuna", "city": "Fremont", "county": "Alameda"},
+            fields={
+                "name": self.persona.name,
+                "city": "Fremont",
+                "county": "Alameda",
+            },
         )
         facts = [
             tables.Fact(
@@ -393,12 +421,6 @@ class MediCalCase(CaseRows):
 
 
 SCAM_DOC_TYPE = "ice_ar11_violation"
-SCAM_LETTER = (
-    Path(__file__).resolve().parents[3]
-    / "demo"
-    / "letters"
-    / "scam_ar11_mariam_namuna.png"
-)
 SCAM_RED_FLAGS = [
     # What scam_rules.py says for this letter's payment section and signature.
     "This letter asks for payment by gift card. USCIS never asks for that.",
@@ -451,9 +473,10 @@ class ScamCase(CaseRows):
     """The fake AR-11 violation notice: flagged by the scam rules and by the
     checks against uscis.gov, and she was told not to pay. No call is offered."""
 
-    def __init__(self, user: tables.User, start: datetime) -> None:
-        png = SCAM_LETTER.read_bytes() if SCAM_LETTER.exists() else None
-        super().__init__(user, start, SCAM_DOC_TYPE, png or placeholder_letter_png())
+    def __init__(self, user: tables.User, persona: Persona, start: datetime) -> None:
+        letter = persona.scam_letter
+        png = letter.read_bytes() if letter.exists() else placeholder_letter_png()
+        super().__init__(user, persona, start, SCAM_DOC_TYPE, png)
         self.case.fast_result = scam_fast_result(self.case.id)
 
     def history(self) -> list[object]:
@@ -575,17 +598,25 @@ class ScamCase(CaseRows):
 
 
 @dataclass
-class MariamSeed:
+class DemoSeed:
     user: tables.User
     cases: list[CaseRows]
 
 
-def build(whatsapp_number: str, with_scam: bool = False) -> MariamSeed:
-    """Mariam and her Medi-Cal case from yesterday; with `with_scam`, also the scam
-    letter from this morning."""
-    user = tables.User(whatsapp_number=whatsapp_number, language=LANGUAGE)
+def build(
+    whatsapp_number: str,
+    with_scam: bool = False,
+    persona: Persona = MARIAM,
+    user_id: str | None = None,
+) -> DemoSeed:
+    """The persona's account with the Medi-Cal case from yesterday; with
+    `with_scam`, also the scam letter from this morning. `user_id` keeps an existing
+    account's ID, so a teammate's phone stays tied to it across resets."""
+    user = tables.User(whatsapp_number=whatsapp_number, language=persona.language)
+    if user_id:
+        user.id = user_id
     now = utcnow()
-    cases: list[CaseRows] = [MediCalCase(user, now - timedelta(days=1))]
+    cases: list[CaseRows] = [MediCalCase(user, persona, now - timedelta(days=1))]
     if with_scam:
-        cases.append(ScamCase(user, now - timedelta(hours=5)))
-    return MariamSeed(user, cases)
+        cases.append(ScamCase(user, persona, now - timedelta(hours=5)))
+    return DemoSeed(user, cases)

@@ -341,6 +341,34 @@ async def test_mariam_seed_with_scam_adds_a_flagged_case() -> None:
     }
 
 
+async def test_a_kept_account_gets_the_story_in_its_persona() -> None:
+    kept = tables.User(id="user_kept_en", whatsapp_number="+15105550144")
+    async with session() as db:
+        db.add(kept)
+        await db.commit()
+    # The reset reads the number before it wipes, then seeds the same ID.
+    [number] = await reset.demo_numbers([reset.DemoUser("ana", user_id=kept.id)])
+    async with session() as db:
+        await db.delete(await db.get(tables.User, kept.id))
+        await db.commit()
+    user_id = await reset.seed_mariam_story(number, True, "ana", kept.id)
+
+    user = await reads.get_user_by_number("+15105550144")
+    assert user is not None and user.id == "user_kept_en" and user.language == "en"
+    profile = await reads.get_profile(user_id)
+    assert profile is not None and profile.fields["name"] == "Ana Morales"
+    async with session() as db:
+        query = select(tables.Message).where(tables.Message.user_id == user_id)
+        bodies = [m.body_original for m in (await db.execute(query)).scalars()]
+    assert "Is this letter real? I'm scared" in bodies
+    assert all(not any("؀" <= ch <= "ۿ" for ch in b) for b in bodies)
+
+
+async def test_a_missing_account_stops_the_reset_before_the_wipe() -> None:
+    with pytest.raises(SystemExit):
+        await reset.demo_numbers([reset.DemoUser("mariam", user_id="user_nobody")])
+
+
 async def test_seed_builds_a_case_awaiting_consent() -> None:
     case_id = await reset.seed()
     assert await reads.case_progress(case_id) == CaseStage.AWAITING_CONSENT

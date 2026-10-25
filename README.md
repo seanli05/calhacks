@@ -54,7 +54,7 @@ Startup creates any missing tables. To rebuild the database and seed the demo ca
 ```bash
 cd backend && python -m app.db.reset --yes           # add --empty to skip the seed; the glossary loads either way
 python -m app.db.reset --yes --after-call             # or: also a finished call, for the ended screens
-python -m app.db.reset --yes --story mariam --number +1...  # or: the demo video's user (Dari, a finished Medi-Cal case); her real phone as --number
+python -m app.db.reset --yes --demo-user user_...=mariam --demo-user user_...=ana  # or: the demo video's story (a finished Medi-Cal case) on those accounts, Dari and English; keeps their IDs and numbers
 # add --with-scam to also seed the scam letter as a flagged case (rehearsals; leave off when it's sent live)
 ```
 
