@@ -30,7 +30,11 @@ from app.phone.line import (
     AgencyAnswered,
     AgencyHungUp,
     AgencyUnreachable,
+    HangUpRequested,
     Heard,
+    ListenEnded,
+    ListenRequested,
+    ListenStarted,
     NonSpeech,
     Overheard,
     SpeechStarted,
@@ -343,6 +347,17 @@ class _CallRunner(MenuSteps):
                 await self._user_unreachable(reason)
             case UserLeft() if state == S.CONNECTED:
                 await self._fire(Trigger.CALL_FINISHED, cause="user_left")
+            case HangUpRequested():
+                await self._user_ended()
+            case ListenRequested():
+                await self._listen_in()
+            case ListenStarted():
+                self.step.sent.append("the user is listening in")
+                logger.info("user listening in (%s)", self._ids())
+            case ListenEnded(reason=reason):
+                # Only their leg: the call with the agency goes on.
+                self.step.flags.append(f"listen_ended:{reason}")
+                logger.info("listen-in ended: %s (%s)", reason, self._ids())
             case NonSpeech():
                 pass
             case _:
@@ -436,6 +451,32 @@ class _CallRunner(MenuSteps):
             return  # the hang-up event follows
         self.step.sent.append("connected the applicant")
         await self._fire(Trigger.USER_JOINED)
+
+    async def _user_ended(self) -> None:
+        """The user asked to end the call. A representative waiting for the applicant
+        hears a fixed goodbye first; then wrap-up hangs up every leg."""
+        state = self.sm.state
+        if (state, Trigger.USER_ENDED) not in TRANSITIONS:
+            self.step.flags.append("ignored")
+            return
+        if state in (S.HUMAN_DETECTED, S.BRIDGING):
+            await self._stop_speaking()
+            await self._say_line(call_lines.USER_ENDED)
+        await self._fire(Trigger.USER_ENDED)
+
+    async def _listen_in(self) -> None:
+        """Ring the user to sit in. Listening runs beside the call's states, so a
+        failure here is logged and the call goes on."""
+        try:
+            await self.deps.telephony.listen_in(self.call_id, self.job.user_id)
+        except LineClosed:
+            self.step.flags.append("line_closed")
+            return
+        except Exception:
+            logger.exception("ringing the user to listen in failed (%s)", self._ids())
+            self.step.flags.append("listen_failed")
+            return
+        self.step.sent.append("rang the user to listen in")
 
     async def _user_unreachable(self, reason: str) -> None:
         await self._stop_speaking()

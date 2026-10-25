@@ -91,6 +91,7 @@ _NEXT_STEPS: dict[Trigger, str] = {
     Trigger.USER_UNREACHABLE: (
         "The applicant didn't answer; the representative was told they'll call back"
     ),
+    Trigger.USER_ENDED: "The applicant asked to end the call before it was done",
 }
 
 

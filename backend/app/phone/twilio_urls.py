@@ -14,6 +14,10 @@ USER_STATUS_PATH = "/phone/calls/{call_id}/user/status"
 USER_JOINED_PATH = "/phone/calls/{call_id}/user/joined"
 USER_MISSED_PATH = "/phone/calls/{call_id}/user/missed"
 FORK_PATH = "/phone/calls/{call_id}/fork/{speaker}"
+LISTEN_STATUS_PATH = "/phone/calls/{call_id}/listen/status"
+LISTEN_JOINED_PATH = "/phone/calls/{call_id}/listen/joined"
+LISTEN_MISSED_PATH = "/phone/calls/{call_id}/listen/missed"
+LISTEN_STREAM_PATH = "/phone/calls/{call_id}/listen/stream"
 
 type Speaker = Literal["agency", "user"]
 
@@ -47,6 +51,18 @@ class LineUrls:
 
     def fork(self, call_id: CallId, speaker: Speaker) -> str:
         return self._wss() + FORK_PATH.format(call_id=call_id, speaker=speaker)
+
+    def listen_status(self, call_id: CallId) -> str:
+        return self.base_url + LISTEN_STATUS_PATH.format(call_id=call_id)
+
+    def listen_joined(self, call_id: CallId) -> str:
+        return self.base_url + LISTEN_JOINED_PATH.format(call_id=call_id)
+
+    def listen_missed(self, call_id: CallId) -> str:
+        return self.base_url + LISTEN_MISSED_PATH.format(call_id=call_id)
+
+    def listen_stream(self, call_id: CallId) -> str:
+        return self._wss() + LISTEN_STREAM_PATH.format(call_id=call_id)
 
     def _wss(self) -> str:
         return f"wss://{urlsplit(self.base_url).netloc}"

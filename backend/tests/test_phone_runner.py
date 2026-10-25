@@ -29,6 +29,7 @@ from app.phone.fakes import (
     HungUp,
     NoAnswer,
     PressedKeys,
+    RangListener,
     RangUser,
     Said,
     Step,
@@ -37,7 +38,11 @@ from app.phone.guard import GuardedTelephony
 from app.phone.line import (
     AgencyAnswered,
     AgencyHungUp,
+    HangUpRequested,
     Heard,
+    ListenEnded,
+    ListenRequested,
+    ListenStarted,
     NonSpeech,
     Overheard,
     SpeechStarted,
@@ -419,6 +424,106 @@ async def test_hold_timeout_hangs_up_and_reports_failed() -> None:
     [ended] = call.events_of(EventType.CALL_ENDED)
     assert ended.data["cause"] == "hold_timeout"
     assert ended.data["minutes"] == 60
+
+
+async def test_listening_in_runs_beside_the_call_and_never_ends_it() -> None:
+    """The user asks to sit in during the menu, listens, and hangs up; the call
+    goes on exactly as it would have."""
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2", "appointments")}))
+    to_rep = _to_rep(Said("two"))
+
+    def tree(action: Action) -> list[Step]:
+        if isinstance(action, RangListener):
+            return [Step(5, ListenStarted()), Step(20, ListenEnded(reason="hung_up"))]
+        return to_rep(action)
+
+    script = [*_opening(), Step(0.5, ListenRequested())]
+    call, report = await _run(llm, script, tree)
+
+    rang = RangListener(call.record.call_id, "user_9", "+15555550123")
+    assert rang in call.actions
+    assert call.record.states[-5:] == [
+        S.HUMAN_DETECTED,
+        S.BRIDGING,
+        S.CONNECTED,
+        S.WRAP_UP,
+        S.ENDED,
+    ]
+    assert EventType.CALL_USER_JOINED in call.log.types
+    assert report.outcome == CallOutcome.PARTIAL
+    ended = next(step for step in call.steps if step.input == "listen_ended")
+    assert "listen_ended:hung_up" in ended.flags
+
+
+async def test_hang_up_now_on_hold_cancels_the_call_without_a_word() -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+
+    def tree(action: Action) -> list[Step]:
+        if action == Said("two"):
+            return [
+                Step(1, NonSpeech(sound="music", seconds=30)),
+                Step(20, HangUpRequested()),
+                Step(600, Heard(text=REP)),  # never reached
+            ]
+        return []
+
+    call, report = await _run(llm, _opening(), tree)
+
+    assert report.outcome == CallOutcome.CANCELLED
+    assert call.actions[-2:] == [Said("two"), HungUp()]
+    assert call.record.states[-3:] == [S.HOLD, S.WRAP_UP, S.ENDED]
+    [ended] = call.events_of(EventType.CALL_ENDED)
+    assert ended.data["cause"] == "user_ended"
+
+
+async def test_hang_up_now_with_a_rep_waiting_says_goodbye_first() -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    to_rep = _to_rep(Said("two"), user=Step(999, UserAnswered()))
+
+    def tree(action: Action) -> list[Step]:
+        if isinstance(action, RangUser):
+            return [Step(5, HangUpRequested())]
+        return to_rep(action)
+
+    call, report = await _run(llm, _opening(), tree)
+
+    assert report.outcome == CallOutcome.CANCELLED
+    assert call.actions[-2:] == [Said(call_lines.USER_ENDED), HungUp()]
+    assert ConnectedUser() not in call.actions
+
+
+async def test_hang_up_now_on_a_connected_call_ends_it() -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    to_rep = _to_rep(Said("two"))
+
+    def tree(action: Action) -> list[Step]:
+        if isinstance(action, ConnectedUser):
+            return [Step(30, HangUpRequested())]
+        return to_rep(action)
+
+    call, report = await _run(llm, _opening(), tree)
+
+    assert call.actions[-2:] == [ConnectedUser(), HungUp()]  # the agent stays silent
+    assert report.outcome == CallOutcome.PARTIAL  # the report reads the conversation
+    assert call.record.states[-3:] == [S.CONNECTED, S.WRAP_UP, S.ENDED]
+
+
+async def test_a_failed_listen_ring_doesnt_stop_the_call() -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    script = [*_opening(), Step(0.5, ListenRequested())]
+    call = Call()
+    deps = call.deps(script, _to_rep(Said("two")), (), True)
+    assert call.line is not None
+
+    async def broken(call_id: str, user_id: str) -> None:
+        raise RuntimeError("boom")
+
+    call.line.listen_in = broken  # type: ignore[method-assign]
+    report = await call.clock.run(
+        run_call("job_12", _job(), deps, llm=llm, observer=call.steps.append)
+    )
+    assert report.outcome == CallOutcome.PARTIAL
+    assert any("listen_failed" in step.flags for step in call.steps)
 
 
 async def test_user_unreachable_tells_the_rep_and_hangs_up() -> None:

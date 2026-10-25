@@ -499,6 +499,20 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "یا تماس قطع شد."
         ),
     },
+    "summary.cancelled": {
+        "es": (
+            "Terminé la llamada con USCIS, como me pidió. Escríbame cuando quiera "
+            "que vuelva a llamar."
+        ),
+        "en": (
+            "I ended the call with USCIS, as you asked. Write to me whenever you'd "
+            "like me to call again."
+        ),
+        "fa": (
+            "طوری که خواسته بودید، تماس با ادارهٔ USCIS را قطع کردم. هر وقت "
+            "خواستید دوباره تماس بگیرم، برایم بنویسید."
+        ),
+    },
     "summary.unreachable_followup": {
         "es": (
             "Si quiere, puedo llamar otra vez a USCIS y avisarle cuando conteste "

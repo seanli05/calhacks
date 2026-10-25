@@ -1,5 +1,6 @@
 """Twilio's ways into a live call: status callbacks, the applicant's join gate,
-the media stream, and the listen-only forks after the bridge.
+the media stream, the listen-only forks after the bridge, and the listen leg when
+the user sits in (its status, its gate, and the stream we play the call into).
 
 All of them find the call's line in `twilio_line.LINES` by the `call_id` in the
 path, and all check Twilio's signature with the relay's helper. Twilio signs the
@@ -23,10 +24,15 @@ from app.phone.audio_pipeline import (
     run_fork,
     run_stream,
 )
+from app.phone.listen_audio import run_listener
 from app.phone.twilio_line import LINES, TwilioTelephony
 from app.phone.twilio_rest import hang_up_twiml
 from app.phone.twilio_urls import (
     FORK_PATH,
+    LISTEN_JOINED_PATH,
+    LISTEN_MISSED_PATH,
+    LISTEN_STATUS_PATH,
+    LISTEN_STREAM_PATH,
     STATUS_PATH,
     STREAM_PATH,
     USER_JOINED_PATH,
@@ -118,6 +124,50 @@ async def user_missed(
     return _twiml(line.user_missed_gate(params.get("CallSid", "")))
 
 
+@router.post(LISTEN_STATUS_PATH)
+async def listen_status(
+    call_id: str,
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Response:
+    params = await _signed_params(request, settings, call_id, "listener status")
+    line = LINES.get(call_id)
+    if line is None:
+        logger.info("Listener status for no live line (call_id=%s)", call_id)
+    else:
+        line.on_listen_status(params.get("CallSid", ""), params.get("CallStatus", ""))
+    return Response(status_code=204)
+
+
+@router.post(LISTEN_JOINED_PATH)
+async def listen_joined(
+    call_id: str,
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Response:
+    """The listen gate's `<Gather>` action: the user pressed a key to sit in."""
+    params = await _signed_params(request, settings, call_id, "listener key press")
+    line = LINES.get(call_id)
+    if line is None:
+        logger.info("Listener key press for no live line (call_id=%s)", call_id)
+        return _twiml(hang_up_twiml())
+    return _twiml(line.listen_pressed_key(params.get("CallSid", "")))
+
+
+@router.post(LISTEN_MISSED_PATH)
+async def listen_missed(
+    call_id: str,
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Response:
+    """The listen gate's fall-through: no key in time."""
+    params = await _signed_params(request, settings, call_id, "listener no key")
+    line = LINES.get(call_id)
+    if line is None:
+        return _twiml(hang_up_twiml())
+    return _twiml(line.listen_missed_gate(params.get("CallSid", "")))
+
+
 def _signed_stream(websocket: WebSocket, settings: Settings) -> bool:
     """The relay's helper reads only the headers and the URL path, which a
     websocket handshake has too."""
@@ -172,3 +222,12 @@ async def call_fork(websocket: WebSocket, call_id: str, speaker: str) -> None:
         case _:
             logger.warning("Refused fork for speaker %r (call_id=%s)", speaker, call_id)
             await websocket.close(code=_POLICY_VIOLATION)
+
+
+@router.websocket(LISTEN_STREAM_PATH)
+async def listen_stream(websocket: WebSocket, call_id: str) -> None:
+    """The listen leg's stream: we play the call into it and ignore what comes back."""
+    settings = get_settings()
+    if opened := await _open_stream(websocket, call_id, settings):
+        line, start = opened
+        await run_listener(websocket, start, line)

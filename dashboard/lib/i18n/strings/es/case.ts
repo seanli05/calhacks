@@ -73,6 +73,10 @@ export const caseView: CaseStrings = {
       title: (agency: string) => `No pudimos hablar con una persona de ${agency}`,
       sub: "Podemos intentarlo de nuevo cuando quieras. Solo dínoslo por WhatsApp.",
     },
+    call_cancelled: {
+      title: "Terminaste la llamada",
+      sub: "Podemos llamar de nuevo cuando quieras. Solo dínoslo por WhatsApp.",
+    },
     call_unreachable: {
       title: "No pudimos contactarte",
       sub: "Contestó una persona, pero tu teléfono no respondió. Podemos intentarlo de nuevo.",
@@ -84,6 +88,7 @@ export const caseView: CaseStrings = {
     partial: "Resuelto en parte",
     failed: "No resuelto",
     user_unreachable: "No pudimos contactarte",
+    cancelled: "Terminada por ti",
   },
   reference: (n: string) => `Número de referencia: ${n}`,
   viewTranscript: "Ver transcripción",

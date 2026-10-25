@@ -619,6 +619,17 @@ async def test_resolved_call_with_follow_up_doesnt_suggest_closing(
     assert "summary.suggest_close" not in db.outbound_templates()
 
 
+async def test_a_call_the_user_ended_is_confirmed_without_a_retry_offer(
+    db: FakeDB, pipe: InboundPipe, consent: ConsentGate, job_watcher: JobWatcher
+) -> None:
+    user = await call_ends(db, pipe, consent, report(outcome=CallOutcome.CANCELLED))
+    [job] = db.jobs_of(JobType.CALL)
+    await until(lambda: not job_watcher.is_watching(job.id))
+
+    assert db.outbound_templates()[-1] == "summary.cancelled"
+    assert consent.pending(user.id) is None
+
+
 @pytest.mark.parametrize(
     ("call_report", "template"),
     [

@@ -72,6 +72,10 @@ export const caseView = {
       title: (agency: string) => `We couldn't reach a person at ${agency}`,
       sub: "We can try again whenever you want. Just say so on WhatsApp.",
     },
+    call_cancelled: {
+      title: "You ended the call",
+      sub: "We can call again whenever you want. Just say so on WhatsApp.",
+    },
     call_unreachable: {
       title: "We couldn't reach you",
       sub: "A person answered, but your phone didn't pick up. We can try again.",
@@ -83,6 +87,7 @@ export const caseView = {
     partial: "Partly resolved",
     failed: "Not resolved",
     user_unreachable: "We couldn't reach you",
+    cancelled: "Ended by you",
   },
   reference: (n: string) => `Reference number: ${n}`,
   viewTranscript: "View transcript",

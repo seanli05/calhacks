@@ -39,6 +39,7 @@ function heroCopy(t: CaseStrings, detail: CaseDetail, call: CallSummary | null, 
       if (call?.report?.outcome === "failed")
         return { title: h.call_failed.title(agency), sub: h.call_failed.sub };
       if (call?.report?.outcome === "user_unreachable") return h.call_unreachable;
+      if (call?.report?.outcome === "cancelled") return h.call_cancelled;
       return { title: h.call_ended.title(agency) };
     default:
       return h[detail.stage];

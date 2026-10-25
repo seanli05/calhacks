@@ -30,7 +30,7 @@ If Plan.md and this doc disagree, Plan.md wins; stop and tell the user rather th
 | `FactStatus` | `active`, `pending_consent`, `superseded` |
 | `Sensitivity` | `normal`, `sensitive` |
 | `CallState` | `dialing`, `menu`, `hold`, `human_detected`, `bridging`, `connected`, `wrap_up`, `ended` |
-| `CallOutcome` | `resolved`, `partial`, `failed`, `user_unreachable` |
+| `CallOutcome` | `resolved`, `partial`, `failed`, `user_unreachable`, `cancelled` (added later: the user ended the call on WhatsApp) |
 | `QuestionStatus` | `open`, `answered`, `timed_out` |
 | `FastResultStatus` | `ok`, `needs_better_image` |
 | `Urgency` | `low`, `medium`, `high` |

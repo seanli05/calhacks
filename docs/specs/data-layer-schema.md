@@ -125,7 +125,7 @@ No status column: progress is computed from jobs, verification, calls, and a `ca
 | `consent_message_id` | text, FK messages | The user's YES (C8) |
 | `state` | text | `dialing` · `menu` · `hold` · `human_detected` · `bridging` · `connected` · `wrap_up` · `ended` |
 | `twilio_call_sid` | text, null | |
-| `outcome` | text, null | `resolved` · `partial` · `failed` · `user_unreachable` |
+| `outcome` | text, null | `resolved` · `partial` · `failed` · `user_unreachable` · `cancelled` |
 | `report` | jsonb, null | P3 payload (C12) |
 | `started_at`, `ended_at` | timestamptz | `ended_at` null while live |
 

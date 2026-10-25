@@ -65,6 +65,13 @@ class Telephony(Protocol):
         """Move the agency leg into the conference, after `UserAnswered`."""
         ...
 
+    async def listen_in(self, call_id: CallId, user_id: UserId) -> None:
+        """Ring the user's own number (C6) on a listen-only leg, after the user asked
+        to sit in (`ListenRequested`). `ListenStarted` or `ListenEnded` follows; the
+        agency leg is unaffected either way. If they're still listening when a
+        person picks up, `ring_user` joins that leg instead of ringing again."""
+        ...
+
     async def hang_up(self) -> None:
         """End every leg. Safe to call more than once."""
         ...

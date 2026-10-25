@@ -10,7 +10,9 @@ Three things feed one call's line, all in this one process:
   (`on_user_status`, `user_pressed_key`, `user_missed_gate`);
 - the media stream's websocket (`routes.py` → `audio_pipeline.py`) attaches an
   `AudioStream` and emits speech events through `emit`. After the bridge, each
-  leg's listen-only fork emits `Overheard` lines the same way.
+  leg's listen-only fork emits `Overheard` lines the same way;
+- the listen leg, when the user sits in before the bridge (`listen_leg.py`): its
+  callbacks and its stream (`listen_audio.py`) come through here to its `ListenLeg`.
 
 The bridge (spikes/bridge/README.md): `ring_user` calls the applicant with a join
 gate, because carrier voicemail picks up unanswered calls and Twilio reports that
@@ -46,11 +48,14 @@ from app.phone.line import (
     AgencyAnswered,
     AgencyHungUp,
     AgencyUnreachable,
+    HangUpRequested,
     LineEvent,
     UserAnswered,
     UserLeft,
     UserUnreachable,
 )
+from app.phone.listen_audio import ListenMixer, ListenSink
+from app.phone.listen_leg import ListenInResult, ListenLeg
 from app.phone.ports import LineClosed, NumberSource
 from app.phone.twilio_rest import (
     ENDED_STATUSES,
@@ -62,6 +67,9 @@ from app.phone.twilio_rest import (
 from app.phone.twilio_urls import LineUrls, Speaker
 
 logger = logging.getLogger(__name__)
+
+type HangUpResult = Literal["ending", "call_over"]
+"""What a request to end the call got: the runner is ending it, or it's over."""
 
 type UserStage = Literal["none", "ringing", "joined", "gone"]
 """The applicant's leg: not rung yet, rung (and maybe picked up, by them or by
@@ -171,6 +179,7 @@ class TwilioTelephony:
         self._user_stage: UserStage = "none"
         self._bridged = False
         """The agency leg was moved into the conference."""
+        self._listen = ListenLeg(calls, urls, self.emit, language=user_language)
 
     def __repr__(self) -> str:
         return f"TwilioTelephony(call_id={self._call_id})"
@@ -243,12 +252,20 @@ class TwilioTelephony:
 
     async def ring_user(self, call_id: CallId, user_id: UserId) -> None:
         """A failed REST call doesn't raise: it's `UserUnreachable("failed")`, so the
-        representative still hears that the account holder will call back."""
+        representative still hears that the account holder will call back. If the
+        user is listening in, their leg joins the conference instead of a ring."""
         self._require_agency()
         if call_id != self._call_id:
             raise RuntimeError("ring_user for another call")
         if self._user_stage != "none":
             raise RuntimeError("the applicant was already rung")
+        self._listen.drop_request()
+        if await self._promote_listener(call_id):
+            return
+        if (sid := self._listen.live_sid()) is not None:
+            # Still at the listen gate: end it, and ring for the bridge instead.
+            self._listen.end("failed")
+            await self._end_leg("listener", self._calls.end, sid)
         number = await self._numbers.user_number(user_id)
         if self._user_language not in JOIN_PROMPTS:
             logger.warning(
@@ -277,6 +294,27 @@ class TwilioTelephony:
             return
         self._user_sid = self._user_sid or sid
         logger.info("rang the applicant (call_id=%s sid=%s)", call_id, sid)
+
+    async def listen_in(self, call_id: CallId, user_id: UserId) -> None:
+        """Ring the user's own number (C6) on a listen-only leg, after
+        `request_listen_in`. A failed ring is `ListenEnded("failed")`; an unknown user
+        ends the request too, then raises."""
+        try:
+            self._require_agency()
+        except LineClosed:
+            self._listen.drop_request()
+            raise
+        if call_id != self._call_id:
+            raise RuntimeError("listen_in for another call")
+        if self._user_stage != "none":
+            self._listen.drop_request()  # a person picked up first; the bridge rings
+            return
+        try:
+            number = await self._numbers.user_number(user_id)
+        except Exception:
+            self._listen.end("failed")
+            raise
+        await self._listen.ring(call_id, number)
 
     async def connect_user(self) -> None:
         self._require_agency()
@@ -316,6 +354,9 @@ class TwilioTelephony:
         if self._user_sid is not None and self._user_stage in ("ringing", "joined"):
             # Twilio refuses `completed` for a call still ringing; `end` cancels it.
             await self._end_leg("applicant", self._calls.end, self._user_sid)
+        if (listen_sid := self._listen.live_sid()) is not None:
+            self._listen.end("hung_up")
+            await self._end_leg("listener", self._calls.end, listen_sid)
         stream, self._stream = self._stream, None
         self._wake()
         if stream is not None:
@@ -325,6 +366,53 @@ class TwilioTelephony:
     async def events(self) -> AsyncIterator[LineEvent]:
         while (event := await self._queue.get()) is not None:
             yield event
+
+    # Listening in
+
+    def request_listen_in(self) -> ListenInResult:
+        """The user asked to sit in. Rings them through the runner (`ListenRequested`
+        → `listen_in`), since only the runner knows whose call this is."""
+        if self._call_id is None or self._hung_up or self._agency_gone:
+            return "call_over"
+        if self._user_stage != "none" or self._bridged:
+            return "rep_on_line"
+        return self._listen.request()
+
+    def request_hang_up(self) -> HangUpResult:
+        """The user asked to end the call. The runner ends it (`HangUpRequested`), so
+        the report is written and a waiting representative hears goodbye first."""
+        if self._call_id is None or self._hung_up or self._agency_gone:
+            return "call_over"
+        self.emit(HangUpRequested())
+        return "ending"
+
+    @property
+    def listen_mixer(self) -> ListenMixer:
+        """For the agency stream's taps (`audio_pipeline.run_stream`)."""
+        return self._listen.mixer
+
+    def on_listen_status(self, call_sid: str, status: str) -> None:
+        """A status callback for the listen leg; once it joined the bridge, for the
+        applicant's leg."""
+        if self._user_sid is not None and call_sid == self._user_sid:
+            self.on_user_status(call_sid, status)
+            return
+        logger.info("listen leg %s (call_id=%s)", status, self._call_id)
+        self._listen.on_status(call_sid, status)
+
+    def listen_pressed_key(self, call_sid: str) -> str:
+        if self._hung_up or self._agency_gone or self._call_id is None:
+            return hang_up_twiml()
+        return self._listen.pressed_key(call_sid, self._call_id)
+
+    def listen_missed_gate(self, call_sid: str) -> str:
+        return self._listen.missed_gate(call_sid)
+
+    def attach_listener(self, sink: ListenSink, call_sid: str) -> bool:
+        return not self._hung_up and self._listen.attach(sink, call_sid)
+
+    def detach_listener(self, sink: ListenSink) -> None:
+        self._listen.detach(sink)
 
     # From the routes and the stream
 
@@ -473,6 +561,32 @@ class TwilioTelephony:
         if self._user_stage == "none":
             return False
         return self._user_sid is None or call_sid == self._user_sid
+
+    async def _promote_listener(self, call_id: CallId) -> bool:
+        """Move a listening user's leg into the conference: they join with no second
+        ring and no gate (they pressed a key to listen). False if nobody listens, or
+        the move failed, in which case their leg is ended and the bridge rings."""
+        sid = self._listen.take_for_bridge()
+        if sid is None:
+            return False
+        try:
+            await self._calls.update_twiml(
+                sid,
+                conference_twiml(self._conference(), self._urls.fork(call_id, "user")),
+            )
+        except _REST_ERRORS as exc:
+            logger.warning(
+                "moving the listener to the bridge failed (call_id=%s): %s",
+                call_id,
+                type(exc).__name__,
+            )
+            await self._end_leg("listener", self._calls.end, sid)
+            return False
+        self._user_sid = sid
+        self._user_stage = "joined"
+        self.emit(UserAnswered())
+        logger.info("listener joined the bridge (call_id=%s sid=%s)", call_id, sid)
+        return True
 
     def _conference(self) -> str:
         return f"bridge-{self._require_call_id()}"
