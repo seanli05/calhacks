@@ -24,7 +24,7 @@ const SCRIPT: ScriptLine[] = [
     tip: {
       kind: "yourself",
       say_en: null,
-      es: "Te preguntan tu nombre y fecha de nacimiento. Contesta tú; nosotros nunca respondemos por ti.",
+      es: "Le preguntan su nombre y fecha de nacimiento. Conteste usted; nosotros nunca respondemos por usted.",
       en: "They're asking your name and date of birth. Answer yourself; we never answer for you.",
     },
   },

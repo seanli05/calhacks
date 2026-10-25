@@ -55,7 +55,7 @@ export function LiveTranscript({
         >
           <span className={styles.who}>{t.speakers[line.speaker]}</span>
           <div className={styles.body}>
-            <p className={styles.text}>
+            <p className={styles.text} dir="auto">
               {findTerms(line.text, glossary, lang === "en" ? "term" : "translation").map((seg, i) =>
                 seg.entry ? (
                   <button key={i} type="button" className={styles.term} onClick={() => onTerm(seg.entry!)}>

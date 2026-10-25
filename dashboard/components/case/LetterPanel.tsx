@@ -119,7 +119,7 @@ export function LetterPanel({ detail }: { detail: CaseDetail }) {
                 <span className="pin">1</span>
                 <span>
                   <span className={styles.fk}>{t.when}</span>
-                  <span className={styles.fv}>
+                  <span className={styles.fv} dir="auto">
                     {longDate(appt.date, lang)}
                     {appt.time && `, ${clockTime(appt.time, lang)}`}
                   </span>
@@ -131,7 +131,7 @@ export function LetterPanel({ detail }: { detail: CaseDetail }) {
                 <span className="pin">2</span>
                 <span>
                   <span className={styles.fk}>{t.where}</span>
-                  <span className={styles.fv}>{appt.location}</span>
+                  <span className={styles.fv} dir="auto">{appt.location}</span>
                 </span>
               </li>
             )}
@@ -140,7 +140,7 @@ export function LetterPanel({ detail }: { detail: CaseDetail }) {
                 <span className={`pin ${c.kind === "who_must_come" ? "warn" : ""}`}>{firstChecklistPin + i}</span>
                 <span>
                   <span className={styles.fk}>{t.kinds[c.kind]}</span>
-                  <span className={styles.fv}>{c.item.text}</span>
+                  <span className={styles.fv} dir="auto">{c.item.text}</span>
                 </span>
               </li>
             ))}

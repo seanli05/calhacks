@@ -6,6 +6,7 @@
  */
 
 import type { FeedItem } from "./api/types";
+import { formatNumber } from "./format";
 
 export interface Task {
   id: string;
@@ -96,8 +97,8 @@ function toTask(id: string, group: FeedItem[], now: number): Task | null {
   };
 }
 
-/** "0:41" or "12:05". */
-export function elapsed(fromIso: string, toMs: number): string {
+/** "0:41" or "12:05", in the language's digits. */
+export function elapsed(fromIso: string, toMs: number, lang: string): string {
   const s = Math.max(0, Math.floor((toMs - Date.parse(fromIso)) / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  return `${formatNumber(Math.floor(s / 60), lang)}:${formatNumber(s % 60, lang, 2)}`;
 }

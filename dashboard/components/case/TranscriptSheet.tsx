@@ -50,7 +50,7 @@ export function TranscriptSheet({ callId, onClose }: { callId: string; onClose: 
           {transcript?.lines.map((line, i) => (
             <div key={i} className={`${styles.line} ${styles[line.speaker] ?? ""}`}>
               <span className={styles.who}>{t.speakers[line.speaker]}</span>
-              <span>{line.text}</span>
+              <span lang="en">{line.text}</span>
             </div>
           ))}
         </div>

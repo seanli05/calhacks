@@ -95,6 +95,10 @@
     background-color 200ms ease;
 }
 
+[dir="rtl"] .arrow {
+  transform: rotate(45deg);
+}
+
 .dark .arrow {
   border-color: rgba(255, 255, 255, 0.3);
 }

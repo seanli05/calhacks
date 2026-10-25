@@ -63,10 +63,10 @@ async def test_seeded_case_end_to_end(api: httpx.AsyncClient) -> None:
     user_id = case["user_id"]
     feed = (await api.get(f"/api/users/{user_id}/feed")).json()
     texts = [item["text"]["text"] for item in feed]
-    assert texts[0] == "Recibimos tu carta"
-    assert "Guardamos: Prefieres mensajes de voz" in texts
+    assert texts[0] == "Recibimos su carta"
+    assert "Guardamos: Prefiere mensajes de voz" in texts
     assert "Confirmamos que la carta es real (uscis.gov)" in texts
-    assert texts[-1] == "Te preguntamos si quieres que llamemos a USCIS"
+    assert texts[-1] == "Le preguntamos si quiere que llamemos a USCIS"
 
     suggestions = (await api.get(f"/api/users/{user_id}/suggestions")).json()
     assert [s["kind"] for s in suggestions] == ["countdown", "glossary", "checklist"]
@@ -83,7 +83,7 @@ async def test_seeded_case_end_to_end(api: httpx.AsyncClient) -> None:
     # The first fact is the immigration one, held for consent (C15, C25).
     assert memory["facts"][0]["status"] == "pending_consent"
     assert [item["text"]["text"] for item in deleted] == [
-        "Te preguntaremos antes de guardar un dato"
+        "Le preguntaremos antes de guardar un dato"
     ]
 
 

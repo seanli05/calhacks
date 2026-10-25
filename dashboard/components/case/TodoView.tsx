@@ -72,7 +72,7 @@ export function TodoView({ detail, onViewLetter }: { detail: CaseDetail; onViewL
             </p>
             {appt.location && (
               <p className={styles.place}>
-                <span>{appt.location}</span>
+                <span dir="auto">{appt.location}</span>
                 <a
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(appt.location)}`}
                   target="_blank"
@@ -92,7 +92,9 @@ export function TodoView({ detail, onViewLetter }: { detail: CaseDetail; onViewL
             <p className={styles.time}>
               <span className={`pill warn ${styles.countdown}`}>{countdown(detail.deadline)}</span>
             </p>
-            {detail.what_is_asked && <p className={styles.place}>{detail.what_is_asked.text}</p>}
+            {detail.what_is_asked && <p className={styles.place} dir="auto">
+                {detail.what_is_asked.text}
+              </p>}
           </section>
         ) : (
           detail.what_is_asked && (
@@ -100,7 +102,9 @@ export function TodoView({ detail, onViewLetter }: { detail: CaseDetail; onViewL
               <span className="label" id="when-title">
                 {t.todo.asks}
               </span>
-              <p className={styles.asks}>{detail.what_is_asked.text}</p>
+              <p className={styles.asks} dir="auto">
+                {detail.what_is_asked.text}
+              </p>
               {englishBelow(detail.what_is_asked, lang) && <small>{detail.what_is_asked.en}</small>}
             </section>
           )
@@ -150,7 +154,7 @@ export function TodoView({ detail, onViewLetter }: { detail: CaseDetail; onViewL
             <span className="label" id="says-title">
               {t.appt.says}
             </span>
-            <p>{detail.explanation.text}</p>
+            <p dir="auto">{detail.explanation.text}</p>
             {englishBelow(detail.explanation, lang) && <small>{detail.explanation.en}</small>}
           </section>
         )}
@@ -161,7 +165,9 @@ export function TodoView({ detail, onViewLetter }: { detail: CaseDetail; onViewL
             <b>{docType}</b>
             {detail.issuer && <span>{detail.issuer}</span>}
           </span>
-          <span className={styles.open}>{t.appt.viewLetter} →</span>
+          <span className={styles.open}>
+            {t.appt.viewLetter} <span className="flip-rtl">→</span>
+          </span>
         </button>
 
         {detail.refs.length > 0 && (

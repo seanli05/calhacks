@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import styles from "./Mascot.module.css";
 
 /** Hellos in the three languages we speak, shown whatever the page language is. */
-const HELLOS = ["Hola!", "Hi!", "سلام!"];
+const HELLOS = ["¡Hola!", "Hi!", "سلام!"];
 
 /**
  * Avocado, our helper: a friendly face so the page greets people instead of selling

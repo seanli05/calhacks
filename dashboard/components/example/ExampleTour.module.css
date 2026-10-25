@@ -38,11 +38,9 @@
   border-radius: 50%;
   background: var(--lime-soft);
   color: var(--forest);
+  /* The arrow icon already mirrors itself on right-to-left pages, so this flip
+     points it backward in either direction. */
   transform: scaleX(-1);
-}
-
-[dir="rtl"] .backArrow {
-  transform: none;
 }
 
 .layout {
@@ -172,14 +170,6 @@
 
 .flip {
   display: grid;
-  transform: scaleX(-1);
-}
-
-[dir="rtl"] .flip {
-  transform: none;
-}
-
-[dir="rtl"] .controls button:last-of-type svg {
   transform: scaleX(-1);
 }
 
