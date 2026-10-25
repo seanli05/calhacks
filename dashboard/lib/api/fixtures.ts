@@ -115,8 +115,8 @@ interface FeedSeed {
   es: string;
   en: string;
   factId?: string;
-  /** A step row, only served with `steps`: [action es, action en, detail, result es, result en, ok]. */
-  step?: [string, string, string, string | null, string | null, boolean | null];
+  /** A step row, only served with `steps`: [action es, action en, detail, result es, result en, ok, reason]. */
+  step?: [string, string, string, string | null, string | null, boolean | null, string?];
 }
 
 const DEEP_JOB = "job_fx_deep";
@@ -129,13 +129,13 @@ const read = (id: string, m: number, page: string): FeedSeed => ({
   id, minStep: 0, at: () => min(D + m), type: "research.fetch", job: DEEP_JOB, es: `Fetched ${page}`, en: `Fetched ${page}`,
   step: ["Leyendo", "Reading", page, "leída", "read", true],
 });
-const check = (id: string, m: number, what: string, es: string, en: string, ok: boolean | null): FeedSeed => ({
+const check = (id: string, m: number, what: string, es: string, en: string, ok: boolean | null, reason?: string): FeedSeed => ({
   id, minStep: 0, at: () => min(D + m), type: "research.check", job: DEEP_JOB, es: `${what}: ${en}`, en: `${what}: ${en}`,
-  step: ["Comprobando", "Checking", what, es, en, ok],
+  step: ["Comprobando", "Checking", what, es, en, ok, reason],
 });
 const heard = (id: string, minStep: number, m: number): FeedSeed => ({
   id, minStep, at: () => min(m), type: "call.menu_heard", call: true, es: "Heard the phone menu", en: "Heard the phone menu",
-  step: ["Escuchando", "Listening", "phone menu", "marcar", "press a key", null],
+  step: ["Escuchando", "Listening", "phone menu", "marcar", "press a key", null, "Lists numbered options. Option 2 is for appointments and interviews."],
 });
 
 const FEED: FeedSeed[] = [
@@ -143,17 +143,17 @@ const FEED: FeedSeed[] = [
   { id: "event_f02", minStep: 0, at: () => min(-2 * 24 * 60 + 1), type: "research.fast_done", es: "Te explicamos la carta en español", en: "We explained the letter in Spanish" },
   { id: "event_f03", minStep: 0, at: () => min(-2 * 24 * 60 + 1), type: "memory.fact_saved", es: "Guardamos: tienes dos hijos en tu solicitud", en: "Saved: you have two children on your application", factId: "fact_demo01" },
   { id: "event_s00", minStep: 0, at: () => min(D), type: "research.deep_started", job: DEEP_JOB, es: "Estamos revisando que la carta sea real", en: "We're checking that the letter is real" },
-  check("event_s01", 0.02, "scam patterns", "0 alertas", "0 red flags", true),
-  check("event_s02", 0.04, "form type", "coincide", "matches", true),
-  check("event_s03", 0.06, "case number format", "coincide", "matches", true),
+  check("event_s01", 0.02, "scam patterns", "0 alertas", "0 red flags", true, "No payment demands, threats, notario offers, or links outside official sites."),
+  check("event_s02", 0.04, "form type", "coincide", "matches", true, "The form number is on an official page or the known form list."),
+  check("event_s03", 0.06, "case number format", "coincide", "matches", true, "The case number has the letters and digits this kind of letter uses."),
   search("event_s04", 0.1, "USCIS I-797C asylum interview notice"),
   search("event_s05", 0.16, "Los Angeles Asylum Office Tustin CA"),
   read("event_s06", 0.2, "uscis.gov/forms/all-forms/form-i-797c"),
   read("event_s07", 0.26, "uscis.gov/about-us/find-a-uscis-office/field-offices"),
   search("event_s08", 0.32, "USCIS Contact Center phone number"),
   read("event_s09", 0.36, "uscis.gov/contactcenter"),
-  check("event_s10", 0.42, "phone on the letter vs. the official site", "coincide", "matches", true),
-  check("event_s11", 0.46, "is the letter real?", "real", "real", true),
+  check("event_s10", 0.42, "phone on the letter vs. the official site", "coincide", "matches", true, "The phone number on the letter is listed for the issuer on an official page."),
+  check("event_s11", 0.46, "is the letter real?", "real", "real", true, "The letter's details matched the issuer's official site. The official phone number was found there too."),
   { id: "event_f04", minStep: 0, at: () => min(-2 * 24 * 60 + 3), type: "verification.verified", job: DEEP_JOB, es: "Confirmamos que la carta es real (uscis.gov)", en: "We confirmed the letter is real (uscis.gov)" },
   { id: "event_f05", minStep: 0, at: () => min(-20), type: "consent.requested", es: "Te preguntamos si quieres que llamemos a USCIS", en: "We asked if you want us to call USCIS" },
   { id: "event_f06", minStep: 1, at: () => min(-16), type: "consent.given", es: "Dijiste que sí a la llamada", en: "You said yes to the call" },
@@ -199,6 +199,7 @@ export function feed(_userId: string, since: string | null, lang: string, steps 
               detail: e.step[2],
               result: e.step[3] && e.step[4] ? L(lang, e.step[3], e.step[4]) : null,
               ok: e.step[5],
+              reason: e.step[6] ?? null,
             }
           : null,
       }));

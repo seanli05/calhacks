@@ -318,10 +318,14 @@ class MenuSteps(RunnerBase):
             "phase": reading.phase,
             "confidence": round(reading.confidence, 2),
             "source": reading.source,
+            # Why, for the case view's activity: the reading names cues, and the
+            # action's reason passed the menu guard (no refs, no digit runs).
+            "reading_reason_en": reading.reason_en,
         }
         if action is not None:
             data["action"] = action.kind
             data["fallback"] = action.fallback
+            data["reason_en"] = action.reason_en
         if stale:
             data["stale"] = True
         if self.ask is not None:
