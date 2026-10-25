@@ -79,6 +79,7 @@ We're building a WhatsApp-based agent that helps immigrant families deal with im
 | C41 | Shorter WhatsApp messages, with no contract change. R1's `explanation_en` is two paragraphs separated by a blank line: a two-sentence summary (what the letter is and what the user must do, without the date, place or checklist items), then the details. WhatsApp sends only the first paragraph, followed by the date line and the checklist; the dashboard gets the whole text. An explanation without a blank line is sent whole. R2's `call_goal_en` is a short goal (one clause, at most 12 words) that the deep pass writes by rewriting the brief's goal with the fast model. The brief's `call_goal_en` stays the full goal the phone agent and the dashboard read. If the rewrite fails, R2's goal is empty and the consent question uses the brief's goal. | On a real phone the explanation came out as one ~250-word message that said the date and checklist three times, and the consent question's "What for:" line ran to several lines. The contracts stay as they are. |
 | C42 | The user's phone rings for 15 s, not 30, and a missed ring rings once more before `user_unreachable` (the rep hears a fixed "calling them again" line; the user gets a WhatsApp nudge, `call.user_dialed`). The join gate (`PHONE_JOIN_GATE`) is on by default and off for the demo, where the user joins on pick-up. | Most carriers' voicemail answers after about 20–30 s, and Twilio reports that as answered: with no gate, the rep would be put through to voicemail. Ringing 15 s ends the ring first, and the second ring makes up for the shorter window. After a long hold, one missed ring shouldn't lose the call. Sean's call (Oct 24). |
 | C43 | Consent to a call may be given in words ("yes, please call them"), not only as `1`/yes. The orchestrator turn relays it through a guarded tool (`answer_call_consent`); code checks that a consent request is open for that case, that the user's latest message is their own and came after the request, and that the words the model quotes are in that message. Only then is `consent.given` logged, with `consent_message_id` pointing at that message (C8) and `data.via = "words"`. A hedge or a question ("maybe", "what will you say?") is answered and the question asked again; an earlier message never counts. A bare `1`/yes is still answered in code with no model call. Rule 4's wording stays: consent is explicit and recorded. | On a real phone, "yes, call them" to the consent question got "reply 1 or 2", and the chat felt like a form. The model never answers for the user: it can only pass on what their latest message says, and code checks the quote. |
+| C45 | Check the letter before explaining it. Right after the fast pass, research runs the checks that need no model and no web (the deep pass's scam rules: payment demands, threats, notario offers; and offline signal conflicts such as look-alike or non-`.gov` links on a federal notice). On a hit, R1's `verification` is `suspicious` (the existing field; no contract change), and the user gets a warm warning at once: no explanation of the letter and no call offer, ever. Otherwise the user hears "I'm just double-checking it's really from USCIS…", and the explanation goes out with the verdict, in one message: verified → the explanation and the call offer; unknown (or the deep pass failed) → the explanation with a gentle caution; suspicious → the warning only. If no verdict comes within 60 s, the explanation goes out with "still checking, don't pay or call yet", and the verdict follows alone. **Needs team OK:** this changes the "Letter → explanation < 30 s" target. | A scam letter was explained in full before it was flagged, so the family read its demands as instructions. Waiting up to a minute keeps the warning ahead of the explanation, and the cap keeps a slow check from leaving the family with nothing. |
 
 ## MVP and stretch goals
 
@@ -186,8 +187,8 @@ User-facing steps are fast or templated; anything slow runs in the background wi
 | Moment | Target | How |
 |---|---|---|
 | Letter sent → first reply | < 2 s | Relay sends a templated acknowledgment |
-| Letter → explanation | < 30 s | Research fast pass |
-| Legitimacy verdict + call offer | 1–3 min | Research deep pass, background |
+| Letter → "double-checking" (or a scam warning) | < 30 s | Research fast pass + instant checks **[C45]** |
+| Explanation with the verdict and call offer | ≤ 60 s after that; the verdict alone later if it takes longer | Research deep pass, background **[C45]** |
 | ask_user reaches user | < 3 s | Relay, pre-translated template |
 | Human answers → user's phone rings | < 5 s | Phone agent dials user directly |
 | Call ends → summary | < 30 s | Call report → orchestrator |
@@ -230,7 +231,7 @@ Trigger: user sends a photo or PDF. Relay acknowledges immediately. Each documen
 
 ### R1. Research → Orchestrator (fast result)
 
-Trigger: parsing done. Orchestrator translates and sends the explanation and checklist, ending with "I'm checking that this letter is legitimate." Proposed facts go to the memory writer; the deep pass starts automatically.
+Trigger: parsing done. If research's instant checks found signs of a scam, `verification` is `suspicious` and the orchestrator warns the user without explaining the letter. Otherwise it says it's double-checking the letter and sends the translated explanation and checklist with the verdict (R2), or after 60 s with a caution not to pay or call yet **[C45]**. Proposed facts go to the memory writer; the deep pass starts automatically.
 
 If `status` is `needs_better_image`, the other fields are empty and the orchestrator asks for a new photo using `image_issue` as the tip. **[C9]** If it's `needs_user_input`, `question_en` holds a question for the user and the deep pass waits for their answer. **[C39]**
 
@@ -276,8 +277,8 @@ Verification `status` is one of `pending`, `verified`, `suspicious`, `unknown`. 
 `letter_phone_matches` is `null` when the letter prints no phone number, as on the I-797C. Checks for USCIS notices: form number and edition date, every URL on `uscis.gov`, receipt number format. Red flags: demands for payment, gift cards, or wire transfers; threats of arrest or deportation; non-`.gov` links; "notario" offers. The official number is always looked up on `uscis.gov` at run time, never taken from the letter or hard-coded. **[C32]**
 
 - **Verified + call recommended** → orchestrator asks for consent.
-- **Suspicious** → warn the user; never offer a call to the letter's number.
-- **Unknown** → explain and ask the user how to proceed.
+- **Suspicious** → warn the user; never explain the letter or offer a call to the letter's number **[C45]**.
+- **Unknown** → explain the letter with a gentle caution (don't pay or call numbers on it); no call offer **[C45]**.
 
 The case brief (`brief_77`, the `CaseBrief` contract) stays in Postgres: JSON fields (doc type, issuer, deadline, appointment, call goal, expected menu path, questions to ask, must_not_do, glossary terms, `<ref:...>` facts) plus a handoff note, likely representative questions with where the answers live, contingencies, and open uncertainties. `must_not_do` always includes: never give the A-Number, receipt number, or date of birth **[C35]**; never discuss the asylum claim **[C34]**.
 
@@ -421,8 +422,9 @@ Decided now so nobody improvises during the build.
 |---|---|
 | Fast pass takes over 45 s | Orchestrator says it's taking longer and keeps waiting |
 | Unreadable photo | Research returns `needs_better_image`; orchestrator asks for a new photo with tips |
-| Verification unknown | No automatic call offer; orchestrator explains and asks the user |
-| Letter looks like a scam | Warn the user with reasons; never call the letter's number. USCIS-specific red flags in R2 **[C32]** |
+| Verification unknown | No automatic call offer; orchestrator explains the letter with a caution **[C45]** |
+| Letter looks like a scam | Warn the user, never explain the letter, never call the letter's number. Instant checks after the fast pass **[C45]**; USCIS-specific red flags in R2 **[C32]** |
+| Verdict not back 60 s after the letter is read | Explain with "still checking, don't pay or call yet"; send the verdict when it comes **[C45]** |
 | User asks for legal advice on their case | Explain what the notice says, say the agent can't give legal advice, point to legal help **[C33]** |
 | User asks the agent to interpret at the interview | Explain that USCIS requires a human interpreter, repeat the notice's rules for who qualifies **[C33]** |
 | Phone menu asks for A-Number, receipt number, or date of birth | Never enter it; take the path that doesn't need it or ask_user **[C35]** |

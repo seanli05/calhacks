@@ -31,6 +31,7 @@ from app.contracts import (
     ResearchFastJob,
     ResearchQuestionJob,
     Verification,
+    VerificationStatus,
 )
 from app.db import jobs as db_jobs
 from app.db import reads, tables
@@ -41,6 +42,7 @@ from app.research.deep_pass import LogFn, run_deep_pass
 from app.research.events import EventLog, LeakGuard
 from app.research.fast_pass import FastPassError, run_fast_pass
 from app.research.fetch_tool import registered_domain
+from app.research.instant_check import instant_red_flags
 from app.research.models import CaseRecord, DeepFindings, FastPassOutput
 from app.research.preprocess import ContentBlock, UnsupportedMedia, to_content_blocks
 from app.research.question import answer_question, letter_context
@@ -87,9 +89,10 @@ class ResearchDeps:
 async def handle_research_fast(job: tables.Job, deps: ResearchDeps) -> None:
     """Run a `research_fast` job end to end (H1 -> R1).
 
-    Reads the documents, runs the fast pass, writes `cases` and `case_refs`,
-    queues `memory_write` and (on status ok) `research_deep`, logs
-    `research.fast_*` events, and sets the job result to R1.
+    Reads the documents, runs the fast pass and the instant checks (C45: scam
+    signs mark R1 `suspicious`), writes `cases` and `case_refs`, queues
+    `memory_write` and (on status ok) `research_deep`, logs `research.fast_*`
+    events, and sets the job result to R1.
     """
     guard = LeakGuard()
     log = EventLog(guard, user_id=job.user_id, case_id=job.case_id, job_id=job.id)
@@ -117,6 +120,16 @@ async def _run_fast(
     output = await _read_letter(payload, deps, log)
     guard.add(sv.value for sv in output.sensitive_values)
     r1 = output.r1
+    if r1.status == "ok":
+        # C45: a letter with scam signs is flagged now, so it's never explained.
+        red_flags = instant_red_flags(output.signals, r1.doc_type)
+        await log.emit(
+            ev.CHECK,
+            f"Instant checks: {len(red_flags)} red flag(s)",
+            {"check": "instant", "red_flags": red_flags},
+        )
+        if red_flags:
+            r1 = r1.model_copy(update={"verification": VerificationStatus.SUSPICIOUS})
 
     # The case row comes first: refs and R1 hang off it. A re-read of the same
     # case (a better photo, or a needs_user_input reply) reuses the row.

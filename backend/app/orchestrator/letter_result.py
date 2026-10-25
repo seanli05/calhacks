@@ -1,24 +1,34 @@
-"""Turning R1 into the user's explanation (Plan.md → R1, C9, C31; Goal 6.1).
+"""Turning R1 into the user's explanation (Plan.md → R1, C9, C31, C45; Goal 6.1).
 
-One message: the explanation's summary paragraph (C41), the interview date and time, the checklist (who must
-come, what to bring, other deadlines), and "I'm checking that this letter is
-legitimate". The explanation and checklist are translated free text (in parallel);
-the date line and the closing are relay templates, with the date formatted in code,
-so the one fact that must survive is never left to a model. If translation fails,
-the user gets the templates and an offer to explain, never English.
+C45: the letter is checked before it's explained. If research's instant checks
+already found signs of a scam (R1 `verification` is suspicious), the user gets a warm
+warning at once and never the explanation. Otherwise "I'm just double-checking it's
+really from USCIS", and the explanation waits for the verdict (verdicts.py), which
+sends both in one message.
 
-Once it's sent, the case's deep pass is watched for the verdict (verdicts.py), so the
-verdict never overtakes the explanation. It's built and sent while holding the user's
-conversation lock, so it never crosses a turn's reply (conversation.py).
+The explanation: the summary paragraph (C41), the interview date and time, and the
+checklist (who must come, what to bring, other deadlines). The explanation and
+checklist are translated free text (in parallel); the date line is a relay template,
+with the date formatted in code, so the one fact that must survive is never left to a
+model. If translation fails, the user gets the templates and an offer to explain,
+never English. Messages are sent while holding the user's conversation lock, so they
+never cross a turn's reply (conversation.py).
 """
 
 import asyncio
 import logging
 from dataclasses import dataclass
+from functools import partial
 
 from pydantic import ValidationError
 
-from app.contracts import ChecklistKind, FastResult, FastResultStatus, ResearchFastJob
+from app.contracts import (
+    ChecklistKind,
+    FastResult,
+    FastResultStatus,
+    ResearchFastJob,
+    VerificationStatus,
+)
 from app.contracts.common import CaseId, DocumentId, LanguageCode, UserId
 from app.db import jobs, reads, tables
 from app.orchestrator.conversation import Conversation
@@ -123,11 +133,28 @@ class LetterResults:
             await self._ask(user, result, job)
             return
         readable = result.status != FastResultStatus.NEEDS_BETTER_IMAGE
+        scam = readable and result.verification == VerificationStatus.SUSPICIOUS
         try:
-            if readable:
-                await self._explain(user, result)
-            else:
+            if not readable:
                 await self._retake(user, result)
+            elif scam:
+                # C45: never explained; the deep pass's verdict isn't sent either.
+                await send_template(
+                    self._whatsapp,
+                    user,
+                    "letter.looks_like_scam",
+                    case_id=result.case_id,
+                )
+                logger.info(
+                    "Scam warning sent before explaining case_id=%s", result.case_id
+                )
+            else:
+                await send_template(
+                    self._whatsapp,
+                    user,
+                    "letter.double_checking",
+                    case_id=result.case_id,
+                )
         except WhatsAppSendError as exc:
             logger.error(
                 "Letter result not sent case_id=%s job_id=%s: %s",
@@ -135,10 +162,19 @@ class LetterResults:
                 job.id,
                 exc,
             )
-        if readable:
-            self._verdicts.watch(user.id, result.case_id, since=job.created_at)
+        if readable and not scam:
+            self._verdicts.watch(
+                user.id,
+                result.case_id,
+                since=job.created_at,
+                explain=partial(self.explanation, result),
+            )
 
-    async def _explain(self, user: tables.User, result: FastResult) -> None:
+    async def explanation(
+        self, result: FastResult, user: tables.User
+    ) -> tuple[str, str]:
+        """The letter's explanation in the user's language, and its English. The
+        verdict closes the message (verdicts.py)."""
         language = user.language or "en"
         explanation_en = _summary(result.explanation_en or "")
         checklist = checklist_en(result)
@@ -148,33 +184,17 @@ class LetterResults:
         )
         if explanation is None or translated_checklist is None:
             logger.warning("Explanation not translated case_id=%s", result.case_id)
-            body = _join(
-                render("letter.explain_failed", language),
-                date_line(result, language),
-                render("letter.checking", language),
+            return (
+                _join(
+                    render("letter.explain_failed", language),
+                    date_line(result, language),
+                ),
+                _join(render("letter.explain_failed", "en"), date_line(result, "en")),
             )
-            body_en = _join(
-                render("letter.explain_failed", "en"),
-                date_line(result, "en"),
-                render("letter.checking", "en"),
-            )
-        else:
-            body = _join(
-                explanation,
-                date_line(result, language),
-                translated_checklist,
-                render("letter.checking", language),
-            )
-            body_en = _join(
-                explanation_en,
-                date_line(result, "en"),
-                checklist,
-                render("letter.checking", "en"),
-            )
-        await send_text(
-            self._whatsapp, user, body, body_en=body_en, case_id=result.case_id
+        return (
+            _join(explanation, date_line(result, language), translated_checklist),
+            _join(explanation_en, date_line(result, "en"), checklist),
         )
-        logger.info("Explanation sent case_id=%s", result.case_id)
 
     async def _retake(self, user: tables.User, result: FastResult) -> None:
         """Plan.md → Failure rules: unreadable photo; ask again with research's tip."""
