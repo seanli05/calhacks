@@ -9,18 +9,36 @@
 .buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  align-items: center;
+  gap: 12px 24px;
 }
 
 .big {
   font-size: var(--fs-lg);
-  padding: 14px 22px;
+  padding: 14px 24px;
+  border-radius: 999px;
 }
 
-.ghost {
-  background: transparent;
-  color: var(--a-fg);
-  border-color: currentColor;
+/* Config not loaded yet: same button, just not clickable. */
+.waiting {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.example {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: var(--forest);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+
+.example:hover {
+  text-decoration-thickness: 2px;
 }
 
 .scan {
@@ -33,6 +51,7 @@
   padding: 8px;
   background: #fff;
   border: 1px solid var(--line);
+  border-radius: 10px;
   flex: none;
 }
 
@@ -49,7 +68,7 @@
 
 .scanLabel {
   margin: 0;
-  font-size: var(--fs-lg);
+  font-size: var(--fs-md);
   font-weight: 600;
 }
 
@@ -74,7 +93,7 @@
     display: none;
   }
 
-  .buttons > * {
+  .buttons > .big {
     flex: 1 1 100%;
     justify-content: center;
   }
