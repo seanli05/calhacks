@@ -58,13 +58,17 @@ export function GlossaryBook({
         {rows.map((e) => (
           <li key={e.term} className={`${styles.row} ${e === flash ? styles.flash : ""}`}>
             <b>{e.translation}</b>
-            <span className={styles.term}>{e.term}</span>
-            <span className={`${styles.trust} ${styles[e.trust_level]}`}>
-              {t.trust[e.trust_level]}
+            <span className={`${styles.trust} ${styles[e.trust_level]}`}>{t.trust[e.trust_level]}</span>
+            {/* The source sits under the word, so a long domain never squeezes it. */}
+            <span className={styles.term}>
+              {e.term}
               {e.source_url && (
-                <a href={e.source_url} target="_blank" rel="noopener noreferrer">
-                  {domain(e.source_url)}
-                </a>
+                <>
+                  {" · "}
+                  <a className={styles.source} href={e.source_url} target="_blank" rel="noopener noreferrer">
+                    {domain(e.source_url)} ↗
+                  </a>
+                </>
               )}
             </span>
           </li>

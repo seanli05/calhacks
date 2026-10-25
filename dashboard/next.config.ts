@@ -4,6 +4,8 @@ import type { NextConfig } from "next";
 const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
 
 const nextConfig: NextConfig = {
+  // A second dev server (e.g. fixtures beside live data) needs its own build folder.
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${backendUrl}/api/:path*` }];
   },

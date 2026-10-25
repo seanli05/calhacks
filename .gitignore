@@ -20,6 +20,7 @@ build/
 # --- Node / Next.js dashboard ---
 node_modules/
 .next/
+.next-*/
 out/
 *.tsbuildinfo
 next-env.d.ts

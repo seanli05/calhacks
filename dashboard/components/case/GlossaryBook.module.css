@@ -66,32 +66,33 @@
 }
 
 .row b {
+  grid-column: 1;
+  grid-row: 1;
   font-size: var(--fs-md);
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .term {
-  grid-column: 1;
+  grid-column: 1 / -1;
   font-size: var(--fs-xs);
   color: var(--muted);
 }
 
 .trust {
   grid-column: 2;
-  grid-row: 1 / span 2;
-  align-self: center;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  grid-row: 1;
+  align-self: start;
+  padding-top: 3px;
   font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--faint);
+  white-space: nowrap;
 }
 
-.trust a {
-  font-weight: 400;
+.source {
   color: var(--faint);
+  white-space: nowrap;
 }
 
 .official {

@@ -17,6 +17,12 @@ export function FixtureBar() {
   useEffect(() => subscribe(() => setLocal(getStep())), []);
 
   useEffect(() => {
+    // `?step=5` opens the fixtures at that step (0-based), e.g. to share a screen.
+    const param = Number(new URLSearchParams(window.location.search).get("step"));
+    if (DATA_MODE === "fixtures" && Number.isInteger(param) && param > 0) setStep(param);
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
