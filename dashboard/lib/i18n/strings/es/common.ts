@@ -13,6 +13,7 @@ export const common: CommonStrings = {
     uscis_i797c_asylum_interview: "Entrevista de asilo",
     medi_cal_renewal: "Renovación de Medi-Cal",
     ice_ar11_violation: "Aviso de violación de dirección",
+    uscis_i797e_request_for_evidence: "Solicitud de pruebas",
   },
   docTypeFallback: "Carta",
   stages: {

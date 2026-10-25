@@ -17,6 +17,7 @@ export const common: CommonStrings = {
     uscis_i797c_asylum_interview: "مصاحبهٔ پناهندگی",
     medi_cal_renewal: "تمدید Medi-Cal",
     ice_ar11_violation: "اطلاعیهٔ تخلف آدرس",
+    uscis_i797e_request_for_evidence: "درخواست شواهد",
   } as Record<string, string>,
   docTypeFallback: "نامه",
   stages: {

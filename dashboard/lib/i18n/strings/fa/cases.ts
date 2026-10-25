@@ -6,6 +6,7 @@ export const casesPage: CasesStrings = {
   empty: "هنوز نامه‌ای نیست. برای شروع، عکس یک نامه را در واتس‌اپ بفرستید.",
   received: (when: string) => `${when} رسید`,
   appointment: "وقت ملاقات",
+  respondBy: "جواب تا",
   onHold: "پشت خط منتظر",
   scam: "احتمالاً کلاهبرداری",
   scamSub: "پول ندهید و به شماره‌های روی نامه زنگ نزنید. برای دیدن دلیل باز کنید.",

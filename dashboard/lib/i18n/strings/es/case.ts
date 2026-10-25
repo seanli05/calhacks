@@ -128,6 +128,7 @@ export const caseView: CaseStrings = {
     title: "Su cita",
     maps: "Abrir en Mapas",
     beforeYouGo: "Antes de ir",
+    youNeed: "Lo que necesita",
     ready: (done: number, total: number) => `${done} de ${total} listos`,
     says: "Qué dice esta carta",
     viewLetter: "Ver su carta",
@@ -154,7 +155,7 @@ export const caseView: CaseStrings = {
       "Ya pagué o di mis datos. ¿Qué hago?",
       "¿Cómo reviso mi caso real con USCIS?",
     ],
-    afterCall: "¿Qué te dijo el oficial?",
+    afterCall: "¿Qué le dijo el oficial?",
   },
   scam: {
     title: "Esta carta parece una estafa",

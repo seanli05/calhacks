@@ -6,6 +6,7 @@ export const casesPage: CasesStrings = {
   empty: "Todavía no hay cartas. Mande una foto de una carta por WhatsApp para empezar.",
   received: (when: string) => `Recibida ${when}`,
   appointment: "Cita",
+  respondBy: "Responda antes del",
   onHold: "en espera",
   scam: "Probable estafa",
   scamSub: "No pague ni llame a los números de la carta. Ábrala para ver por qué.",

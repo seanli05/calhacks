@@ -170,6 +170,7 @@ export const landing = {
     ],
   },
 
+  dashboards: { prompt: "Already have a dashboard?" },
   closing: {
     title: ["Got a letter?", "Send us a photo."],
     sub: "One photo is all it takes. In Spanish, English or Dari.",

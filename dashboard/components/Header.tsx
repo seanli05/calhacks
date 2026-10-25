@@ -7,8 +7,17 @@ import { LANGUAGES, useLang, useStrings } from "@/lib/i18n";
 
 import styles from "./Header.module.css";
 
-/** Top bar for every page. `userId` turns on the user nav; `back` shows "← My cases". */
-export function Header({ userId, back = false }: { userId?: string; back?: boolean }) {
+/** Top bar for every page. `userId` turns on the user nav; `back` shows "← My cases";
+ * `actions` sits just before the language switch (the landing page's dashboard menu). */
+export function Header({
+  userId,
+  back = false,
+  actions,
+}: {
+  userId?: string;
+  back?: boolean;
+  actions?: React.ReactNode;
+}) {
   const t = useStrings().common;
   const pathname = usePathname();
   const casesHref = userId ? `/u/${userId}` : null;
@@ -37,6 +46,7 @@ export function Header({ userId, back = false }: { userId?: string; back?: boole
             {t.nav.memory}
           </Link>
         )}
+        {actions}
         <LangSwitch />
       </nav>
     </header>

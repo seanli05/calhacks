@@ -93,7 +93,10 @@ export function HoldVisual() {
   const held = HOLD_BASE_S + (Math.floor(now / 1000) % 600);
   return (
     <div className={styles.hold}>
-      <span className={styles.clock}>{duration(held, lang)}</span>
+      {/* The server and the browser can render a second apart. */}
+      <span className={styles.clock} suppressHydrationWarning>
+        {duration(held, lang)}
+      </span>
       <span className={styles.holdLabel}>
         <span className={styles.dot} />
         {t.onHold}

@@ -2,10 +2,12 @@
 
 import { Header } from "@/components/Header";
 import { Icon, type IconName } from "@/components/Icon";
+import { demoUsers } from "@/lib/demoUsers";
 import { useStrings } from "@/lib/i18n";
 
 import { ChatDemo } from "./ChatDemo";
 import { ClosingBand } from "./ClosingBand";
+import { DashboardMenu } from "./DashboardMenu";
 import { Mascot } from "./Mascot";
 import { Promises } from "./Promises";
 import { Reveal } from "./Reveal";
@@ -13,6 +15,9 @@ import { Steps } from "./Steps";
 import { TryActions } from "./TryActions";
 import { useTryLinks } from "./useTryLinks";
 import styles from "./Landing.module.css";
+
+/** Read once per page load: the values are fixed at build time. */
+const DEMO_USERS = demoUsers();
 
 const PERK_ICONS: IconName[] = ["chat", "book", "shield"];
 
@@ -27,7 +32,7 @@ export function Landing() {
   return (
     <div className={styles.page}>
       <div className={styles.wrap}>
-        <Header />
+        <Header actions={<DashboardMenu users={DEMO_USERS} />} />
       </div>
       <main>
         <div className={styles.wrap}>

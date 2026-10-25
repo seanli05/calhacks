@@ -78,7 +78,8 @@ export function CaseLiveView({ userId, caseId }: { userId: string; caseId: strin
   const newest = live.tips[live.tips.length - 1];
   const turn = newest && !newest.used ? newest : null;
   const pastTips = live.tips.filter((tip) => tip !== turn);
-  const userLang = usePoll(() => api.user(userId), userId, 60_000).data?.language ?? null;
+  // Keyed by the UI language too, so a switch refetches it (fixtures follow the switch).
+  const userLang = usePoll(() => api.user(userId), `${userId}:${lang}`, 60_000).data?.language ?? null;
   const glossary = usePoll(() => api.glossary(userLang ?? "en"), `glossary:${userLang}`, 300_000).data ?? [];
   const [query, setQuery] = useState("");
   const [flash, setFlash] = useState<GlossaryEntry | null>(null);

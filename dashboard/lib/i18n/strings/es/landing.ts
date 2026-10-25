@@ -165,6 +165,7 @@ export const landing: LandingStrings = {
     ],
   },
 
+  dashboards: { prompt: "¿Ya tienes un panel?" },
   closing: {
     title: ["¿Le llegó una carta?", "Envíenos una foto."],
     sub: "Solo necesita una foto. En español, inglés o dari.",
