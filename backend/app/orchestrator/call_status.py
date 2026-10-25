@@ -6,6 +6,8 @@ as relay templates:
 
 - `call.human_detected`: always, at once (the user has 30 s to pick up).
 - `call.dialing`, `call.user_unreachable`: once per call.
+- `call.user_dialed`: only when the applicant is rung again after a missed ring;
+  the first ring is covered by `call.human_detected`.
 - `call.on_hold`: at most once every 10 minutes per call.
 - Anything else: dashboard only.
 
@@ -47,6 +49,7 @@ _TEMPLATES = {event_type: str(event_type) for event_type in USER_MESSAGING_EVENT
 class _CallSent:
     dialing: bool = False
     unreachable: bool = False
+    rings: int = 0
     last_on_hold: datetime | None = None
 
 
@@ -72,6 +75,10 @@ class StatusRules:
             if sent.unreachable:
                 return None
             sent.unreachable = True
+        elif event.type == EventType.CALL_USER_DIALED:
+            sent.rings += 1
+            if sent.rings == 1:
+                return None
         elif event.type == EventType.CALL_ON_HOLD:
             last = sent.last_on_hold
             if last is not None and event.created_at - last < self._on_hold_every:

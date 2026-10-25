@@ -184,6 +184,8 @@ class TwilioTelephony:
         self._keys_lock = asyncio.Lock()
         self._gone_check: asyncio.Task[None] | None = None
         self._user_sid: str | None = None
+        self._old_user_sids: set[str] = set()
+        """Legs from earlier rings: their callbacks are stale."""
         self._user_stage: UserStage = "none"
         self._bridged = False
         """The agency leg was moved into the conference."""
@@ -261,12 +263,16 @@ class TwilioTelephony:
     async def ring_user(self, call_id: CallId, user_id: UserId) -> None:
         """A failed REST call doesn't raise: it's `UserUnreachable("failed")`, so the
         representative still hears that the account holder will call back. If the
-        user is listening in, their leg joins the conference instead of a ring."""
+        user is listening in, their leg joins the conference instead of a ring.
+        Called again after a missed ring, it rings a new leg: the earlier one is
+        ended if it's still ringing, and its callbacks no longer count."""
         self._require_agency()
         if call_id != self._call_id:
             raise RuntimeError("ring_user for another call")
+        if self._user_stage == "joined":
+            raise RuntimeError("the applicant has already joined")
         if self._user_stage != "none":
-            raise RuntimeError("the applicant was already rung")
+            await self._forget_user_leg()
         self._listen.drop_request()
         if await self._promote_listener(call_id):
             return
@@ -594,7 +600,7 @@ class TwilioTelephony:
         return self._sid is None or call_sid == self._sid
 
     def _matches_user(self, call_sid: str) -> bool:
-        if self._user_stage == "none":
+        if self._user_stage == "none" or call_sid in self._old_user_sids:
             return False
         return self._user_sid is None or call_sid == self._user_sid
 
@@ -626,6 +632,18 @@ class TwilioTelephony:
 
     def _conference(self) -> str:
         return f"bridge-{self._require_call_id()}"
+
+    async def _forget_user_leg(self) -> None:
+        """Before ringing again: end the earlier leg if it may still ring (the
+        runner's backstop gave up on it), and ignore its callbacks from now on."""
+        old_sid, stage = self._user_sid, self._user_stage
+        self._user_sid = None
+        self._user_stage = "none"
+        if old_sid is None:
+            return
+        self._old_user_sids.add(old_sid)
+        if stage == "ringing":
+            await self._end_leg("applicant", self._calls.end, old_sid)
 
     async def _end_leg(
         self, leg: str, end: Callable[[str], Awaitable[None]], sid: str

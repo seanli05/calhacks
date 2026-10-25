@@ -73,6 +73,14 @@ def test_on_hold_at_most_once_every_ten_minutes_per_call() -> None:
     assert rules.template_for(event(on_hold, T0, call_id="call_2")) == "call.on_hold"
 
 
+def test_only_a_second_ring_of_the_applicant_is_sent() -> None:
+    rules = StatusRules()
+    dialed = EventType.CALL_USER_DIALED
+    assert rules.template_for(event(dialed)) is None  # call.human_detected said it
+    assert rules.template_for(event(dialed)) == "call.user_dialed"
+    assert rules.template_for(event(dialed, call_id="call_2")) is None
+
+
 @pytest.mark.parametrize(
     "event_type",
     [

@@ -540,7 +540,7 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         ),
     },
     # Call status (P2). The orchestrator picks which call events become these (C36).
-    # Exactly the four in USER_MESSAGING_EVENTS; after the call, the user gets the
+    # Exactly the five in USER_MESSAGING_EVENTS; after the call, the user gets the
     # post-call summary instead of a "call ended" message.
     "call.dialing": {
         "es": "Estoy llamando a USCIS ahora.",
@@ -559,6 +559,18 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         "es": "Contestó una persona. Le estoy llamando ahora; por favor conteste.",
         "en": "Someone picked up. I'm calling you now; please answer.",
         "fa": "یک شخص جواب داد. حالا به شما زنگ می‌زنم؛ لطفاً تیلفون را جواب بدهید.",
+    },
+    # Only for a second ring: the first is covered by call.human_detected.
+    "call.user_dialed": {
+        "es": (
+            "USCIS sigue esperándole en la línea. Le estoy llamando otra vez; "
+            "por favor conteste."
+        ),
+        "en": "USCIS is still waiting for you. I'm calling you again; please answer.",
+        "fa": (
+            "ادارهٔ USCIS هنوز پشت خط منتظر شماست. دوباره به شما زنگ می‌زنم؛ "
+            "لطفاً تیلفون را جواب بدهید."
+        ),
     },
     "call.user_unreachable": {
         "es": (

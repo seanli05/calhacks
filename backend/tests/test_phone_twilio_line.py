@@ -506,6 +506,84 @@ async def test_with_no_gate_connect_user_bridges_after_pick_up() -> None:
     assert ">bridge-call_1</Conference>" in line.calls.updates[-1]
 
 
+# Ringing again after a missed ring (RunnerConfig.user_ring_attempts)
+
+SECOND_SID = "CA789"
+
+
+async def _rung_again(line: Line) -> None:
+    """Ring a second time; the fake hands the new leg `SECOND_SID`."""
+    created = len(line.calls.created)
+    real_create = line.calls.create
+
+    async def create(*, to: str, twiml: str, status_callback: str) -> str:
+        await real_create(to=to, twiml=twiml, status_callback=status_callback)
+        return SECOND_SID
+
+    line.calls.create = create  # type: ignore[method-assign]
+    await line.line.ring_user("call_1", "user_9")
+    assert len(line.calls.created) == created + 1
+
+
+async def test_a_missed_ring_can_ring_again_and_the_second_leg_joins() -> None:
+    line, _ = await Line().rung()
+    line.line.on_user_status(USER_SID, "no-answer")
+    await _rung_again(line)
+
+    assert line.calls.created[2]["to"] == APPLICANT
+    assert "<Conference" in line.line.user_pressed_key(SECOND_SID)
+    assert await line.events() == [
+        AgencyAnswered(),
+        UserUnreachable(reason="no_answer"),
+        UserAnswered(),
+    ]
+
+
+async def test_callbacks_from_the_first_ring_dont_count_after_the_second() -> None:
+    line, _ = await Line().rung()
+    line.line.on_user_status(USER_SID, "busy")
+    await _rung_again(line)
+
+    line.line.on_user_status(USER_SID, "completed")  # late, from the first leg
+    assert "<Hangup" in line.line.user_pressed_key(USER_SID)
+    assert not line.line.attach_fork("user", USER_SID)
+    line.line.on_user_status(SECOND_SID, "no-answer")
+
+    assert await line.events() == [
+        AgencyAnswered(),
+        UserUnreachable(reason="busy"),
+        UserUnreachable(reason="no_answer"),
+    ]
+
+
+async def test_ringing_again_ends_a_first_leg_still_ringing() -> None:
+    """The runner's backstop gave up on a leg Twilio never reported on."""
+    line, _ = await Line().rung()
+    await _rung_again(line)
+    assert line.calls.ended == [USER_SID]
+
+
+async def test_no_second_ring_once_the_applicant_joined() -> None:
+    line, _ = await Line().rung()
+    line.line.user_pressed_key(USER_SID)
+    with pytest.raises(RuntimeError):
+        await line.line.ring_user("call_1", "user_9")
+
+
+async def test_with_no_gate_the_second_leg_joins_on_pick_up() -> None:
+    line, _ = await Line(join_gate=False).rung()
+    line.line.on_user_status(USER_SID, "no-answer")
+    await _rung_again(line)
+
+    line.line.on_user_status(USER_SID, "in-progress")  # stale: ignored
+    assert line.line.attach_fork("user", SECOND_SID)
+    assert await line.events() == [
+        AgencyAnswered(),
+        UserUnreachable(reason="no_answer"),
+        UserAnswered(),
+    ]
+
+
 async def test_connect_user_moves_the_agency_leg_into_the_conference() -> None:
     line, _ = await Line().bridged()
     await asyncio.sleep(0.1)  # past the grace: the stream's close isn't a hang-up

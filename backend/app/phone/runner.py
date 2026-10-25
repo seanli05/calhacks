@@ -420,6 +420,11 @@ class _CallRunner(MenuSteps):
         """Ring the applicant at once (< 5 s) and introduce the agent meanwhile. The
         intro plays in the background, so the applicant joining never waits on it."""
         self._speak_meanwhile(call_lines.INTRO)
+        await self._ring_user()
+
+    async def _ring_user(self) -> None:
+        """Ring the applicant, and log it (`call.user_dialed`, with the attempt)."""
+        self.user_rings += 1
         try:
             await self.deps.telephony.ring_user(self.call_id, self.job.user_id)
         except LineClosed:
@@ -429,7 +434,7 @@ class _CallRunner(MenuSteps):
             await self._stop_speaking()
             raise
         self.step.sent.append("rang the applicant")
-        await self._fire(Trigger.USER_DIALED)
+        await self._fire(Trigger.USER_DIALED, attempt=self.user_rings)
 
     async def _bridging_heard(self, at_s: float) -> None:
         gap_ok = (
@@ -481,7 +486,16 @@ class _CallRunner(MenuSteps):
         self.step.sent.append("rang the user to listen in")
 
     async def _user_unreachable(self, reason: str) -> None:
+        """A missed ring rings once more (`user_ring_attempts`) while the rep hears
+        a fixed line; only the last miss gets the call-back line."""
         await self._stop_speaking()
+        if self.user_rings < self.config.user_ring_attempts:
+            self.step.flags.append(f"ring_again:{reason}")
+            self.holding_said = 0
+            self.last_holding_s = None
+            self._speak_meanwhile(call_lines.RINGING_AGAIN)
+            await self._ring_user()
+            return
         await self._say_line(call_lines.CALL_BACK)
         await self._fire(Trigger.USER_UNREACHABLE, reason=reason)
 

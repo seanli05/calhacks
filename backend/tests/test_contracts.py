@@ -188,11 +188,12 @@ def test_event_requires_user_id() -> None:
         Event.model_validate(data)
 
 
-def test_user_messaging_events_are_the_four_from_p2() -> None:
+def test_user_messaging_events_are_p2s_and_the_second_ring() -> None:
     assert USER_MESSAGING_EVENTS == {
         EventType.CALL_DIALING,
         EventType.CALL_ON_HOLD,
         EventType.CALL_HUMAN_DETECTED,
+        EventType.CALL_USER_DIALED,
         EventType.CALL_USER_UNREACHABLE,
     }
 

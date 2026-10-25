@@ -77,6 +77,7 @@ USER_MESSAGING_EVENTS: frozenset[EventType] = frozenset(
         EventType.CALL_DIALING,
         EventType.CALL_ON_HOLD,
         EventType.CALL_HUMAN_DETECTED,
+        EventType.CALL_USER_DIALED,
         EventType.CALL_USER_UNREACHABLE,
     }
 )

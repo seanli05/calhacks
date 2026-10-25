@@ -560,6 +560,92 @@ async def test_no_key_at_the_join_gate_tells_the_rep_and_hangs_up() -> None:
     assert unreachable.data["reason"] == "no_key_press"
 
 
+def _rings(*user_steps: Step) -> Callable[[Action], list[Step]]:
+    """To a rep; the applicant's phone does `user_steps[n]` on ring n+1."""
+    base = _to_rep(Said("two"))
+    rings = iter(user_steps)
+
+    def tree(action: Action) -> list[Step]:
+        if isinstance(action, RangUser):
+            return [next(rings)]
+        return base(action)
+
+    return tree
+
+
+async def test_a_missed_ring_rings_again_and_the_applicant_joins() -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    tree = _rings(
+        Step(30, UserUnreachable(reason="no_answer")), Step(6, UserAnswered())
+    )
+    call, report = await _run(llm, _opening(), tree)
+
+    rings = [action for action in call.actions if isinstance(action, RangUser)]
+    assert len(rings) == 2
+    assert Said(call_lines.RINGING_AGAIN) in call.actions
+    assert Said(call_lines.CALL_BACK) not in call.actions
+    assert ConnectedUser() in call.actions
+    dialed = call.events_of(EventType.CALL_USER_DIALED)
+    assert [event.data["attempt"] for event in dialed] == [1, 2]
+    assert EventType.CALL_USER_UNREACHABLE not in call.log.types
+    assert report.outcome == CallOutcome.PARTIAL
+
+
+async def test_two_missed_rings_tell_the_rep_and_hang_up() -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    tree = _rings(
+        Step(30, UserUnreachable(reason="no_answer")),
+        Step(30, UserUnreachable(reason="busy")),
+    )
+    call, report = await _run(llm, _opening(), tree)
+
+    rings = [action for action in call.actions if isinstance(action, RangUser)]
+    assert len(rings) == 2
+    # The line to the rep plays in the background, beside the second ring.
+    assert call.actions.index(Said(call_lines.RINGING_AGAIN)) > call.actions.index(
+        rings[0]
+    )
+    assert call.actions[-2:] == [Said(call_lines.CALL_BACK), HungUp()]
+    [unreachable] = call.events_of(EventType.CALL_USER_UNREACHABLE)
+    assert unreachable.data["reason"] == "busy"
+    assert report.outcome == CallOutcome.USER_UNREACHABLE
+
+
+async def test_one_ring_attempt_gives_up_after_the_first_miss() -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    tree = _rings(Step(30, UserUnreachable(reason="no_answer")))
+    config = RunnerConfig(user_ring_attempts=1)
+    call, report = await _run(llm, _opening(), tree, config=config)
+
+    assert Said(call_lines.RINGING_AGAIN) not in call.actions
+    assert call.actions[-2:] == [Said(call_lines.CALL_BACK), HungUp()]
+    assert report.outcome == CallOutcome.USER_UNREACHABLE
+
+
+async def test_the_backstop_on_the_first_ring_rings_again() -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    tree = _rings(Step(999, UserAnswered()), Step(5, UserAnswered()))
+    call, report = await _run(llm, _opening(), tree)
+
+    backstop = next(step for step in call.steps if step.input == "timer:user_backstop")
+    assert "ring_again:no_answer" in backstop.flags
+    assert ConnectedUser() in call.actions
+    assert report.outcome == CallOutcome.PARTIAL
+
+
+async def test_the_agency_hanging_up_during_the_second_ring_fails_the_call() -> None:
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    tree = _rings(
+        Step(30, UserUnreachable(reason="no_answer")),
+        Step(10, AgencyHungUp()),
+    )
+    call, report = await _run(llm, _opening(), tree)
+
+    assert report.outcome == CallOutcome.FAILED
+    assert ConnectedUser() not in call.actions
+    assert Said(call_lines.CALL_BACK) not in call.actions
+
+
 async def test_the_applicant_joining_cuts_the_intro_short() -> None:
     """Speech takes time on a real line; a join mustn't wait for the intro to end."""
     llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
