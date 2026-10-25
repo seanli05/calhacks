@@ -55,7 +55,7 @@ Files: `runner.py` (lifecycle, dispatch, hold, the person, the bridge), `runner_
 | Hold limit | From the first hold, never reset. If it passes in a menu or with a person, it fires on the next hold |
 | Menu gives up | Over 8 min in menus, or "representative" a 4th time in one menu stretch → `AGENT_ABORTED` |
 | Person | Ring the applicant at once (< 5 s) and say the intro meanwhile; `USER_DIALED` once ringing. So `FALSE_HUMAN` almost never fires: 1c's thresholds are the defense, and after the ring a transfer just means the applicant waits on hold too |
-| Bridging | The intro and holding lines play in the background, so the applicant joining (or not) is acted on at once and cuts them short. Rep speech gets one fixed holding line, at most twice, ≥ 8 s apart, never over a line still playing. `UserUnreachable` (or the 75 s backstop: 30 s ringing plus the join gate) → the call-back line, then hang up |
+| Bridging | The intro and holding lines play in the background, so the applicant joining (or not) is acted on at once and cuts them short. Rep speech gets one fixed holding line, at most twice, ≥ 8 s apart, never over a line still playing. `UserUnreachable` (or the 45 s backstop per ring: 15 s ringing, `USER_RING_TIMEOUT_S`, plus the join gate) on the first ring → the fixed `RINGING_AGAIN` line and a second ring (`user_ring_attempts`, 2), logged as another `call.user_dialed` with `data.attempt`, which messages the user. On the last ring → the call-back line, then hang up. The line ends a first leg still ringing and ignores its late callbacks |
 | Connected | `Overheard` lines from the forks go into the transcript as `agency` / `user`, saved as they arrive; nothing else is decided |
 | Blocked identifier | Nothing sent, flagged; a second in a row says "representative" instead |
 | Unexpected error | `AGENT_ABORTED` and wrap-up. With the applicant on (no abort from `connected`), the bridge stays up and the runner only watches for the end |
@@ -152,7 +152,7 @@ The user can tell the WhatsApp agent "hang up now". The orchestrator's `hang_up_
 **Open, for the team:** no `call.listen_in_*` event types yet (a shared-contract change, plus feed templates), so the dashboard doesn't show listening; it's in the logs and the runner's steps. The user's own WhatsApp request is what consents to the ring (rule 4).
 
 **Open, for the team:**
-- **The any-key gate is the current choice, not a team decision yet.** It means "answered" in the Plan.md failure rules is "pressed a key", and the worst case before the call-back line is about 55 s (30 s ringing, the prompt twice, 15 s). Alternatives if the team objects: answering-machine detection, or detecting voicemail after bridging.
+- **The any-key gate is the current choice, not a team decision yet.** It means "answered" in the Plan.md failure rules is "pressed a key", and the worst case per ring is about 40 s (15 s ringing, the prompt twice, 15 s), and a missed ring rings once more (C42). Alternatives if the team objects: answering-machine detection, or detecting voicemail after bridging.
 - Dari (or any language past `en`/`es`) needs a `JOIN_PROMPTS` entry; Twilio may have no Dari voice, so it will likely be a pre-recorded clip played with `<Play>`.
 - Not yet run live: the agency hanging up first after the bridge (spike row 5).
 - No `bridging → hold`: a "person" who transfers after the ring can't be undone (state.py).

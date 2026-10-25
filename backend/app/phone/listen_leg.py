@@ -29,6 +29,7 @@ from app.phone.line import LineEvent, ListenEnded, ListenRequested, ListenStarte
 from app.phone.listen_audio import ListenMixer, ListenSink
 from app.phone.twilio_rest import (
     ENDED_STATUSES,
+    USER_RING_TIMEOUT_S,
     hang_up_twiml,
     listen_stream_twiml,
     user_gate_twiml,
@@ -101,6 +102,7 @@ class ListenLeg:
                     self._urls.listen_missed(call_id),
                 ),
                 status_callback=self._urls.listen_status(call_id),
+                ring_s=USER_RING_TIMEOUT_S,
             )
         except _REST_ERRORS as exc:
             logger.warning(

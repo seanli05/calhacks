@@ -21,6 +21,12 @@ HOLDING = (
 """Said when the representative speaks while the applicant's phone rings, including
 when they ask a question the agent must not answer."""
 
+RINGING_AGAIN = (
+    "I'm sorry for the wait. The applicant didn't pick up, so I'm calling them "
+    "again. One moment, please."
+)
+"""Said when the applicant missed the first ring and their phone rings again."""
+
 CALL_BACK = (
     "I'm sorry, the applicant can't join right now. "
     "The account holder will call back. Thank you, goodbye."

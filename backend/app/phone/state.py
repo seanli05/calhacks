@@ -76,6 +76,8 @@ TRANSITIONS: dict[tuple[CallState, Trigger], _Rule] = {
     (S.HUMAN_DETECTED, T.USER_DIALED): (S.BRIDGING, None, EventType.CALL_USER_DIALED),
     (S.HUMAN_DETECTED, T.AGENCY_HUNG_UP): (S.WRAP_UP, FAILED, None),
     (S.BRIDGING, T.USER_JOINED): (S.CONNECTED, None, EventType.CALL_USER_JOINED),
+    # A missed ring rings again (RunnerConfig.user_ring_attempts).
+    (S.BRIDGING, T.USER_DIALED): (S.BRIDGING, None, EventType.CALL_USER_DIALED),
     (S.BRIDGING, T.USER_UNREACHABLE): (
         S.WRAP_UP,
         CallOutcome.USER_UNREACHABLE,

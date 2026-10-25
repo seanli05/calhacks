@@ -62,10 +62,14 @@ class FakeCalls:
         self.fail_create = False
         self.fail_update = False
 
-    async def create(self, *, to: str, twiml: str, status_callback: str) -> str:
+    async def create(
+        self, *, to: str, twiml: str, status_callback: str, ring_s: int = 30
+    ) -> str:
         if self.fail_create:
             raise TimeoutError
-        self.created.append({"to": to, "twiml": twiml, "status": status_callback})
+        self.created.append(
+            {"to": to, "twiml": twiml, "status": status_callback, "ring_s": ring_s}
+        )
         return self.sids[len(self.created) - 1]
 
     async def update_twiml(self, sid: str, twiml: str) -> None:
@@ -218,6 +222,7 @@ async def test_a_request_rings_the_users_own_number_behind_a_gate(
     assert LISTEN_PROMPTS["es"].text in listen["twiml"]
     assert f"{BASE}/phone/calls/call_1/listen/joined" in listen["twiml"]
     assert listen["status"] == f"{BASE}/phone/calls/call_1/listen/status"
+    assert listen["ring_s"] == 15
     assert line.line.request_listen_in() == "already_listening"
     assert await line.events() == [AgencyAnswered(), ListenRequested()]
 

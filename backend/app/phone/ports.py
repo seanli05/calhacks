@@ -58,7 +58,9 @@ class Telephony(Protocol):
     async def ring_user(self, call_id: CallId, user_id: UserId) -> None:
         """Ring the user's own number (C6, C29) into the call's conference. Returns
         once it's ringing; `UserAnswered` or `UserUnreachable` follows. The agency
-        leg stays on our line meanwhile, so the agent can keep the rep talking."""
+        leg stays on our line meanwhile, so the agent can keep the rep talking.
+        After `UserUnreachable` it may be called again to ring once more; a leg
+        from the earlier ring no longer counts."""
         ...
 
     async def connect_user(self) -> None:

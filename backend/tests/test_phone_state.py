@@ -1,7 +1,7 @@
 """Call state machine: the demo path, every failure path, and illegal moves."""
 
 import pytest
-from app.contracts import CallOutcome, CallState
+from app.contracts import CallOutcome, CallState, EventType
 from app.phone.state import (
     TRANSITIONS,
     CallStateMachine,
@@ -135,6 +135,15 @@ def test_false_human_returns_to_hold_and_can_still_reach_a_human() -> None:
 
     assert machine.fire(Trigger.FALSE_HUMAN).to_state == CallState.HOLD
     assert machine.fire(Trigger.HUMAN_DETECTED).to_state == CallState.HUMAN_DETECTED
+
+
+def test_ringing_the_user_again_stays_in_bridging_and_logs_it() -> None:
+    machine = run(*HAPPY_PATH[:4])
+    assert machine.state == CallState.BRIDGING
+    again = machine.fire(Trigger.USER_DIALED)
+    assert again.to_state == CallState.BRIDGING
+    assert again.event_type == EventType.CALL_USER_DIALED
+    assert machine.fire(Trigger.USER_JOINED).to_state == CallState.CONNECTED
 
 
 def test_late_agency_hangup_during_wrap_up_keeps_outcome() -> None:

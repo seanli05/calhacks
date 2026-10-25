@@ -37,10 +37,13 @@ class RunnerConfig:
     turn_backstop_s: float = 30.0
     """A turn that never closes after `SpeechStarted` counts as closed after this
     long, so a held answer still goes out."""
-    user_answer_backstop_s: float = 75.0
-    """In case `UserUnreachable` never comes. Covers the slowest real answer: 30 s
-    of ringing (Twilio's timeout), then the join prompt twice and 15 s for a key
-    (`twilio_rest.GATE_TIMEOUT_S`), about 55 s in all."""
+    user_answer_backstop_s: float = 45.0
+    """Per ring, in case `UserUnreachable` never comes. Covers the slowest real
+    answer: 15 s of ringing (`twilio_rest.USER_RING_TIMEOUT_S`), then the join
+    prompt twice and 15 s for a key (`GATE_TIMEOUT_S`), about 40 s in all."""
+    user_ring_attempts: int = 2
+    """Rings before giving up on the applicant. After a hold, one missed ring
+    shouldn't lose the call: the rep hears `RINGING_AGAIN` and the phone rings again."""
     holding_lines_max: int = 2
     holding_line_gap_s: float = 8.0
     menu_budget_s: float = 8 * 60

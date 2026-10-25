@@ -19,7 +19,7 @@ This page is the record for the WhatsApp side (relay, orchestrator pipe, call st
   - **Cancelled** (the phone agent moved on): the question is closed quietly, and the next reply goes to normal routing.
   - **Anything else while the question is open:** the user is asked again for a number.
   - **Priority:** an open question gets the user's reply before anything else.
-- **Call status (P2, C36).** The orchestrator watches a call's events and sends four kinds of message: dialing, on hold (at most every 10 minutes), human detected (always, at once), and unreachable.
+- **Call status (P2, C36).** The orchestrator watches a call's events and sends five kinds of message: dialing, on hold (at most every 10 minutes), human detected (always, at once), a second ring of the applicant (`call.user_dialed` after a missed ring: "USCIS is still waiting for you. I'm calling you again"; the first ring is covered by human detected), and unreachable.
 - **Fake phone agent.** `POST /dev/fake-call` plays a scripted call, so all of the above can be seen on a phone before the real phone agent exists.
 
 **Goal 4, letter to research (4.2–4.4).** Tested on fakes.

@@ -15,8 +15,12 @@ from app.settings import Settings
 
 TWILIO_TIMEOUT_S = 10.0
 RING_TIMEOUT_S = 30
-"""How long Twilio lets a line ring before reporting `no-answer`: the agency's, and
-the applicant's (Plan.md failure rules: 30 s to answer the bridged call)."""
+"""How long Twilio lets the agency's line ring before reporting `no-answer`."""
+USER_RING_TIMEOUT_S = 15
+"""How long the applicant's phone rings (the bridge, and listening in) before
+`no-answer` (Plan.md C42). Short enough that Twilio gives up before most carriers'
+voicemail answers (about 20-30 s), which matters with no join gate: voicemail that
+picks up would be put through to the representative. A miss rings once more."""
 GATE_TIMEOUT_S = 15
 """After the join prompt has played (twice), how long the applicant has to press a
 key before the pickup counts as voicemail."""
@@ -106,15 +110,22 @@ class TwilioCalls:
             http_client=http,
         )
 
-    async def create(self, *, to: str, twiml: str, status_callback: str) -> str:
+    async def create(
+        self,
+        *,
+        to: str,
+        twiml: str,
+        status_callback: str,
+        ring_s: int = RING_TIMEOUT_S,
+    ) -> str:
         """Place the call from the agent's number; returns the call SID. It rings
-        for `RING_TIMEOUT_S`."""
+        for `ring_s`."""
         async with AsyncTwilioHttpClient(timeout=TWILIO_TIMEOUT_S) as http:
             call = await self._client(http).calls.create_async(
                 to=to,
                 from_=self._settings.twilio_agent_number,
                 twiml=twiml,
-                timeout=RING_TIMEOUT_S,
+                timeout=ring_s,
                 status_callback=status_callback,
                 status_callback_event=STATUS_EVENTS,
             )
