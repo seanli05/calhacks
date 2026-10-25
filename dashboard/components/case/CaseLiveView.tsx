@@ -37,8 +37,11 @@ export function CaseLiveView({ userId, caseId }: { userId: string; caseId: strin
   const notFound = error instanceof ApiError && error.status === 404;
 
   const call = detail?.calls.length ? detail.calls[detail.calls.length - 1] : null;
-  const bridged = detail?.stage === "connected" && call?.state === "connected";
-  const live = useLiveCall(call?.id ?? null, bridged);
+  const connected = detail?.stage === "connected" && call?.state === "connected";
+  const live = useLiveCall(call?.id ?? null, connected);
+  // The live layout waits for the first line, so a call whose transcript isn't
+  // saved as it goes keeps the feed instead of an empty transcript.
+  const bridged = connected && live.lines.length > 0;
   const userLang = usePoll(() => api.user(userId), userId, 60_000).data?.language ?? null;
   const glossary = usePoll(() => api.glossary(userLang ?? "en"), `glossary:${userLang}`, 300_000).data ?? [];
   const [query, setQuery] = useState("");

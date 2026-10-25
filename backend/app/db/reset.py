@@ -1,11 +1,13 @@
-"""Drop and recreate every table, then seed the demo case.
+"""Drop and recreate every table, seed the demo case, then load the preset glossary.
 
     python -m app.db.reset --yes               # rebuild and seed (awaiting consent)
     python -m app.db.reset --yes --after-call  # ...plus a finished call
     python -m app.db.reset --yes --empty       # rebuild, no seed
 
 The database is shared by the whole team, so this wipes everyone's data; it refuses
-to run without --yes. It's a dev tool, so seeding writes several owners' tables.
+to run without --yes. It's a dev tool, so seeding writes several owners' tables. The glossary
+(`app.glossary.load`) is reference data, so it's loaded even with --empty; without
+it the translation book is empty and translations lose their USCIS wording.
 Seed values match mock_agency/agency/case_record.py (DEMO_CASE). All fictional.
 """
 
@@ -22,6 +24,7 @@ from app.db.engine import get_engine, session
 from app.db.schema import create_all, drop_all
 from app.db.seed_story import Story, placeholder_letter_png
 from app.db.tables import utcnow
+from app.glossary import load as glossary_load
 from app.settings import get_settings
 
 DEMO_WHATSAPP_NUMBER = "+15555550100"
@@ -292,6 +295,9 @@ async def reset(empty: bool, after_call: bool) -> None:
         if not empty:
             case_id = await seed(after_call)
             print(f"Seeded demo case {case_id}.")
+        # After the seed: the loader replaces the seed's few placeholder terms.
+        terms = await glossary_load.load(glossary_load.read_rows())
+        print(f"Loaded {terms} glossary terms.")
     finally:
         await get_engine().dispose()
 

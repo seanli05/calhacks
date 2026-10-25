@@ -52,7 +52,7 @@ The dashboard API lives under `/api` (routes in [docs/specs/dashboard-api.md](do
 Startup creates any missing tables. To rebuild the database and seed the demo case (one Spanish-speaking user, the I-797C case from `mock_agency`, verified, with the WhatsApp exchange, memory, and feed events up to the consent question), run the command below. **This wipes the shared database for everyone**, so check with the team first:
 
 ```bash
-cd backend && python -m app.db.reset --yes           # add --empty to skip the seed
+cd backend && python -m app.db.reset --yes           # add --empty to skip the seed; the glossary loads either way
 python -m app.db.reset --yes --after-call             # or: also a finished call, for the ended screens
 ```
 
