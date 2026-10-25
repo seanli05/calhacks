@@ -65,6 +65,8 @@ from app.phone.ports import CallDeps
 from app.phone.runner import RunnerConfig, run_call
 
 S = CallState
+QUIET = RunnerConfig().menu_quiet_s
+"""How long a menu answer is held after the turn closes."""
 OFFICIAL = "+18005550100"
 BLOCKED_A_NUMBER = "A123456789"
 BRIEF = {
@@ -323,7 +325,7 @@ async def test_observer_sees_readings_actions_and_transitions() -> None:
     assert "held" in menu_step.flags
     sent_step = _sent_step(call, "speech: two")
     assert sent_step.input == "timer:menu_quiet"
-    assert sent_step.at_s == pytest.approx(menu_step.at_s + 1.0)
+    assert sent_step.at_s == pytest.approx(menu_step.at_s + QUIET)
     assert set(menu_step.latency_ms) == {"classify", "decide"}
     assert call.steps[0].input == "dial"
     assert call.steps[-1].input == "wrap_up"
@@ -367,8 +369,8 @@ async def test_ask_user_timeout_takes_the_default() -> None:
         llm, _opening(ASK_MENU), _hang_up_after(Said("four")), replies=[NoAnswer()]
     )
     assert Said("four") in call.actions
-    # Asked once the menu had been quiet 1 s; the default goes out at the timeout.
-    assert _sent_step(call, "speech: four").at_s == pytest.approx(3 + 1 + 30)
+    # Asked once the menu had been quiet; the default goes out at the timeout.
+    assert _sent_step(call, "speech: four").at_s == pytest.approx(3 + QUIET + 30)
 
 
 async def test_menu_reprompts_while_asking_take_the_default_early() -> None:
@@ -385,8 +387,8 @@ async def test_menu_reprompts_while_asking_take_the_default_early() -> None:
     assert len(llm.menu_calls) == 1
     assert call.relay is not None
     assert call.relay.cancelled == [call.relay.asked[0].question_id]
-    # The default is held until the second reprompt has been quiet 1 s.
-    assert _sent_step(call, "speech: four").at_s == pytest.approx(3 + 14 + 1)
+    # The default is held until the second reprompt has been quiet.
+    assert _sent_step(call, "speech: four").at_s == pytest.approx(3 + 14 + QUIET)
     flags = [flag for step in call.steps for flag in step.flags]
     assert flags.count("reprompt_while_asking") == 2
     assert "ask_default_early" in flags
@@ -963,7 +965,7 @@ async def test_a_menu_after_hold_is_answered_on_the_utterance_that_showed_it() -
     assert isinstance(returned.action, PressAction)
     later = [step for step in call.steps if step.at_s > returned.at_s]
     assert _sent_step(call, "speech: two", among=later).at_s == pytest.approx(
-        returned.at_s + 1.0
+        returned.at_s + QUIET
     )
 
 
@@ -987,13 +989,13 @@ async def test_options_heard_in_pieces_are_answered_once_after_the_last() -> Non
     script = [
         Step(2, AgencyAnswered()),
         Step(1, Heard(text=SPLIT_MENU[0])),
-        Step(0.6, Heard(text=SPLIT_MENU[1])),
+        Step(QUIET / 2, Heard(text=SPLIT_MENU[1])),
     ]
     call, _ = await _run(llm, script, _hang_up_after(Said("two")))
 
     assert _said(call) == [Said("two")]
     assert llm.menu_calls[-1] == " ".join(SPLIT_MENU)
-    assert _sent_step(call, "speech: two").at_s == pytest.approx(3.6 + 1.0)
+    assert _sent_step(call, "speech: two").at_s == pytest.approx(3 + QUIET / 2 + QUIET)
 
 
 async def test_speech_starting_in_the_quiet_window_holds_the_answer() -> None:
@@ -1001,28 +1003,29 @@ async def test_speech_starting_in_the_quiet_window_holds_the_answer() -> None:
     script = [
         Step(2, AgencyAnswered()),
         Step(1, Heard(text=SPLIT_MENU[0])),
-        Step(0.5, SpeechStarted()),  # inside the 1 s window after option 1
+        Step(QUIET / 2, SpeechStarted()),  # inside the window after option 1
         Step(2.5, Heard(text=SPLIT_MENU[1])),
     ]
     call, _ = await _run(llm, script, _hang_up_after(Said("two")))
 
     assert _said(call) == [Said("two")]
-    assert _sent_step(call, "speech: two").at_s == pytest.approx(6 + 1.0)
+    sent_at = 3 + QUIET / 2 + 2.5 + QUIET
+    assert _sent_step(call, "speech: two").at_s == pytest.approx(sent_at)
     assert any("held_dropped" in step.flags for step in call.steps)
 
 
 @pytest.mark.parametrize(
     ("close", "sent_at"),
     [
-        (Step(1, NonSpeech(sound="silence", seconds=1)), 3.5 + 1 + 1.0),
-        (None, 3.5 + 30 + 1.0),  # never closes: the backstop releases it
+        (Step(1, NonSpeech(sound="silence", seconds=1)), 3 + QUIET / 2 + 1 + QUIET),
+        (None, 3 + QUIET / 2 + 30 + QUIET),  # never closes: the backstop releases it
     ],
 )
 async def test_a_turn_with_no_words_lets_the_held_answer_out(
     close: Step | None, sent_at: float
 ) -> None:
     llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
-    script = [*_opening(), Step(0.5, SpeechStarted())]
+    script = [*_opening(), Step(QUIET / 2, SpeechStarted())]
     if close is not None:
         script.append(close)
     call, _ = await _run(llm, script, _hang_up_after(Said("two")))
@@ -1037,7 +1040,7 @@ async def test_a_turn_with_no_words_lets_the_held_answer_out(
 async def test_the_applicants_choice_waits_for_the_line_to_go_quiet() -> None:
     reprompt = "Sorry, I didn't get that. " + ASK_MENU
     script = [
-        *_opening(ASK_MENU),  # heard at 3 s; asked at 4 s
+        *_opening(ASK_MENU),  # heard at 3 s; asked once quiet
         Step(5.5, SpeechStarted()),  # a reprompt starts at 8.5 s
         Step(3.5, Heard(text=reprompt)),  # and ends at 12 s
     ]
@@ -1046,11 +1049,11 @@ async def test_the_applicants_choice_waits_for_the_line_to_go_quiet() -> None:
         llm,
         script,
         _hang_up_after(Said("six")),
-        replies=[Answer(choice=2, after_s=5)],  # at 9 s, mid-reprompt
+        replies=[Answer(choice=2, after_s=9 - (3 + QUIET))],  # at 9 s, mid-reprompt
     )
 
     assert _said(call) == [Said("six")]
-    assert _sent_step(call, "speech: six").at_s == pytest.approx(12 + 1.0)
+    assert _sent_step(call, "speech: six").at_s == pytest.approx(12 + QUIET)
     assert len(llm.menu_calls) == 1  # the reprompt wasn't decided, or asked, again
     assert any("reprompt_while_held" in step.flags for step in call.steps)
 
@@ -1059,7 +1062,7 @@ async def test_leaving_the_menu_drops_a_held_answer() -> None:
     llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
     script = [
         *_opening(),
-        Step(0.5, NonSpeech(sound="music", seconds=6)),  # hold, before the answer
+        Step(QUIET / 2, NonSpeech(sound="music", seconds=6)),  # hold, before the answer
         Step(10, AgencyHungUp()),
     ]
     call, _ = await _run(llm, script)

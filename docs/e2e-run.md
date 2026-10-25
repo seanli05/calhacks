@@ -113,7 +113,7 @@ The landing page shows the seeded demo user, not you. Open `http://localhost:300
 The bridge rings the WhatsApp number that started the case, so the applicant and the agency must be different phones.
 
 - **Mock line** (default): `DEMO_DIAL_NUMBER` = the mock agency line. You're the applicant. Ask person 3 for a short hold (`MOCK_AGENCY_HOLD_SECONDS`).
-- **A friend as the agency** (on your own backend, not the team host, since it changes every teammate's calls): `DEMO_DIAL_NUMBER` = their phone (E.164, in `.env` only, never in code). Restart. They read a menu ("For case status, press 1…"), put the agent on hold, then greet like a rep ("USCIS, this is Maria, how can I help?"). The agent answers a menu after the whole prompt and ~2 s of quiet. Set it back to the mock line afterwards.
+- **A friend as the agency** (on your own backend, not the team host, since it changes every teammate's calls): `DEMO_DIAL_NUMBER` = their phone (E.164, in `.env` only, never in code). Restart. They read a menu ("For case status, press 1…"), put the agent on hold, then greet like a rep ("USCIS, this is Maria, how can I help?"). The agent answers a menu after the whole prompt and ~1.5 s of quiet. Set it back to the mock line afterwards.
 
 ## When it doesn't work
 

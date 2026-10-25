@@ -29,10 +29,11 @@ class RunnerConfig:
     menus usually hang up after two or three no-inputs."""
     music_to_hold_s: float = 5.0
     """Music this long in a menu means hold, with no model call."""
-    menu_quiet_s: float = 1.0
+    menu_quiet_s: float = 0.4
     """How long the line must stay quiet after a menu turn closes before an answer
     goes out, so every option has been heard. The audio line closes a turn after
-    about 1 s of quiet, so it's about 2 s of quiet in all; menus usually wait 5-10 s
+    about 1.1 s of quiet, so it's about 1.5 s of quiet in all, and the decision (about
+    1-1.5 s) runs during it, so it rarely adds to the wait. Menus usually wait 5-10 s
     for input."""
     turn_backstop_s: float = 30.0
     """A turn that never closes after `SpeechStarted` counts as closed after this

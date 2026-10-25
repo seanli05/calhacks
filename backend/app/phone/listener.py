@@ -51,9 +51,11 @@ _TICK_S = 0.1
 
 @dataclass(frozen=True)
 class TurnTiming:
-    merge_gap_s: float = 1.0
-    """Quiet that closes a turn. Longer than the pauses between a menu's options,
-    short enough for the < 5 s human → ring target."""
+    merge_gap_s: float = 0.6
+    """Quiet that closes a turn, after VAD's 0.5 s stop: about 1.1 s in all. A menu
+    that pauses longer between options splits into turns, which the runner joins
+    and decides again as a whole; closing sooner starts the decision sooner, and
+    keeps the human → ring time well under 5 s."""
     final_grace_s: float = 0.5
     """Extra wait for speech-to-text's last fragment after the gap. Cartesia sends
     nothing for a turn with no words, so a wordless turn waits all of it."""

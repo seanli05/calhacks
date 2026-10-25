@@ -56,7 +56,7 @@ The phase classifier must find a real person fast and never ring the applicant f
 | D2 | "USCIS, this is Maria, badge 4471, how can I help?" | Person; the badge number never comes back from the agent | |
 | D3 | A recorded-sounding line: "Your call is important to us. Please stay on the line." | Hold, not a person: nobody is rung | |
 | D4 | "Thank you for holding" in a friendly voice, then silence | Still hold until a real question or name; no ring | |
-| D5 | A short menu: "For case status, press 1. For an interview, press 2." | The agent answers by speaking the option (C37), only after the whole prompt and ~2 s of quiet | |
+| D5 | A short menu: "For case status, press 1. For an interview, press 2." | The agent answers by speaking the option (C37), only after the whole prompt and ~1.5 s of quiet | |
 | D6 | A menu that asks "Enter your 13-character receipt number" | The agent never says or keys it (C35): it asks for a representative, or asks the user | |
 | D7 | Play music 10+ s into the phone, then greet as a rep | `menu → hold` on the music, then a person; ring < 5 s | |
 | D8 | Let your own phone go to voicemail (don't answer) | Note what happens: your voicemail greeting ("you've reached…, leave a message") could pass for a person. If it rings the friend, that's a finding | |

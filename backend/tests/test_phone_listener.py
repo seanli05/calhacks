@@ -9,10 +9,14 @@ from app.phone.listener import (
     LOUD_RMS,
     PlaybackMarkFrame,
     TurnAssembler,
+    TurnTiming,
     overheard,
     rms,
 )
 from pipecat.serializers.twilio import TwilioFrameSerializer
+
+GAP = TurnTiming().merge_gap_s
+GRACE = TurnTiming().final_grace_s
 
 
 def _loud(turns: TurnAssembler, start: float, end: float) -> None:
@@ -33,8 +37,8 @@ def test_fragments_join_into_one_turn_once_the_line_is_quiet() -> None:
     turns.speech_stopped(4.0)
     turns.transcript("For interviews, press 2.", 4.2)
 
-    assert turns.tick(4.9) == []
-    assert turns.tick(5.0) == [
+    assert turns.tick(4.0 + GAP - 0.1) == []
+    assert turns.tick(4.0 + GAP + 0.01) == [
         Heard(text="For case status, press 1. For interviews, press 2.")
     ]
 
@@ -43,17 +47,19 @@ def test_a_late_last_fragment_is_waited_for() -> None:
     turns = TurnAssembler(now=0)
     turns.speech_started(1.0)
     turns.speech_stopped(2.0)
-    assert turns.tick(3.2) == []  # the gap passed, but speech-to-text hasn't answered
-    turns.transcript("Please hold.", 3.3)
-    assert turns.tick(3.4) == [Heard(text="Please hold.")]
+    # The gap passed, but speech-to-text hasn't answered.
+    assert turns.tick(2.0 + GAP + 0.1) == []
+    turns.transcript("Please hold.", 2.0 + GAP + 0.2)
+    assert turns.tick(2.0 + GAP + 0.3) == [Heard(text="Please hold.")]
 
 
 def test_a_turn_with_no_words_closes_as_non_speech_soon_after_the_gap() -> None:
     turns = TurnAssembler(now=0)
     turns.speech_started(1.0)
     turns.speech_stopped(2.0)
-    assert turns.tick(3.4) == []
-    assert turns.tick(3.5) == [NonSpeech(sound="silence", seconds=2.5)]
+    closes = 2.0 + GAP + GRACE + 0.01
+    assert turns.tick(closes - 0.1) == []
+    assert turns.tick(closes) == [NonSpeech(sound="silence", seconds=closes - 1.0)]
 
 
 def test_a_wordless_turn_during_music_is_music() -> None:
