@@ -102,18 +102,25 @@ class FactConsent:
             "Fact consent asked user_id=%s facts=%d", user_id, len(question.fact_ids)
         )
 
-    async def answer(self, user: tables.User, choice: int) -> None:
-        """The user's 1 (save) or 2 (don't) to the open question."""
+    async def answer(
+        self, user: tables.User, choice: int, *, confirm: bool = True
+    ) -> str | None:
+        """The user's 1 (save) or 2 (don't) to the open question. Returns the
+        template that confirms it, sent only with `confirm` (the turn's reply says
+        it instead); None if no question was open."""
         fact_ids = self._pending.pop(user.id, None)
         self._unanswered.pop(user.id, None)
         if fact_ids is None:
             logger.error(
                 "Fact consent answer with no open question user_id=%s", user.id
             )
-            return
+            return None
         if choice == 1:
             await memory_consent.confirm_facts(user.id, fact_ids)
-            await send_template(self._whatsapp, user, "memory.saved")
+            template = "memory.saved"
         else:
             await memory_consent.decline_facts(user.id, fact_ids)
-            await send_template(self._whatsapp, user, "memory.not_saved")
+            template = "memory.not_saved"
+        if confirm:
+            await send_template(self._whatsapp, user, template)
+        return template

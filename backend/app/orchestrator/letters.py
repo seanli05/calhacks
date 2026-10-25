@@ -90,6 +90,12 @@ class Letters:
         message about it is on its way."""
         return user_id in self._reading or self._results.verdict_pending(user_id)
 
+    def reading_case(self, user_id: UserId) -> CaseId | None:
+        """The case whose letter the fast pass is reading now; it has no `cases` row
+        until the pass finishes."""
+        letter = self._reading.get(user_id)
+        return letter.case_id if letter is not None else None
+
     def question_pending(self, user_id: UserId) -> bool:
         """Research asked something about the user's letter (C39)."""
         return self._results.question(user_id) is not None

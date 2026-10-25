@@ -7,14 +7,21 @@ import json
 from typing import Any
 
 import pytest
-from app.contracts import AskUserRequest, EventType, JobType
+from app.contracts import AskUserRequest, EventType, JobType, VerificationStatus
 from app.db import tables
 from app.orchestrator import tools as orchestrator_tools
 from app.orchestrator.consent import ConsentGate
 from app.orchestrator.pipe import InboundPipe
 from app.orchestrator.tools import CaseTools
 from app.relay.ask_user import AskUser
-from whatsapp_fakes import FakeDB, FakeRunnerClient, FakeWhatsApp, inbound, use_spanish
+from whatsapp_fakes import (
+    FakeDB,
+    FakeRunnerClient,
+    FakeWhatsApp,
+    inbound,
+    use_spanish,
+    wait_for_batches,
+)
 
 
 async def asked_to_call(
@@ -58,10 +65,112 @@ async def test_yes_in_words_records_consent_and_answers_the_rest(
     assert job.payload["consent_message_id"] == yes.id
     [given] = [e for e in db.events if e.type == EventType.CONSENT_GIVEN]
     assert given.data == {"consent_message_id": yes.id, "via": "words"}
-    # Answer and act in one message: the confirmation, then the rest of the reply.
-    assert db.outbound_templates()[-2:] == ["consent.given", None]
+    # One message: the reply confirms the call and answers the rest; no template.
+    assert db.outbound_templates()[-2:] == ["consent.request", None]
     assert db.messages[-1].body_en == "Yes, bring your children."
+    assert "calling USCIS now" in json.loads(runner.tool_results[0])["note"]
     assert consent.pending(user.id) is None
+
+
+async def test_consent_in_words_with_no_reply_sends_the_template(
+    db: FakeDB,
+    agent_pipe: InboundPipe,
+    consent: ConsentGate,
+    runner: FakeRunnerClient,
+) -> None:
+    _, case = await asked_to_call(db, consent)
+    runner.queue(
+        [
+            (
+                "answer_call_consent",
+                {"case_id": case.id, "answer": "yes", "user_words": "sí, llame"},
+            )
+        ],
+        reply=None,
+    )
+
+    await agent_pipe.handle(inbound("sí, llame"))
+
+    assert len(db.jobs_of(JobType.CALL)) == 1
+    assert db.outbound_templates() == ["consent.request", "consent.given"]
+
+
+async def test_a_yes_the_gate_refuses_at_dial_time_is_not_told_as_a_call(
+    db: FakeDB,
+    agent_pipe: InboundPipe,
+    consent: ConsentGate,
+    runner: FakeRunnerClient,
+) -> None:
+    """The case lost its verified number after the question went out: the tool
+    tells the model the call couldn't start, and the fallback says so too."""
+    _, case = await asked_to_call(db, consent)
+    db.verifications[case.id].status = VerificationStatus.SUSPICIOUS
+    runner.queue(
+        [
+            (
+                "answer_call_consent",
+                {"case_id": case.id, "answer": "yes", "user_words": "sí, llame"},
+            )
+        ],
+        reply=None,
+    )
+
+    await agent_pipe.handle(inbound("sí, llame"))
+
+    assert db.jobs_of(JobType.CALL) == []
+    assert "couldn't be started" in json.loads(runner.tool_results[0])["note"]
+    assert db.outbound_templates()[-1] == "consent.unavailable"
+
+
+# The user asks for the call: the turn writes the question
+
+
+async def test_asked_for_a_call_the_turn_asks_in_its_own_words(
+    db: FakeDB,
+    agent_pipe: InboundPipe,
+    consent: ConsentGate,
+    runner: FakeRunnerClient,
+) -> None:
+    user = await use_spanish(db)
+    case = db.add_verified_case(user)
+    runner.queue(
+        [("request_consent", {"case_id": case.id})],
+        reply="Of course. I'll call USCIS and ring you when someone answers. "
+        "Shall I go ahead?",
+    )
+
+    await agent_pipe.handle(inbound("¿puede llamar a USCIS otra vez?"))
+
+    # One natural question, no numbered template.
+    assert db.outbound_templates() == [None]
+    asked = db.messages[-1]
+    assert asked.body_en is not None and "Shall I go ahead?" in asked.body_en
+    pending = consent.pending(user.id)
+    assert pending is not None and pending.asked_at == asked.created_at
+
+    await agent_pipe.handle(inbound("sí"))
+
+    assert len(runner.requests) == 1  # a bare yes is answered in code (rule 4)
+    [job] = db.jobs_of(JobType.CALL)
+    assert job.payload["consent_message_id"] == db.messages[-2].id
+    assert db.outbound_templates()[-1] == "consent.given"
+
+
+async def test_asked_for_a_call_with_no_reply_sends_the_template_question(
+    db: FakeDB,
+    agent_pipe: InboundPipe,
+    consent: ConsentGate,
+    runner: FakeRunnerClient,
+) -> None:
+    user = await use_spanish(db)
+    case = db.add_verified_case(user)
+    runner.queue([("request_consent", {"case_id": case.id})], reply=None)
+
+    await agent_pipe.handle(inbound("llámelos"))
+
+    assert db.outbound_templates() == ["consent.request"]
+    pending = consent.pending(user.id)
+    assert pending is not None and pending.asked_at == db.messages[-1].created_at
 
 
 async def test_consent_in_words_with_no_open_request_is_refused(
@@ -283,3 +392,82 @@ async def test_same_or_new_answered_in_words(
     assert "same_or_new" in context_of(runner)
     assert db.outbound_templates() == ["letter.same_or_new", "letter.pages_added"]
     assert [p["media_id"] for p in letter.pages] == ["media_old", db.media[0].id]
+
+
+async def test_same_or_new_in_words_is_confirmed_once(
+    db: FakeDB, agent_pipe: InboundPipe, runner: FakeRunnerClient
+) -> None:
+    user = await use_spanish(db)
+    letter = await db.create_document(user.id, ["media_old"])
+    db.cases.append(tables.Case(user_id=user.id, document_ids=[letter.id]))
+    await agent_pipe.handle(inbound(photos=1))
+    runner.queue(
+        [("answer_same_or_new", {"choice": "same_letter"})],
+        reply="Thanks, I added it to your letter.",
+    )
+
+    await agent_pipe.handle(inbound("es otra hoja de la misma carta"))
+
+    assert db.outbound_templates() == ["letter.same_or_new", None]
+    assert [p["media_id"] for p in letter.pages] == ["media_old", db.media[0].id]
+
+
+async def test_a_consent_question_that_never_went_out_is_withdrawn(
+    db: FakeDB,
+    agent_pipe: InboundPipe,
+    consent: ConsentGate,
+    runner: FakeRunnerClient,
+    whatsapp: FakeWhatsApp,
+) -> None:
+    """Rule 4: a yes can only answer a question the user saw."""
+    user = await use_spanish(db)
+    case = db.add_verified_case(user)
+    runner.queue([("request_consent", {"case_id": case.id})], reply="Shall I call?")
+    whatsapp.fail_sends = True
+
+    await agent_pipe.handle(inbound("llámelos"))
+
+    assert consent.pending(user.id) is None
+
+
+# Letters not read yet: no case row, but the turn knows they're there
+
+
+async def test_text_while_photos_arrive_tells_the_turn_a_letter_is_coming(
+    db: FakeDB, agent_pipe: InboundPipe, runner: FakeRunnerClient
+) -> None:
+    """On a real phone, "No other pages" right after the photo got "I don't see
+    your letter in the system yet... could you send the photo again?"."""
+    await use_spanish(db)
+    await agent_pipe.handle(inbound(photos=1))
+
+    await agent_pipe.handle(inbound("no hay más páginas"))
+
+    assert db.cases == []
+    assert "Photos of a letter are arriving" in context_of(runner)
+
+
+async def test_text_while_the_letter_is_read_names_its_case(
+    db: FakeDB, agent_pipe: InboundPipe, runner: FakeRunnerClient
+) -> None:
+    await use_spanish(db)
+    await agent_pipe.handle(inbound(photos=1))
+    await wait_for_batches()
+    [job] = db.jobs_of(JobType.RESEARCH_FAST)
+
+    await agent_pipe.handle(inbound("¿ya la leyó?"))
+
+    assert db.cases == []
+    context = context_of(runner)
+    assert f"{job.case_id}: the letter is being read now" in context
+    assert "Photos of a letter are arriving" not in context
+
+
+async def test_no_letter_in_progress_says_none(
+    db: FakeDB, agent_pipe: InboundPipe, runner: FakeRunnerClient
+) -> None:
+    await use_spanish(db)
+
+    await agent_pipe.handle(inbound("hola"))
+
+    assert "<letters_in_progress>\n(none)\n</letters_in_progress>" in context_of(runner)

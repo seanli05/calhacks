@@ -273,8 +273,28 @@ async def test_save_answered_in_words_through_the_turn(
     await memory_pipe.handle(inbound("claro, guárdelo"))
 
     assert {f.status for f in db.facts} == {FactStatus.ACTIVE}
-    # The confirmation was the only message: an empty reply sends nothing more.
+    # An empty reply: the template confirms it instead.
     assert db.outbound_templates()[-1] == "memory.saved"
+
+
+async def test_save_answered_in_words_is_confirmed_once(
+    db: FakeDB, memory_pipe: InboundPipe, runner: FakeRunnerClient
+) -> None:
+    """On a real phone, "Yes please" got "Done, I saved it." and then "I've saved
+    that. Thank you.": now the reply is the only confirmation."""
+    user = await use_spanish(db)
+    await pending_fact(db, user, "Has an asylum interview scheduled")
+    await memory_pipe.handle(inbound("hola"))
+    sent = len(db.outbound_templates())
+    runner.queue(
+        [("answer_save_facts", {"answer": "yes"})], reply="I've saved that. Thank you."
+    )
+
+    await memory_pipe.handle(inbound("Yes please"))
+
+    assert {f.status for f in db.facts} == {FactStatus.ACTIVE}
+    assert db.outbound_templates()[sent:] == [None]
+    assert db.messages[-1].body_en == "I've saved that. Thank you."
 
 
 async def test_asking_what_the_question_means_then_answering_in_words_saves(

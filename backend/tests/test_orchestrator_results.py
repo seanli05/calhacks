@@ -535,18 +535,23 @@ async def test_no_second_request_while_a_call_is_running(
     assert refusal is not None and "in progress" in refusal
 
 
-async def test_request_consent_tool_only_asks(
+async def test_request_consent_tool_only_opens_the_question(
     db: FakeDB, whatsapp: FakeWhatsApp, consent: ConsentGate
 ) -> None:
+    """The turn asks in its own words (the reply); the tool sends nothing."""
     user = await use_spanish(db)
     case = db.add_verified_case(user)
     tools = CaseTools(user, whatsapp, consent)
 
     result = json.loads(await tools.request_consent(case.id))
 
-    assert result["asked"] == case.id
-    assert tools.consent_requested  # the turn sends no reply of its own
-    assert db.outbound_templates() == ["consent.request"]
+    assert result["opened"] == case.id
+    assert "Confirm the interview" in result["note"]
+    assert tools.consent_question == case.id
+    assert db.messages == []
+    assert consent.pending(user.id) is not None
+    [requested] = [e for e in db.events if e.type == EventType.CONSENT_REQUESTED]
+    assert requested.data == {"agency": "USCIS", "via": "words"}
     assert db.jobs_of(JobType.CALL) == []
 
 
