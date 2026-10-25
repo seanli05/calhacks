@@ -54,6 +54,7 @@ Startup creates any missing tables. To rebuild the database and seed the demo ca
 ```bash
 cd backend && python -m app.db.reset --yes           # add --empty to skip the seed; the glossary loads either way
 python -m app.db.reset --yes --after-call             # or: also a finished call, for the ended screens
+python -m app.db.reset --yes --story mariam --number +1...  # or: the demo video's user (Dari, a finished Medi-Cal case); her real phone as --number
 ```
 
 To try the seed without touching the shared database, point it at the test branch: `DATABASE_URL_UNPOOLED=<TEST_DATABASE_URL> python -m app.db.reset --yes`.

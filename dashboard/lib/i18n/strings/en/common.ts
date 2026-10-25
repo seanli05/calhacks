@@ -10,6 +10,7 @@ export const common = {
   languageSwitch: "Language",
   docTypes: {
     uscis_i797c_asylum_interview: "Asylum interview",
+    medi_cal_renewal: "Medi-Cal renewal",
   } as Record<string, string>,
   docTypeFallback: "Letter",
   stages: {

@@ -10,6 +10,7 @@ export const common: CommonStrings = {
   languageSwitch: "Idioma",
   docTypes: {
     uscis_i797c_asylum_interview: "Entrevista de asilo",
+    medi_cal_renewal: "Renovación de Medi-Cal",
   },
   docTypeFallback: "Carta",
   stages: {

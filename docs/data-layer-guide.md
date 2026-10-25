@@ -13,7 +13,7 @@ Owner: person 1. Ask before changing the schema, the contracts, or another write
 | Contracts (every Plan.md payload) | `backend/app/contracts/` | Done |
 | Tables (all 16) | `backend/app/db/tables.py` | Done; created on app startup |
 | Helpers (reads, writes, jobs, events, messages, deletes) | `backend/app/db/` | Done; tested against Postgres |
-| Reset and demo seed | `python -m app.db.reset` | Done (`--after-call` adds a finished call) |
+| Reset and demo seed | `python -m app.db.reset` | Done (`--after-call` adds a finished call; `--story mariam --number +1...` seeds the demo video's user) |
 | WhatsApp pipe, relay, ask_user, call-status messages | `backend/app/relay/`, `orchestrator/` | On `main`; writes `users`, `media`, `documents`, `messages`, `questions`, events. Status: [whatsapp-pipe.md](whatsapp-pipe.md) |
 | Orchestrator's Claude turn, translation, memory writer | their packages | Done. The memory worker starts with the app (`MEMORY_WORKER`) |
 | Phone agent | `backend/app/phone/` | State machine and menu decider on `main`; the call runner (dial, hold, bridge, report) not yet |

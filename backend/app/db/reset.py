@@ -3,6 +3,11 @@
     python -m app.db.reset --yes               # rebuild and seed (awaiting consent)
     python -m app.db.reset --yes --after-call  # ...plus a finished call
     python -m app.db.reset --yes --empty       # rebuild, no seed
+    python -m app.db.reset --yes --story mariam --number +1...  # the demo video
+
+The default story is Ana (Spanish, an I-797C waiting for consent). `--story mariam`
+seeds the demo video's user instead (`seed_mariam.py`): pass her real phone as
+`--number`, so the letter she sends on camera lands on her seeded account.
 
 The database is shared by the whole team, so this wipes everyone's data; it refuses
 to run without --yes. It's a dev tool, so seeding writes several owners' tables. The glossary
@@ -19,7 +24,7 @@ from datetime import date, timedelta
 from urllib.parse import urlsplit
 
 from app.contracts.common import VerificationStatus
-from app.db import tables
+from app.db import seed_mariam, tables
 from app.db.engine import get_engine, session
 from app.db.schema import create_all, drop_all
 from app.db.seed_story import Story, placeholder_letter_png
@@ -50,7 +55,22 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         action="store_true",
         help="also seed a finished call, to check the ended screens",
     )
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--story",
+        choices=["ana", "mariam"],
+        default="ana",
+        help="which demo user to seed (mariam: the demo video)",
+    )
+    parser.add_argument(
+        "--number",
+        help="with --story mariam: her WhatsApp number in E.164 (+1...)",
+    )
+    args = parser.parse_args(argv)
+    if args.story == "mariam" and not (args.number or "").startswith("+"):
+        parser.error("--story mariam needs --number in E.164, e.g. +15105550100")
+    if args.story == "mariam" and args.after_call:
+        parser.error("--after-call is for the ana story")
+    return args
 
 
 def target_host() -> str:
@@ -288,11 +308,39 @@ async def seed(after_call: bool = False) -> str:
     return case.id
 
 
-async def reset(empty: bool, after_call: bool) -> None:
+async def seed_mariam_story(whatsapp_number: str) -> str:
+    """Mariam and her finished Medi-Cal case. Returns her user ID."""
+    story = seed_mariam.build(whatsapp_number)
+    async with session() as db:
+        db.add(story.user)
+        await db.flush()
+        db.add_all([story.case, story.media, story.document])
+        await db.flush()
+        db.add_all([story.fast_job, story.deep_job])
+        await db.flush()
+        db.add_all(
+            [
+                story.verification(),
+                *story.profile_and_facts(),
+                *story.messages(),
+                *story.research_events(),
+            ]
+        )
+        await db.commit()
+    return story.user.id
+
+
+async def reset(
+    empty: bool, after_call: bool, story: str = "ana", number: str | None = None
+) -> None:
     try:
         await drop_all()
         await create_all()
-        if not empty:
+        if not empty and story == "mariam":
+            assert number is not None
+            user_id = await seed_mariam_story(number)
+            print(f"Seeded Mariam ({user_id}).")
+        elif not empty:
             case_id = await seed(after_call)
             print(f"Seeded demo case {case_id}.")
         # After the seed: the loader replaces the seed's few placeholder terms.
@@ -309,7 +357,7 @@ def main(argv: Sequence[str]) -> int:
     if not args.yes:
         print("This wipes every table on the shared database. Re-run with --yes.")
         return 2
-    asyncio.run(reset(args.empty, args.after_call))
+    asyncio.run(reset(args.empty, args.after_call, args.story, args.number))
     print("Done.")
     return 0
 

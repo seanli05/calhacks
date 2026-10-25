@@ -300,6 +300,18 @@ async def test_resolve_ref_accepts_placeholder() -> None:
         assert await db.get(tables.CaseRef, (case.id, "receipt_number")) is not None
 
 
+async def test_mariam_seed_is_a_finished_verified_case_in_dari() -> None:
+    user_id = await reset.seed_mariam_story("+15105550142")
+    user = await reads.get_user_by_number("+15105550142")
+    assert user is not None and user.id == user_id and user.language == "fa"
+    [case] = await reads.list_active_cases(user_id)
+    # Verified with no call offered, so the case asks nothing of her mid-demo.
+    assert await reads.case_progress(case.id) == CaseStage.VERIFIED
+    assert FastResult.model_validate(case.fast_result).doc_type == "medi_cal_renewal"
+    pending = await reads.list_facts(user_id, [FactStatus.PENDING_CONSENT])
+    assert [f.category for f in pending] == ["health"]
+
+
 async def test_seed_builds_a_case_awaiting_consent() -> None:
     case_id = await reset.seed()
     assert await reads.case_progress(case_id) == CaseStage.AWAITING_CONSENT
