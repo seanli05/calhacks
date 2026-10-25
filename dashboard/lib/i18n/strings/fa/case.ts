@@ -122,8 +122,6 @@ export const caseView: CaseStrings = {
     show: "دیدن قدم‌ها",
     hide: "پنهان کردن قدم‌ها",
     why: "چرا",
-    showWhy: "دیدن دلیل‌ها",
-    hideWhy: "پنهان کردن دلیل‌ها",
   },
   close: "بستن",
 };

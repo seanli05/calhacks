@@ -119,8 +119,6 @@ export const caseView = {
     show: "show steps",
     hide: "hide steps",
     why: "Why",
-    showWhy: "show reasoning",
-    hideWhy: "hide reasoning",
   },
   close: "Close",
 };

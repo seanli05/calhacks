@@ -250,24 +250,6 @@
   min-width: 0;
 }
 
-.whyToggle {
-  margin-inline-start: auto;
-  padding: 2px 8px;
-  border: 1px solid var(--faint);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.whyToggle[aria-pressed="true"] {
-  border-color: var(--forest-2);
-  color: var(--forest-2);
-}
-
 .why {
   grid-column: 2 / -1;
   margin: -4px 0 4px;
