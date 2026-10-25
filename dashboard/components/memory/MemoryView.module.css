@@ -29,6 +29,14 @@
   margin: 8px 0 0;
   font-size: var(--fs-lg);
   color: var(--muted);
+  max-width: 62ch;
+}
+
+.intro .summary {
+  margin-top: 14px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--forest-2);
 }
 
 .status {
@@ -36,8 +44,14 @@
 }
 
 .empty {
-  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
   padding: 28px 26px;
+}
+
+.empty p {
+  margin: 0;
   font-size: var(--fs-lg);
   color: var(--muted);
 }
@@ -59,9 +73,23 @@
   border-top: 1px solid var(--line);
 }
 
-.section h2 {
+.heading {
   margin: 0;
   padding-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: start;
+}
+
+.headingIcon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--lime-soft);
+  color: var(--forest);
 }
 
 .fading {
@@ -69,9 +97,35 @@
 }
 
 .none {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+}
+
+.none p {
   margin: 0;
-  padding: 14px 0;
   color: var(--faint);
+}
+
+.noneIcon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 1px dashed var(--line-strong);
+  color: var(--faint);
+}
+
+.tags {
+  list-style: none;
+  margin: 0;
+  padding: 12px 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .profile {
@@ -111,11 +165,6 @@
   font-weight: 500;
 }
 
-.en {
-  font-size: var(--fs-sm);
-  color: var(--faint);
-}
-
 .meta {
   display: flex;
   align-items: center;
@@ -138,8 +187,38 @@
 
 .failed {
   margin: 0;
-  text-align: center;
   color: var(--coral);
+}
+
+/* "Clear my profile" sits down here, quiet, in the same label + body grid as a section. */
+.privacy {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 20px;
+  margin-top: 12px;
+  padding: 18px 27px 0;
+  border-top: 1px solid var(--line-strong);
+}
+
+.privacy .heading {
+  padding-top: 0;
+}
+
+.privacyBody {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.privacyBody > p {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--muted);
+}
+
+.privacyBody > div {
+  align-self: stretch;
 }
 
 .history {
@@ -172,12 +251,21 @@
     padding-inline: 16px;
   }
 
-  .section {
+  .privacy {
+    padding-inline: 0;
+  }
+
+  .section,
+  .privacy {
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
   }
 
-  .section h2 {
+  .privacy {
+    gap: 12px;
+  }
+
+  .heading {
     padding-top: 0;
   }
 }

@@ -3,6 +3,12 @@ import type { MemoryStrings } from "../en/memory";
 export const memoryPage: MemoryStrings = {
   title: "Perfil",
   subtitle: "Esto es lo que Avocado guarda para ayudarte con tu caso. Puedes quitar cualquier cosa, cuando quieras.",
+  separator: " · ",
+  counts: {
+    facts: (n) => (n === 1 ? "1 cosa que compartiste" : `${n} cosas que compartiste`),
+    documents: (n) => (n === 1 ? "1 carta" : `${n} cartas`),
+    calls: (n) => (n === 1 ? "1 llamada" : `${n} llamadas`),
+  },
   sections: {
     profile: "Sobre ti",
     facts: "Lo que nos contaste",
@@ -29,14 +35,19 @@ export const memoryPage: MemoryStrings = {
   pages: (n) => (n === 1 ? "1 página" : `${n} páginas`),
   transcript: (date) => `Llamada del ${date}`,
   empty: {
-    profile: "Todavía no hay nada.",
-    facts: "Todavía no hay nada.",
-    documents: "Todavía no hay nada.",
-    calls: "Todavía no hay nada.",
+    profile: "Tu nombre, idioma y ciudad aparecerán aquí cuando los compartas.",
+    facts: "Lo que le cuentes a Avocado por WhatsApp aparecerá aquí.",
+    documents: "Las cartas que envíes en foto aparecerán aquí.",
+    calls: "Las llamadas que Avocado haga por ti aparecerán aquí.",
   },
   delete: "Quitar",
+  removeItem: (what) => `Quitar: ${what}`,
   deleteFailed: "No funcionó. Inténtalo otra vez.",
   deleteEverything: "Borrar mi perfil",
+  privacy: {
+    title: "Privacidad",
+    note: "Tú decides lo que Avocado guarda. Borrar tu perfil quita todo lo que ves en esta página.",
+  },
   confirm: {
     title: "¿Borrar todo tu perfil?",
     body: "Esto quita todo lo guardado: tus datos, cartas, notas de llamadas y mensajes de WhatsApp. No se puede deshacer.",

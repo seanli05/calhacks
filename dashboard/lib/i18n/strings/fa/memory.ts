@@ -5,6 +5,12 @@ const n = (count: number) => count.toLocaleString("fa-AF");
 export const memoryPage: MemoryStrings = {
   title: "پروفایل",
   subtitle: "این‌ها چیزهایی است که Avocado برای کمک به قضیهٔ شما ذخیره می‌کند. هر وقت بخواهید، هر چیزی را می‌توانید حذف کنید.",
+  separator: "، ",
+  counts: {
+    facts: (count: number) => `${n(count)} چیز که گفتید`,
+    documents: (count: number) => `${n(count)} نامه`,
+    calls: (count: number) => `${n(count)} تماس`,
+  },
   sections: {
     profile: "دربارهٔ شما",
     facts: "چیزهایی که گفتید",
@@ -31,14 +37,19 @@ export const memoryPage: MemoryStrings = {
   pages: (count: number) => `${n(count)} صفحه`,
   transcript: (date: string) => `تماس در ${date}`,
   empty: {
-    profile: "هنوز چیزی نیست.",
-    facts: "هنوز چیزی نیست.",
-    documents: "هنوز چیزی نیست.",
-    calls: "هنوز چیزی نیست.",
+    profile: "نام، زبان و شهر شما وقتی آن‌ها را بگویید اینجا نشان داده می‌شود.",
+    facts: "چیزهایی که در واتس‌اپ به Avocado می‌گویید اینجا نشان داده می‌شود.",
+    documents: "نامه‌هایی که عکس آن‌ها را می‌فرستید اینجا نشان داده می‌شود.",
+    calls: "تماس‌هایی که Avocado برای شما می‌گیرد اینجا نشان داده می‌شود.",
   },
   delete: "حذف",
+  removeItem: (what: string) => `حذف: ${what}`,
   deleteFailed: "انجام نشد. دوباره کوشش کنید.",
   deleteEverything: "پاک کردن پروفایل من",
+  privacy: {
+    title: "حریم خصوصی",
+    note: "شما تصمیم می‌گیرید Avocado چه چیزی را نگه دارد. با پاک کردن پروفایل، همه چیزهای این صفحه حذف می‌شود.",
+  },
   confirm: {
     title: "تمام پروفایل شما پاک شود؟",
     body: "این کار همه چیزهای ذخیره‌شده را پاک می‌کند: معلومات شما، نامه‌ها، یادداشت‌های تماس و پیام‌های واتس‌اپ. دوباره برگردانده نمی‌شود.",

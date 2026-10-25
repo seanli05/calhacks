@@ -4,6 +4,14 @@ import type { FactSource } from "@/lib/api/types";
 export const memoryPage = {
   title: "Profile",
   subtitle: "This is what Avocado saves to help with your case. You can remove anything, any time.",
+  /** Between items on one line (summary, "where it came from · when"). */
+  separator: " · ",
+  /** Counts in the summary line under the title; zero counts are left out. */
+  counts: {
+    facts: (n: number) => (n === 1 ? "1 thing you've shared" : `${n} things you've shared`),
+    documents: (n: number) => (n === 1 ? "1 letter" : `${n} letters`),
+    calls: (n: number) => (n === 1 ? "1 call" : `${n} calls`),
+  },
   sections: {
     profile: "About you",
     facts: "Things you've shared",
@@ -31,14 +39,19 @@ export const memoryPage = {
   pages: (n: number) => (n === 1 ? "1 page" : `${n} pages`),
   transcript: (date: string) => `Call on ${date}`,
   empty: {
-    profile: "Nothing here yet.",
-    facts: "Nothing here yet.",
-    documents: "Nothing here yet.",
-    calls: "Nothing here yet.",
+    profile: "Your name, language and city show up here once you share them.",
+    facts: "Things you tell Avocado on WhatsApp show up here.",
+    documents: "Letters you send a photo of show up here.",
+    calls: "Calls Avocado makes for you show up here.",
   },
   delete: "Remove",
+  removeItem: (what: string) => `Remove: ${what}`,
   deleteFailed: "That didn't go through. Try again.",
   deleteEverything: "Clear my profile",
+  privacy: {
+    title: "Privacy",
+    note: "You decide what Avocado keeps. Clearing your profile removes everything on this page.",
+  },
   confirm: {
     title: "Clear your whole profile?",
     body: "This removes everything saved: your details, letters, call notes and WhatsApp messages. You can't undo this.",
