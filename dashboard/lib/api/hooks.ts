@@ -80,8 +80,9 @@ export function usePoll<T>(load: () => Promise<T>, key: string, intervalMs = 100
 /**
  * The user's feed, oldest first. Polls with `since` set to the newest item's time
  * and appends; starts over when the language changes (the text is per language).
+ * `steps` adds the step logs behind each task (the case view's live activity).
  */
-export function useFeed(userId: string): { items: FeedItem[]; error: Error | null } {
+export function useFeed(userId: string, steps = false): { items: FeedItem[]; error: Error | null } {
   const { lang } = useLang();
   const [items, setItems] = useState<FeedItem[]>([]);
   const [error, setError] = useState<Error | null>(null);
@@ -97,7 +98,7 @@ export function useFeed(userId: string): { items: FeedItem[]; error: Error | nul
     let since: string | null = null;
     setItems([]);
     const run = () =>
-      api.feed(userId, since, lang).then(
+      api.feed(userId, since, lang, steps).then(
         (fresh) => {
           if (!alive) return;
           setError(null);
@@ -117,7 +118,7 @@ export function useFeed(userId: string): { items: FeedItem[]; error: Error | nul
       alive = false;
       stop();
     };
-  }, [userId, lang, epoch]);
+  }, [userId, lang, epoch, steps]);
 
   return { items, error };
 }

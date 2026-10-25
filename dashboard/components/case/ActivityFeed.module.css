@@ -1,0 +1,371 @@
+.wrap {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.working {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--forest-2);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--forest-2);
+  animation: blink 1.6s ease-in-out infinite;
+}
+
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+
+.feed::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 12px;
+  bottom: 12px;
+  width: 1px;
+  background: var(--line);
+}
+
+/* Plain items, as in FeedList. */
+.item {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 0 14px;
+  align-items: start;
+  animation: rise 380ms ease both;
+}
+
+.ic {
+  width: 30px;
+  height: 30px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  z-index: 1;
+}
+
+.latest .ic {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: var(--lime);
+}
+
+.what {
+  font-size: var(--fs-lg);
+  padding-top: 3px;
+}
+
+.what small,
+.title small,
+.newsText small {
+  display: block;
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  color: var(--faint);
+  margin-top: 1px;
+}
+
+.deleted {
+  color: var(--faint);
+  font-style: italic;
+}
+
+.when {
+  font-size: var(--fs-sm);
+  color: var(--faint);
+  padding-top: 6px;
+  white-space: nowrap;
+}
+
+/* A task card. */
+.taskItem {
+  position: relative;
+  z-index: 1;
+  animation: rise 380ms ease both;
+}
+
+.task {
+  background: var(--card);
+  border: 1px solid var(--line);
+  transition: border-color 400ms ease;
+}
+
+.running {
+  border-color: var(--forest-2);
+  animation: glow 2.2s ease-in-out infinite;
+}
+
+.taskHead {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto 16px;
+  gap: 0 14px;
+  align-items: center;
+  padding: 8px 14px 8px 0;
+  cursor: pointer;
+}
+
+.taskHead:focus-visible {
+  outline: 2px solid var(--forest-2);
+  outline-offset: -2px;
+}
+
+.badge {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  margin-left: -1px;
+}
+
+.badgeDone {
+  background: var(--lime);
+  color: var(--forest);
+  animation: rise 300ms ease both;
+}
+
+.badgeWarn {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.title {
+  min-width: 0;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+.meta {
+  font-family: var(--font-code);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.chev {
+  display: grid;
+  color: var(--muted);
+  transition: transform 300ms ease;
+}
+
+.open .chev {
+  transform: rotate(180deg);
+}
+
+/* Folds by animating the row track from 0fr to 1fr. */
+.body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 520ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 320ms ease;
+}
+
+.open .body {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.steps {
+  overflow: hidden;
+  min-height: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0 14px 0 44px;
+  display: flex;
+  flex-direction: column;
+}
+
+.open .steps {
+  padding-bottom: 10px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 16px 104px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 30px;
+  font-size: var(--fs-sm);
+  animation: rowIn 240ms ease both;
+}
+
+.news {
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  padding: 4px 0;
+}
+
+.ri {
+  display: grid;
+  place-items: center;
+  color: var(--faint);
+}
+
+.active .ri {
+  color: var(--forest-2);
+}
+
+.action {
+  font-weight: 600;
+}
+
+.detail {
+  font-family: var(--font-code);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.newsText {
+  min-width: 0;
+}
+
+.active .detail,
+.shimmer {
+  background: linear-gradient(90deg, currentColor 0%, currentColor 40%, var(--faint) 50%, currentColor 60%, currentColor 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 1.6s linear infinite;
+}
+
+.result {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  animation: rise 240ms ease both;
+}
+
+.good {
+  color: var(--forest-2);
+}
+
+.bad {
+  color: var(--amber);
+}
+
+.spin {
+  display: block;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 2px solid var(--lime-soft);
+  border-top-color: var(--forest-2);
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+.badge .spin {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 0 4px var(--lime-soft);
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .running,
+  .spin,
+  .dot,
+  .shimmer,
+  .active .detail {
+    animation: none;
+  }
+
+  .body {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .item {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .when {
+    grid-column: 2;
+    padding-top: 0;
+  }
+
+  .steps {
+    padding-left: 14px;
+  }
+
+  .row {
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+  }
+
+  .action {
+    display: none;
+  }
+}

@@ -149,3 +149,64 @@ def test_every_research_type_is_templated_or_hidden() -> None:
 
     research = {t for t in EventType if t.startswith("research.")}
     assert research <= set(TEMPLATES) | HIDDEN
+
+
+def test_steps_come_with_the_task_when_asked(monkeypatch: pytest.MonkeyPatch) -> None:
+    events = [
+        _event(EventType.RESEARCH_DEEP_STARTED),
+        _event(EventType.RESEARCH_SEARCH, query="USCIS contact center phone"),
+        _event(
+            EventType.RESEARCH_FETCH,
+            url="https://www.uscis.gov/contactcenter/",
+            final_url="https://www.uscis.gov/contactcenter/",
+            status=200,
+        ),
+        _event(EventType.RESEARCH_CHECK, check="scam_rules", red_flags=[]),
+        _event(
+            EventType.RESEARCH_CHECK,
+            check="letter_phone",
+            state="conflict",
+            evidence=["never shown"],
+        ),
+        _event(EventType.CALL_MENU_HEARD, phase="menu", action="press"),
+        _event(EventType.RESEARCH_DEEP_DONE),
+    ]
+    items = _texts(_serve(monkeypatch, events), "?steps=true")
+    steps = [item["step"] for item in items]
+    assert steps[0] is None and steps[-1] is None
+    search, fetch, scam, phone, menu = steps[1:6]
+    assert search["action"] == {"text": "Buscando", "en": "Searching"}
+    assert search["detail"] == '"USCIS contact center phone"'
+    assert fetch["detail"] == "uscis.gov/contactcenter"
+    assert fetch["ok"] is True
+    assert scam["result"]["text"] == "0 alertas"
+    assert scam["ok"] is True
+    assert phone["result"]["en"] == "doesn't match"
+    assert phone["ok"] is False
+    assert "never shown" not in str(items)
+    assert menu["result"]["text"] == "marcar"
+
+
+def test_a_failed_lookup_is_marked(monkeypatch: pytest.MonkeyPatch) -> None:
+    events = [
+        _event(EventType.RESEARCH_SEARCH, error="max_uses_exceeded"),
+        _event(
+            EventType.RESEARCH_FETCH, url="https://example.com/x", refused="off-list"
+        ),
+        _event(
+            EventType.RESEARCH_FETCH,
+            url="https://www.uscis.gov/contactcenter",
+            final_url="https://www.uscis.gov/contactcenter",
+            status=403,
+        ),
+    ]
+    search, fetch, denied = (
+        item["step"] for item in _texts(_serve(monkeypatch, events), "?steps=true")
+    )
+    assert (denied["ok"], denied["result"]["en"]) == (False, "failed")
+    assert (search["ok"], search["result"]["en"]) == (False, "failed")
+    assert (fetch["ok"], fetch["result"]["en"], fetch["detail"]) == (
+        False,
+        "blocked",
+        "example.com/x",
+    )

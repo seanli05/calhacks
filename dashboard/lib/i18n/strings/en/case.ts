@@ -112,6 +112,13 @@ export const caseView = {
     onCall: "on the call",
     trust: { official: "Official", community: "Community", machine: "Machine" },
   },
+  activity: {
+    title: "Activity",
+    working: "Working now",
+    steps: (n: number) => `${n} step${n === 1 ? "" : "s"}`,
+    show: "show steps",
+    hide: "hide steps",
+  },
   close: "Close",
 };
 

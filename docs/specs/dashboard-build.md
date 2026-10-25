@@ -15,6 +15,8 @@ npm run build          # type-checks every page; must pass before merging
 
 Pages run on **live data** by default. With `NEXT_PUBLIC_DATA=fixtures` they use fake data from `lib/api/fixtures.ts` instead, with no backend needed. A **Fixtures** bar at the bottom steps the demo call through its states (◀ ▶ or the arrow keys): waiting for consent → dialing → menu → on hold → person answered → connected → call ended. Deletes work in fixtures too.
 
+Before that, the feed shows the agents' work live (`ActivityFeed`, grouping in `lib/activity.ts`): each research job or call is a card whose steps (searches, pages read, checks, menus heard; `?steps=true`) stream in under a spinner and shimmering title, then fold behind the result 1.2 s after it finishes ("11 pasos · 0:41 · ver pasos"; the header reopens it). A job that finished with no steps stays plain feed items. Research cards stop spinning after 10 min without news; a call runs until it ends.
+
 At **connected** the case view switches to the live call: both sides stream in word by word in the viewer's language (`LiveTranscript`), tips for what to say sit above the assistant (`LiveTips`), the hero shrinks to a bar after 3 s ("Details" reopens it), and the left column splits into the compact letter over the searchable translation book (`SplitColumn` + `GlossaryBook`; drag, arrow keys or double-click to reset; the book takes 50–75%, remembered per browser). Fixtures play a scripted call (`lib/api/fixtures-live.ts`); live mode reads `GET /api/calls/{call_id}/live` and `GET /api/glossary` ([dashboard-api.md → Live call](dashboard-api.md#live-call)). On a real call, lines appear only once the phone agent saves the transcript as it goes, not only at wrap-up.
 
 With the backend running, `npm run dev` calls the real API through the `/api` rewrite (`BACKEND_URL`, default `http://localhost:8000`; see `.env.example`).
@@ -34,7 +36,7 @@ dashboard/
     u/[userId]/memory/page.tsx What we know about you       → memory agent
     u/[userId]/cases/[caseId]/page.tsx   live case view (built)
   components/                  shared: Header, Tracker, FeedList, AssistantPanel, MiniLetter, Icon, FixtureBar
-    case/                      case view: CallHero, LetterPanel, TranscriptSheet, CaseLiveView
+    case/                      case view: CallHero, LetterPanel, TranscriptSheet, CaseLiveView, ActivityFeed
     landing/ cases/ memory/    one folder per page agent (create yours)
   lib/
     api/types.ts               the API contract (mirrored by backend/app/api/models.py)

@@ -24,7 +24,7 @@ Conventions:
 | `GET /api/demo` | `DemoInfo` | The first user by `created_at` and their newest active case. Powers the landing page's "open the dashboard" link. |
 | `GET /api/config` | `PublicConfig` | `whatsapp_number` from `TWILIO_WHATSAPP_FROM` without `whatsapp:`. `sandbox_join_message` = `"join " + TWILIO_SANDBOX_JOIN_CODE`, or null when unset (new setting, see below). |
 | `GET /api/users/{user_id}` | `UserInfo` | |
-| `GET /api/users/{user_id}/feed?since=&lang=` | `FeedItem[]` | Oldest first, `since` exclusive (`reads.list_events`). See [Feed rendering](#feed-rendering). |
+| `GET /api/users/{user_id}/feed?since=&lang=&steps=` | `FeedItem[]` | Oldest first, `since` exclusive (`reads.list_events`). `steps=true` adds the step logs behind each task. See [Feed rendering](#feed-rendering). |
 | `GET /api/users/{user_id}/cases?lang=` | `CaseSummary[]` | Active cases, newest first, with `case_progress`, the appointment, and the latest call. |
 | `GET /api/cases/{case_id}?lang=` | `CaseDetail` | See [Case detail](#case-detail). |
 | `GET /api/calls/{call_id}/transcript` | `Transcript` | Lines as stored (English). 404 when deleted. |
@@ -64,6 +64,7 @@ Server-side, so the dashboard stays simple (C23, C27).
 - **Other types:** `summary_en`, translated the same way (English until the translation lands).
 - **References (C27):** an event whose `data` has `fact_id` or `document_id` shows that row's text, looked up at render time. Once the row is gone, set `deleted_at` (the time of the matching `fact.deleted` / `document.deleted` event) and render the text without the content. Event rows never contain the content itself.
 - Write down which `data` fields each template expects in a table at the top of `feed_templates.py`, and report it to Chris so the team can emit them.
+- **Steps (`api/feed_steps.py`):** the step logs (`research.search`, `.fetch`, `.check`, `call.menu_heard`) are hidden unless `steps=true`, which the case view's live activity asks for. Each then carries `step`: `action` (localized: "Searching", "Reading", "Checking", "Listening"), `detail` (English as logged: the query, the page as `host/path`, a plain name for the check, what was heard), `result` (localized, or null) and `ok` (false when it went wrong). `evidence` and model notes never reach it. Every item also carries `job_id`, which the dashboard groups research steps by (calls group by `call_id`).
 
 ### Suggestions
 

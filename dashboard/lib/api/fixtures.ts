@@ -111,21 +111,58 @@ interface FeedSeed {
   at: () => string;
   type: string;
   call?: boolean;
+  job?: string;
   es: string;
   en: string;
   factId?: string;
+  /** A step row, only served with `steps`: [action es, action en, detail, result es, result en, ok]. */
+  step?: [string, string, string, string | null, string | null, boolean | null];
 }
+
+const DEEP_JOB = "job_fx_deep";
+const D = -2 * 24 * 60 + 2;
+const search = (id: string, m: number, query: string): FeedSeed => ({
+  id, minStep: 0, at: () => min(D + m), type: "research.search", job: DEEP_JOB, es: `Searched: ${query}`, en: `Searched: ${query}`,
+  step: ["Buscando", "Searching", `"${query}"`, null, null, null],
+});
+const read = (id: string, m: number, page: string): FeedSeed => ({
+  id, minStep: 0, at: () => min(D + m), type: "research.fetch", job: DEEP_JOB, es: `Fetched ${page}`, en: `Fetched ${page}`,
+  step: ["Leyendo", "Reading", page, "leída", "read", true],
+});
+const check = (id: string, m: number, what: string, es: string, en: string, ok: boolean | null): FeedSeed => ({
+  id, minStep: 0, at: () => min(D + m), type: "research.check", job: DEEP_JOB, es: `${what}: ${en}`, en: `${what}: ${en}`,
+  step: ["Comprobando", "Checking", what, es, en, ok],
+});
+const heard = (id: string, minStep: number, m: number): FeedSeed => ({
+  id, minStep, at: () => min(m), type: "call.menu_heard", call: true, es: "Heard the phone menu", en: "Heard the phone menu",
+  step: ["Escuchando", "Listening", "phone menu", "marcar", "press a key", null],
+});
 
 const FEED: FeedSeed[] = [
   { id: "event_f01", minStep: 0, at: () => min(-2 * 24 * 60), type: "case.created", es: "Recibimos tu carta", en: "We received your letter" },
   { id: "event_f02", minStep: 0, at: () => min(-2 * 24 * 60 + 1), type: "research.fast_done", es: "Te explicamos la carta en español", en: "We explained the letter in Spanish" },
   { id: "event_f03", minStep: 0, at: () => min(-2 * 24 * 60 + 1), type: "memory.fact_saved", es: "Guardamos: tienes dos hijos en tu solicitud", en: "Saved: you have two children on your application", factId: "fact_demo01" },
-  { id: "event_f04", minStep: 0, at: () => min(-2 * 24 * 60 + 3), type: "verification.verified", es: "Confirmamos que la carta es real (uscis.gov)", en: "We confirmed the letter is real (uscis.gov)" },
+  { id: "event_s00", minStep: 0, at: () => min(D), type: "research.deep_started", job: DEEP_JOB, es: "Estamos revisando que la carta sea real", en: "We're checking that the letter is real" },
+  check("event_s01", 0.02, "scam patterns", "0 alertas", "0 red flags", true),
+  check("event_s02", 0.04, "form type", "coincide", "matches", true),
+  check("event_s03", 0.06, "case number format", "coincide", "matches", true),
+  search("event_s04", 0.1, "USCIS I-797C asylum interview notice"),
+  search("event_s05", 0.16, "Los Angeles Asylum Office Tustin CA"),
+  read("event_s06", 0.2, "uscis.gov/forms/all-forms/form-i-797c"),
+  read("event_s07", 0.26, "uscis.gov/about-us/find-a-uscis-office/field-offices"),
+  search("event_s08", 0.32, "USCIS Contact Center phone number"),
+  read("event_s09", 0.36, "uscis.gov/contactcenter"),
+  check("event_s10", 0.42, "phone on the letter vs. the official site", "coincide", "matches", true),
+  check("event_s11", 0.46, "is the letter real?", "real", "real", true),
+  { id: "event_f04", minStep: 0, at: () => min(-2 * 24 * 60 + 3), type: "verification.verified", job: DEEP_JOB, es: "Confirmamos que la carta es real (uscis.gov)", en: "We confirmed the letter is real (uscis.gov)" },
   { id: "event_f05", minStep: 0, at: () => min(-20), type: "consent.requested", es: "Te preguntamos si quieres que llamemos a USCIS", en: "We asked if you want us to call USCIS" },
   { id: "event_f06", minStep: 1, at: () => min(-16), type: "consent.given", es: "Dijiste que sí a la llamada", en: "You said yes to the call" },
   { id: "event_f07", minStep: 1, at: () => min(-15), type: "call.dialing", call: true, es: "Llamamos al número oficial de USCIS", en: "We called the official USCIS number" },
+  heard("event_m01", 2, -14.3),
   { id: "event_f08", minStep: 2, at: () => min(-14), type: "call.menu_choice", call: true, es: "Elegimos la opción 2: citas y entrevistas", en: "We chose option 2: appointments and interviews" },
+  heard("event_m02", 2, -13.8),
   { id: "event_f09", minStep: 2, at: () => min(-13.5), type: "call.menu_choice", call: true, es: "Elegimos la opción 2: entrevista de asilo", en: "We chose option 2: asylum interview" },
+  { id: "event_s12", minStep: 0, at: () => min(D + 1.02), type: "research.deep_done", job: DEEP_JOB, es: "Terminamos de revisar tu carta", en: "We finished checking your letter" },
   { id: "event_f10", minStep: 3, at: () => min(-13), type: "call.on_hold", call: true, es: "Estamos en espera", en: "We're on hold" },
   { id: "event_f11", minStep: 4, at: () => atStep(4, 0), type: "call.human_detected", call: true, es: "Contestó una persona de USCIS", en: "A person from USCIS answered" },
   { id: "event_f12", minStep: 4, at: () => atStep(4, 0), type: "call.user_dialed", call: true, es: "Te llamamos para conectarte", en: "We're calling you to connect you" },
@@ -136,25 +173,34 @@ const FEED: FeedSeed[] = [
 function deleteEvents(lang: string): FeedItem[] {
   const items: FeedItem[] = [];
   for (const [id, at] of deletedFacts) {
-    items.push({ id: `event_del_${id}`, at, type: "fact.deleted", case_id: null, call_id: null, text: L(lang, "Borraste un dato", "You deleted a fact"), deleted_at: null });
+    items.push({ id: `event_del_${id}`, at, type: "fact.deleted", case_id: null, call_id: null, job_id: null, text: L(lang, "Borraste un dato", "You deleted a fact"), deleted_at: null });
   }
-  if (deletedDocument) items.push({ id: "event_del_doc", at: deletedDocument, type: "document.deleted", case_id: null, call_id: null, text: L(lang, "Borraste la carta", "You deleted the letter"), deleted_at: null });
-  if (deletedTranscript) items.push({ id: "event_del_tr", at: deletedTranscript, type: "transcript.deleted", case_id: null, call_id: null, text: L(lang, "Borraste una transcripción", "You deleted a transcript"), deleted_at: null });
-  if (deletedAll) items.push({ id: "event_del_all", at: deletedAll, type: "user.deleted_all", case_id: null, call_id: null, text: L(lang, "Borraste todo", "You deleted everything"), deleted_at: null });
+  if (deletedDocument) items.push({ id: "event_del_doc", at: deletedDocument, type: "document.deleted", case_id: null, call_id: null, job_id: null, text: L(lang, "Borraste la carta", "You deleted the letter"), deleted_at: null });
+  if (deletedTranscript) items.push({ id: "event_del_tr", at: deletedTranscript, type: "transcript.deleted", case_id: null, call_id: null, job_id: null, text: L(lang, "Borraste una transcripción", "You deleted a transcript"), deleted_at: null });
+  if (deletedAll) items.push({ id: "event_del_all", at: deletedAll, type: "user.deleted_all", case_id: null, call_id: null, job_id: null, text: L(lang, "Borraste todo", "You deleted everything"), deleted_at: null });
   return items;
 }
 
-export function feed(_userId: string, since: string | null, lang: string): FeedItem[] {
+export function feed(_userId: string, since: string | null, lang: string, steps = false): FeedItem[] {
   const items: FeedItem[] = deletedAll
     ? []
-    : FEED.filter((e) => e.minStep <= step).map((e) => ({
+    : FEED.filter((e) => e.minStep <= step && (steps || !e.step)).map((e) => ({
         id: e.id,
         at: e.at(),
         type: e.type,
         case_id: FIXTURE_CASE_ID,
         call_id: e.call ? CALL_ID : null,
+        job_id: e.job ?? null,
         text: L(lang, e.es, e.en),
         deleted_at: e.factId ? (deletedFacts.get(e.factId) ?? null) : null,
+        step: e.step
+          ? {
+              action: L(lang, e.step[0], e.step[1]),
+              detail: e.step[2],
+              result: e.step[3] && e.step[4] ? L(lang, e.step[3], e.step[4]) : null,
+              ok: e.step[5],
+            }
+          : null,
       }));
   items.push(...deleteEvents(lang));
   items.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));

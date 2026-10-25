@@ -3,7 +3,6 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { AssistantPanel } from "@/components/AssistantPanel";
-import { FeedList } from "@/components/FeedList";
 import { Header } from "@/components/Header";
 import { api, ApiError } from "@/lib/api/client";
 import { useFeed, useLiveCall, usePoll } from "@/lib/api/hooks";
@@ -11,6 +10,7 @@ import type { GlossaryEntry } from "@/lib/api/types";
 import { findTerms } from "@/lib/glossary";
 import { stringsFor, useLang, useStrings } from "@/lib/i18n";
 
+import { ActivityFeed } from "./ActivityFeed";
 import { CallHero } from "./CallHero";
 import { GlossaryBook } from "./GlossaryBook";
 import { LetterPanel } from "./LetterPanel";
@@ -30,7 +30,7 @@ export function CaseLiveView({ userId, caseId }: { userId: string; caseId: strin
   const { lang } = useLang();
   const t = useStrings().common;
   const { data: detail, error } = usePoll(() => api.caseDetail(caseId, lang), `${caseId}:${lang}`);
-  const { items } = useFeed(userId);
+  const { items } = useFeed(userId, true);
   const [transcriptCallId, setTranscriptCallId] = useState<string | null>(null);
   const closeTranscript = useCallback(() => setTranscriptCallId(null), []);
   const caseItems = items.filter((i) => i.case_id === caseId);
@@ -85,7 +85,7 @@ export function CaseLiveView({ userId, caseId }: { userId: string; caseId: strin
             {bridged ? (
               <LiveTranscript lines={live.lines} glossary={glossary} onTerm={pickTerm} />
             ) : (
-              <FeedList items={caseItems} className={styles.feed} />
+              <ActivityFeed items={caseItems} className={styles.feed} />
             )}
           </section>
           {bridged ? (

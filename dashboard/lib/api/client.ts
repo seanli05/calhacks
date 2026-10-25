@@ -51,8 +51,8 @@ const live = {
   demo: () => request<DemoInfo>("/api/demo"),
   config: () => request<PublicConfig>("/api/config"),
   user: (userId: string) => request<UserInfo>(`/api/users/${userId}`),
-  feed: (userId: string, since: string | null, lang: string) =>
-    request<FeedItem[]>(`/api/users/${userId}/feed${qs({ since, lang })}`),
+  feed: (userId: string, since: string | null, lang: string, steps = false) =>
+    request<FeedItem[]>(`/api/users/${userId}/feed${qs({ since, lang, steps: steps ? "true" : null })}`),
   cases: (userId: string, lang: string) => request<CaseSummary[]>(`/api/users/${userId}/cases${qs({ lang })}`),
   caseDetail: (caseId: string, lang: string) => request<CaseDetail>(`/api/cases/${caseId}${qs({ lang })}`),
   transcript: (callId: string) => request<Transcript>(`/api/calls/${callId}/transcript`),
@@ -83,7 +83,7 @@ const fixtures: typeof live = {
   demo: () => fake(fx.demo),
   config: () => fake(fx.config),
   user: (userId) => fake(() => fx.user(userId)),
-  feed: (userId, since, lang) => fake(() => fx.feed(userId, since, lang)),
+  feed: (userId, since, lang, steps = false) => fake(() => fx.feed(userId, since, lang, steps)),
   cases: (userId, lang) => fake(() => fx.cases(userId, lang)),
   caseDetail: (caseId, lang) => fake(() => fx.caseDetail(caseId, lang)),
   transcript: (callId) => fake(() => fx.transcript(callId)),

@@ -49,6 +49,20 @@ const PATHS = {
   memory: <path d="M7 4h10v16l-5-3.5L7 20z" />,
   book: <path d="M5 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H5zM19 4h-4a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h4z" />,
   arrow: <path d="M5 12h13M13 6l6 6-6 6" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16 16l4.5 4.5" />
+    </>
+  ),
+  shield: (
+    <>
+      <path d="M12 3l7 3v6c0 4-3 7.5-7 9-4-1.5-7-5-7-9V6z" />
+      <path d="M9 12l2 2 4-4" />
+    </>
+  ),
+  wave: <path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2" />,
+  chevron: <path d="M6 9l6 6 6-6" />,
 };
 
 export type IconName = keyof typeof PATHS;

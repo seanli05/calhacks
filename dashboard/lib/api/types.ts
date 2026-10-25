@@ -80,9 +80,21 @@ export interface FeedItem {
   type: string;
   case_id: string | null;
   call_id: string | null;
+  job_id: string | null;
   text: Localized;
   /** Set when the fact or document this event refers to has been deleted (C27). */
   deleted_at: string | null;
+  /** Only with `?steps=true`: one lookup inside a task (research or the call). */
+  step?: FeedStep | null;
+}
+
+/** A step row (backend/app/api/feed_steps.py). `detail` is English as logged. */
+export interface FeedStep {
+  action: Localized;
+  detail: string | null;
+  result: Localized | null;
+  /** False: the step went wrong. Null: neither good nor bad. */
+  ok: boolean | null;
 }
 
 /** GET /api/users/{user_id}/cases?lang=xx: active cases, newest first. */

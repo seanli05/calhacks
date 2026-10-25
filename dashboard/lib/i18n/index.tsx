@@ -27,10 +27,10 @@ const STRINGS = {
 
 export type Strings = (typeof STRINGS)["en"];
 
-/** Languages the switch offers, as shown on the button. */
+/** Languages the switch offers, each named in itself. */
 export const LANGUAGES: { code: string; label: string }[] = [
-  { code: "es", label: "ES" },
-  { code: "en", label: "EN" },
+  { code: "es", label: "Español" },
+  { code: "en", label: "English" },
 ];
 
 const STORAGE_KEY = "dashboard.lang";

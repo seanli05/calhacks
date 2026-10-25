@@ -113,5 +113,12 @@ export const caseView: CaseStrings = {
     onCall: "en la llamada",
     trust: { official: "Oficial", community: "Comunidad", machine: "Automática" },
   },
+  activity: {
+    title: "Actividad",
+    working: "Trabajando ahora",
+    steps: (n: number) => `${n} paso${n === 1 ? "" : "s"}`,
+    show: "ver pasos",
+    hide: "ocultar pasos",
+  },
   close: "Cerrar",
 };

@@ -5,7 +5,7 @@ from datetime import datetime
 
 from fastapi import APIRouter
 
-from app.api import feed_templates
+from app.api import feed_steps, feed_templates
 from app.api.case_views import fast_result_of
 from app.api.common import LangQuery, localize, resolve_language
 from app.api.models import FeedItem, Localized
@@ -25,12 +25,22 @@ _DELETE_TYPES = {
 
 @router.get("/users/{user_id}/feed")
 async def feed(
-    user_id: str, since: datetime | None = None, lang: LangQuery = None
+    user_id: str,
+    since: datetime | None = None,
+    lang: LangQuery = None,
+    steps: bool = False,
 ) -> list[FeedItem]:
+    """`steps` adds the step logs behind each task (`feed_steps.py`), for the case
+    view's live activity."""
     lang, events = await asyncio.gather(
         resolve_language(user_id, lang), reads.list_events(user_id, since)
     )
-    events = [e for e in events if e.type not in feed_templates.HIDDEN]
+    hidden = (
+        feed_templates.HIDDEN - feed_steps.STEP_TYPES
+        if steps
+        else feed_templates.HIDDEN
+    )
+    events = [e for e in events if e.type not in hidden]
     if not events:
         return []
     refs = _References()
@@ -55,19 +65,24 @@ def _item(
             values_en["fact"] = fact
             values["fact"] = localize(fact, lang).text
     rendered = feed_templates.render(event.type, lang, values, values_en)
-    text = (
-        Localized(text=rendered[0], en=rendered[1])
-        if rendered
-        else localize(event.summary_en, lang)
-    )
+    step = feed_steps.step(event, lang)
+    if rendered:
+        text = Localized(text=rendered[0], en=rendered[1])
+    elif step:
+        # The row shows `step`; translating every lookup's summary would be waste.
+        text = Localized(text=event.summary_en, en=event.summary_en)
+    else:
+        text = localize(event.summary_en, lang)
     return FeedItem(
         id=event.event_id,
         at=event.created_at,
         type=event.type,
         case_id=event.case_id,
         call_id=event.call_id,
+        job_id=event.job_id,
         text=text,
         deleted_at=deleted_at,
+        step=step,
     )
 
 

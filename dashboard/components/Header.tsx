@@ -46,17 +46,17 @@ export function LangSwitch() {
   const { lang, setLang } = useLang();
   const t = useStrings().common;
   return (
-    <div className={styles.lang} role="group" aria-label={t.languageSwitch}>
+    <select
+      className={styles.lang}
+      aria-label={t.languageSwitch}
+      value={lang}
+      onChange={(e) => setLang(e.target.value)}
+    >
       {LANGUAGES.map((l) => (
-        <button
-          key={l.code}
-          type="button"
-          aria-pressed={lang === l.code}
-          onClick={() => setLang(l.code)}
-        >
+        <option key={l.code} value={l.code} lang={l.code}>
           {l.label}
-        </button>
+        </option>
       ))}
-    </div>
+    </select>
   );
 }

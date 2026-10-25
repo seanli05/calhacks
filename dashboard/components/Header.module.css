@@ -63,24 +63,27 @@
 }
 
 .lang {
-  display: flex;
-  padding: 3px;
-  border: 1px solid var(--line);
-  background: var(--card);
-}
-
-.lang button {
-  border: 0;
-  background: transparent;
-  padding: 5px 12px;
+  min-height: 34px;
+  padding: 5px 30px 5px 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--card)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234f5c54' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")
+    no-repeat right 10px center;
+  appearance: none;
+  font: inherit;
   font-size: var(--fs-sm);
   font-weight: 600;
-  color: var(--muted);
+  color: var(--ink, inherit);
+  cursor: pointer;
 }
 
-.lang button[aria-pressed="true"] {
-  background: var(--forest);
-  color: #fff;
+.lang:hover {
+  border-color: var(--forest-2);
+}
+
+.lang:focus-visible {
+  outline: 2px solid var(--forest-2);
+  outline-offset: 1px;
 }
 
 @media (max-width: 640px) {
