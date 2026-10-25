@@ -187,6 +187,73 @@ def test_steps_come_with_the_task_when_asked(monkeypatch: pytest.MonkeyPatch) ->
     assert menu["result"]["text"] == "marcar"
 
 
+def test_steps_say_why(monkeypatch: pytest.MonkeyPatch) -> None:
+    events = [
+        _event(
+            EventType.RESEARCH_CHECK,
+            check="letter_read",
+            status="ok",
+            doc_type="uscis_i797c",
+        ),
+        _event(EventType.RESEARCH_CHECK, check="private_values", count=3),
+        _event(EventType.RESEARCH_CHECK, check="urgency", urgency="high", dates=2),
+        _event(
+            EventType.RESEARCH_CHECK,
+            check="scam_rules",
+            red_flags=["This letter asks for gift cards. USCIS never asks for that."],
+        ),
+        _event(EventType.RESEARCH_CHECK, check="letter_phone", state="match"),
+        _event(
+            EventType.RESEARCH_CHECK,
+            check="verdict",
+            status="verified",
+            official_phone_found=True,
+        ),
+        _event(
+            EventType.CALL_MENU_HEARD,
+            phase="menu",
+            action="press",
+            reading_reason_en="Lists numbered options",
+            reason_en="Option 2 is for scheduled interviews",
+        ),
+    ]
+    steps = [
+        item["step"] for item in _texts(_serve(monkeypatch, events), "?steps=true")
+    ]
+    read, private, urgency, scam, phone, verdict, menu = steps
+    assert read["result"]["en"] == "read" and read["reason"] == "Read as: uscis i797c."
+    assert (
+        private["result"]["en"] == "3 set aside" and "placeholders" in private["reason"]
+    )
+    assert urgency["result"]["en"] == "high"
+    assert urgency["reason"] == "Based on 2 dates on the letter."
+    assert scam["reason"].startswith("This letter asks for gift cards.")
+    assert "listed for the issuer" in phone["reason"]
+    assert "official phone number was found" in verdict["reason"]
+    assert (
+        menu["reason"]
+        == "Lists numbered options. Option 2 is for scheduled interviews."
+    )
+
+
+def test_reasons_are_masked_at_the_edge(monkeypatch: pytest.MonkeyPatch) -> None:
+    events = [
+        _event(
+            EventType.CALL_MENU_HEARD,
+            phase="menu",
+            action="say",
+            reading_reason_en="Asked for 123-456-789",
+            reason_en="Said <ref:receipt_number>",
+        ),
+        _event(EventType.RESEARCH_CHECK, check="issuer", state="match", evidence=["x"]),
+    ]
+    menu, issuer = (
+        item["step"] for item in _texts(_serve(monkeypatch, events), "?steps=true")
+    )
+    assert menu["reason"] == "Asked for [number]. Said [hidden]."
+    assert issuer["reason"] and "x" not in issuer["reason"].split()
+
+
 def test_a_failed_lookup_is_marked(monkeypatch: pytest.MonkeyPatch) -> None:
     events = [
         _event(EventType.RESEARCH_SEARCH, error="max_uses_exceeded"),

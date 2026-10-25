@@ -118,6 +118,7 @@ export const caseView = {
     steps: (n: number) => `${n} step${n === 1 ? "" : "s"}`,
     show: "show steps",
     hide: "hide steps",
+    why: "Why",
   },
   close: "Close",
 };

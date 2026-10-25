@@ -119,6 +119,7 @@ export const caseView: CaseStrings = {
     steps: (n: number) => `${n} paso${n === 1 ? "" : "s"}`,
     show: "ver pasos",
     hide: "ocultar pasos",
+    why: "Por qué",
   },
   close: "Cerrar",
 };

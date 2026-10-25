@@ -139,10 +139,9 @@ class InboundPipe:
             routed = await self._guarded(message, self._handle(message))
         if routed is None:
             return
-        user_id, turn = routed
+        _, turn = routed
         if turn is not None:
             await self._guarded(message, turn())
-        await self._guarded(message, self.conversation.flush(user_id))
 
     async def question_open(self, user_id: UserId) -> bool:
         """A numbered question (or research's question about a letter) is waiting
@@ -428,12 +427,11 @@ class InboundPipe:
 
     async def _quiet_moment(self, user_id: UserId) -> bool:
         """C15: "may I save this?" only at a quiet moment. Not while another
-        numbered question is open or waiting (its "1" must not be read as this
+        numbered question is open (its "1" must not be read as this
         one's), and not while research or a call will soon send the user something
         else: the question would get lost among it."""
         return not (
             await self.question_open(user_id)
-            or self.conversation.is_waiting(user_id)
             or self.letters.researching(user_id)
             or (self._consent is not None and self._consent.calling(user_id))
         )
@@ -545,6 +543,6 @@ def _results_path(
     consent = ConsentGate(
         whatsapp, translator, job_watcher, get_call_status(), conversation=conversation
     )
-    verdicts = Verdicts(whatsapp, translator, consent, conversation=conversation)
+    verdicts = Verdicts(whatsapp, translator, conversation=conversation)
     results = LetterResults(whatsapp, translator, verdicts, conversation=conversation)
     return consent, Letters(whatsapp, job_watcher, results, conversation=conversation)

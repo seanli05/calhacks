@@ -46,12 +46,14 @@ class UserInfo(BaseModel):
 
 class FeedStep(BaseModel):
     """One lookup inside a task (`api/feed_steps.py`). `detail` is English as logged;
-    `ok` False marks a step that went wrong, None one that's neither."""
+    `ok` False marks a step that went wrong, None one that's neither. `reason` is
+    why, in English: the check's own notes or the phone agent's stated reason."""
 
     action: Localized
     detail: str | None
     result: Localized | None
     ok: bool | None
+    reason: str | None = None
 
 
 class FeedItem(BaseModel):

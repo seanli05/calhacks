@@ -121,6 +121,7 @@ export const caseView: CaseStrings = {
     steps: (count: number) => `${n(count)} قدم`,
     show: "دیدن قدم‌ها",
     hide: "پنهان کردن قدم‌ها",
+    why: "چرا",
   },
   close: "بستن",
 };

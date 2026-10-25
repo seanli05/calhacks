@@ -14,7 +14,7 @@ from app.translation.script import for_display, local_digits
 LANGUAGES: tuple[LanguageCode, ...] = ("es", "en", "fa")
 """Supported languages, in the order the language menu lists them."""
 
-# No numbers to pick from (C44): the user writes the language, or just writes to us
+# No numbers to pick from (C45): the user writes the language, or just writes to us
 # in it. A number still works, in this order (decision 20 in whatsapp-pipe.md).
 _MENU = (
     "Hola 👋 Hello 👋 سلام\n"
@@ -75,7 +75,7 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "یا سوال خود را برایم بنویسید."
         ),
     },
-    # Also after a language read from the first message (C44), so it says in passing
+    # Also after a language read from the first message (C45), so it says in passing
     # how to change it.
     "language.set_letter": {
         "es": (
@@ -411,16 +411,6 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
     "consent.request": {lang: _WANT_CALL[lang] + _CALL_ASK[lang] for lang in _CALL_ASK},
     "consent.request_generic": {
         lang: _WANT_CALL_GENERIC[lang] + _CALL_ASK[lang] for lang in _CALL_ASK
-    },
-    # The verdict and the consent request in one message, so the user has one thing
-    # to answer (conversation.py).
-    "verification.verified_call": {
-        lang: _VERIFIED[lang] + "\n" + _WANT_CALL[lang] + _CALL_ASK[lang]
-        for lang in _CALL_ASK
-    },
-    "verification.verified_call_generic": {
-        lang: _VERIFIED[lang] + "\n" + _WANT_CALL_GENERIC[lang] + _CALL_ASK[lang]
-        for lang in _CALL_ASK
     },
     "consent.reprompt": {
         "es": "Por favor responda 1 si quiere que llame a USCIS, o 2 si no.",

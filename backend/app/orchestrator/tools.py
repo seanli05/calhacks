@@ -170,6 +170,8 @@ class CaseTools:
                 "letter": _letter(case),
                 "verification": _verification(verification),
                 "last_call": _call(calls[-1]) if calls else None,
+                "call_available": self._consent is not None
+                and await self._consent.can_call(case.id),
             }
         )
 
@@ -401,7 +403,8 @@ def build_tools(tools: CaseTools) -> list[BetaAsyncFunctionTool[Any]]:
     @beta_async_tool
     async def get_case_status(case_id: str) -> str:
         """One case's stage, what its letter says (explanation, appointment date
-        and time, checklist, deadline), and whether it was verified as legitimate.
+        and time, checklist, deadline), whether it was verified as legitimate, and
+        whether we could call the agency about it if the user needs that.
 
         Args:
             case_id: A case ID from list_active_cases.
@@ -427,8 +430,10 @@ def build_tools(tools: CaseTools) -> list[BetaAsyncFunctionTool[Any]]:
     async def request_consent(case_id: str) -> str:
         """Open the question whether we may call USCIS about this letter; you then
         ask it in your reply, as its result says. The call starts only if the user
-        answers yes. Use it when the user asks for a call, or to offer one again.
-        It refuses if the letter isn't verified or a call is already under way.
+        answers yes. Use it only when the user asks for a call, or has a need only
+        the agency can resolve (see "When a call helps"); never just because the
+        letter is verified. It refuses if the letter isn't verified or a call is
+        already under way.
 
         Args:
             case_id: A case ID from list_active_cases.

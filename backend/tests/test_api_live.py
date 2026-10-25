@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from app.api import live
 from app.api.live_tips import Tips, says
-from app.api.models import LiveCallEvent
+from app.api.models import LiveCallEvent, TranscriptLine
 from app.contracts import CallState, Component, Event, EventType
 from app.db import reads, tables
 from app.main import app
@@ -41,11 +41,18 @@ class FakeStreamer:
     def __init__(self, fail: bool = False) -> None:
         self.calls = 0
         self.fail = fail
+        self.contexts: dict[str, list[str]] = {}
 
     async def stream(
-        self, text_en: str, speaker: str, language: str
+        self,
+        text_en: str,
+        speaker: str,
+        language: str,
+        *,
+        context: list[TranscriptLine] | None = None,
     ) -> AsyncIterator[str]:
         self.calls += 1
+        self.contexts[text_en] = [line.text for line in context or []]
         if self.fail:
             raise TimeoutError
         for word in f"[{language}] {text_en}".split(" "):
@@ -131,6 +138,29 @@ async def test_follow_streams_bridged_lines_with_translation_and_tips(
     used = [e.id for e in events if e.type == "tip_used"]
     assert yourself.id in used
     assert asks[0].id in used
+
+
+async def test_each_line_is_translated_with_the_two_before_it(
+    call_world: tables.Call, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    streamer = FakeStreamer()
+    monkeypatch.setattr(live, "get_streamer", lambda: streamer)
+    await _collect(call_world, "es")
+
+    shown = [line["text"] for line in LINES[1:]]
+    assert streamer.contexts[shown[0]] == []  # nothing before it since the answer
+    assert streamer.contexts[shown[1]] == shown[:1]
+    assert streamer.contexts[shown[4]] == shown[2:4]
+
+
+def test_context_goes_around_the_line_to_translate() -> None:
+    line = TranscriptLine.model_validate(LINES[2])
+    assert live._with_context("Thank you.", None) == "Thank you."
+    content = live._with_context("Thank you.", [line])
+    assert content == (
+        "<earlier>\nthe agency officer: " + LINES[2]["text"] + "\n</earlier>\n"
+        "<line>\nThank you.\n</line>"
+    )
 
 
 async def test_follow_is_english_without_a_model(

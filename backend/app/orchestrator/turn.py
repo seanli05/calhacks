@@ -124,7 +124,7 @@ class OrchestratorTurn:
         already logged; then queue the memory writer on it (Goal 6.5).
         `open_questions` is what the user hasn't answered yet; with `quiet_moment`,
         a plain reply may end with "may I save this?". With `language_guessed`, the
-        user's language was just read from this message (C44), and the reply says
+        user's language was just read from this message (C45), and the reply says
         so in passing."""
         await self._reply(
             user,
@@ -294,7 +294,7 @@ async def build_context(
 
 
 def _language_note(user: tables.User) -> list[str]:
-    """C44: the language was read from this first message, not picked."""
+    """C45: the language was read from this first message, not picked."""
     name = LANGUAGE_NAMES.get(user.language or "en", user.language or "English")
     return [
         "<language_note>",

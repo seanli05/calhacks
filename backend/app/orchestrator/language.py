@@ -1,4 +1,4 @@
-"""First-contact language pick (Plan.md C44, replacing the Oct 23 one-tap confirm).
+"""First-contact language pick (Plan.md C45, replacing the Oct 23 one-tap confirm).
 
 A first message clear enough to read sets the language at once, and the reply
 confirms it in passing ("if another language is easier, just tell me"); the user

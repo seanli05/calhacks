@@ -206,8 +206,8 @@ async def test_a_fact_deleted_meanwhile_is_left_alone(
 async def test_a_one_for_the_save_question_never_starts_a_call(
     db: FakeDB, memory_pipe: InboundPipe, verdicts: Verdicts, consent: ConsentGate
 ) -> None:
-    """The verdict lands while "may I save this?" is open: the call question
-    waits, so the user's "1" saves the facts and starts nothing (rule 4)."""
+    """The verdict lands while "may I save this?" is open: the user's "1" saves
+    the facts and starts nothing (rule 4)."""
     user = await use_spanish(db)
     case = db.add_verified_case(user)
     await pending_fact(db, user, "Has an asylum interview scheduled")
@@ -220,11 +220,9 @@ async def test_a_one_for_the_save_question_never_starts_a_call(
 
     await memory_pipe.handle(inbound("1"))
 
-    assert db.outbound_templates()[-2:] == ["memory.saved", "consent.request"]
+    assert db.outbound_templates()[-1] == "memory.saved"
+    assert consent.pending(user.id) is None
     assert db.jobs_of(JobType.CALL) == []
-
-    await memory_pipe.handle(inbound("1"))
-    assert len(db.jobs_of(JobType.CALL)) == 1
 
 
 async def test_facts_wait_while_research_is_still_checking_the_letter(
