@@ -29,10 +29,9 @@ For the fluent Dari checker (build order 1.9). Generated from `backend/app/relay
 
 | Template | English | Dari | OK? | Fix |
 |---|---|---|---|---|
-| `language.confirm` | It looks like you're writing in English. Shall we continue in English?<br>1 Yes<br>2 Another language | <div dir="rtl">معلوم می‌شود که شما به دری می‌نویسید. به دری ادامه بدهیم؟<br>۱ بلی<br>۲ زبان دیگر</div> | | |
-| `language.menu` | Hola 👋 Hello 👋 سلام<br>¿En qué idioma prefiere que le escriba? / Which language would you like?<br>به کدام زبان برایتان بنویسم؟<br>1 Español<br>2 English<br>3 دری | <div dir="rtl">Hola 👋 Hello 👋 سلام<br>¿En qué idioma prefiere que le escriba? / Which language would you like?<br>به کدام زبان برایتان بنویسم؟<br>1 Español<br>2 English<br>3 دری</div> | | |
+| `language.menu` | Hola 👋 Hello 👋 سلام<br>¿En qué idioma prefiere que le escriba? / Which language would you like?<br>به کدام زبان برایتان بنویسم؟<br>Español · English · دری | <div dir="rtl">Hola 👋 Hello 👋 سلام<br>¿En qué idioma prefiere que le escriba? / Which language would you like?<br>به کدام زبان برایتان بنویسم؟<br>Español · English · دری</div> | | |
 | `language.set` | Great, we'll continue in English. Send me a photo of your letter, or write me your question. | <div dir="rtl">خوب، به دری ادامه می‌دهیم. یک عکس از نامهٔ خود را برایم بفرستید، یا سوال خود را برایم بنویسید.</div> | | |
-| `language.set_letter` | Great, we'll continue in English. I got your letter. If it has more pages, send them now. | <div dir="rtl">خوب، به دری ادامه می‌دهیم. نامهٔ شما را گرفتم. اگر صفحه‌های بیشتر دارد، حالا بفرستید.</div> | | |
+| `language.set_letter` | Thanks, I got your letter. I'll write in English; if another language is easier, just tell me. If it has more pages, send them now. | <div dir="rtl">تشکر، نامهٔ شما را گرفتم. به دری برایتان می‌نویسم؛ اگر زبان دیگری برایتان آسان‌تر است، فقط بگویید. اگر نامه صفحه‌های بیشتر دارد، حالا بفرستید.</div> | | |
 | `letter.received` | Got it. If there are more pages, send them now. | <div dir="rtl">گرفتم. اگر صفحه‌های بیشتر دارد، حالا بفرستید.</div> | | |
 | `letter.same_or_new` | Is this another page of the same letter, or a new letter?<br>1 Same letter<br>2 New letter | <div dir="rtl">آیا این یک صفحهٔ دیگر همان نامه است، یا یک نامهٔ نو؟<br>۱ همان نامه<br>۲ نامهٔ نو</div> | | |
 | `letter.pages_added` | Thanks, I added the page to your letter. | <div dir="rtl">تشکر، صفحه را به نامهٔ شما اضافه کردم.</div> | | |

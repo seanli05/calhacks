@@ -1,4 +1,5 @@
 import pytest
+from agency.case_record import DEMO_CASE, SF_DEMO_CASE
 from agency.config import IVR_VOICE_ID, OFFICER_VOICE_ID, MockAgencySettings, Mode
 from pydantic import ValidationError
 
@@ -49,6 +50,25 @@ def test_env_var_picks_quick_mode(env: pytest.MonkeyPatch) -> None:
 def test_unknown_mode_fails_at_startup(env: pytest.MonkeyPatch) -> None:
     env.setenv("MOCK_AGENCY_MODE", "quik")
     with pytest.raises(ValidationError):
+        MockAgencySettings.from_env()
+
+
+def test_case_defaults_to_the_original_demo_case(env: pytest.MonkeyPatch) -> None:
+    env.delenv("MOCK_AGENCY_CASE", raising=False)
+    assert MockAgencySettings.from_env().case_record == DEMO_CASE
+
+
+def test_env_var_picks_the_sf_demo_case(env: pytest.MonkeyPatch) -> None:
+    env.setenv("MOCK_AGENCY_CASE", "sf_demo")
+    case = MockAgencySettings.from_env().case_record
+    assert case == SF_DEMO_CASE
+    assert case.applicant_name == "Mariam Namuna"
+    assert case.interview_office == "San Francisco Asylum Office"
+
+
+def test_unknown_case_fails_at_startup(env: pytest.MonkeyPatch) -> None:
+    env.setenv("MOCK_AGENCY_CASE", "sf")
+    with pytest.raises(ValidationError, match="sf_demo"):
         MockAgencySettings.from_env()
 
 

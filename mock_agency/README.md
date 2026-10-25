@@ -49,7 +49,12 @@ Other behaviors:
 - The menu never asks for an identifier (receipt number, A-Number, date of birth). The phone agent may not give one (Plan.md C35), and the officer doesn't ask either.
 - Saying "reschedule" at the reason step skips the attendance menu.
 
-The fictional case data (receipt number, A-number, name, date of birth, interview date and place) is in [agency/case_record.py](agency/case_record.py). The demo letter must use the same values.
+The fictional case data (receipt number, A-number, name, date of birth, interview date and place) is in [agency/case_record.py](agency/case_record.py). The line knows one case per deploy, chosen with `MOCK_AGENCY_CASE`:
+
+| `MOCK_AGENCY_CASE` | Case | Letter to photograph |
+|---|---|---|
+| `demo` (default) | `DEMO_CASE`: Ana Morales, Los Angeles Asylum Office, November 12. The backend's database seed and tests depend on it | `backend/tests/fixtures/research/letters/i797c_asylum_interview/page_1.png` (a research fixture; its name, office and dates differ from this case) |
+| `sf_demo` | `SF_DEMO_CASE`: Mariam Namuna, San Francisco Asylum Office, November 25 | `demo/letters/i797c_mariam_namuna.png`, which matches it value for value (the demo video) |
 
 **The officer** never asks for a name, date of birth, or case number, takes answers at face value, and asks only simple questions one at a time. It works the call to a resolution: it confirms the interview, answers the interpreter question (bring another qualified interpreter, or request a reschedule in writing for good cause), notes requests on the case, gives a reference number, and ends the call.
 
@@ -61,7 +66,7 @@ The fictional case data (receipt number, A-number, name, date of birth, intervie
 | [agency/ivr.py](agency/ivr.py) | The phone tree as a pure state machine (no SDK imports) |
 | [agency/speech.py](agency/speech.py) | Transcript parsing: menu digits, requests for a person, reason topics |
 | [agency/prompts.py](agency/prompts.py) | Every line the menu says, plus the officer's system prompt |
-| [agency/case_record.py](agency/case_record.py) | The fictional demo case |
+| [agency/case_record.py](agency/case_record.py) | The fictional demo cases |
 | [agency/config.py](agency/config.py) | Settings from env vars |
 
 This folder deploys to Cartesia as its own project, with its own [pyproject.toml](pyproject.toml) and [cartesia.toml](cartesia.toml). It imports nothing from the rest of the repo.
@@ -73,6 +78,7 @@ This folder deploys to Cartesia as its own project, with its own [pyproject.toml
 | `ANTHROPIC_API_KEY` | yes | | For the officer |
 | `MOCK_AGENCY_OFFICER_MODEL` | yes | | LiteLLM string, e.g. `anthropic/claude-haiku-5-5` (fast model; it's a live voice turn) |
 | `MOCK_AGENCY_MODE` | no | `demo` | `demo` or `quick` (see [Modes](#modes)). Anything else fails at startup |
+| `MOCK_AGENCY_CASE` | no | `demo` | Which case the line knows: `demo` (Ana Morales, Los Angeles) or `sf_demo` (Mariam Namuna, San Francisco; the demo video). The officer's intro and case record follow it. Anything else fails at startup |
 | `MOCK_AGENCY_HOLD_SECONDS` | no | `45` | Total hold time. Keep it short for the video. |
 | `MOCK_AGENCY_HOLD_ANNOUNCE_EVERY_S` | no | `15` | Gap between hold announcements |
 | `MOCK_AGENCY_NO_INPUT_SECONDS` | no | `12` | Silence before a reprompt, counted only once the line stops talking |
@@ -116,4 +122,4 @@ Then attach a phone number to the agent in the [Cartesia dashboard](https://play
 
 - No hold music. Line speaks text only, so hold is announcements with silence in between.
 - Like a real line, the caller can't talk over recorded prompts, but can interrupt the officer. Menu and hold prompts always play to the end, and speech that ends mid-prompt is dropped (logged as `ignored_speech_during_prompt`). Key presses register mid-prompt and take effect once the prompt finishes. The officer stops talking when interrupted and responds to what was said.
-- One fixed case.
+- One case per deploy (`MOCK_AGENCY_CASE`). To offer both, deploy twice, as with the modes.

@@ -15,7 +15,6 @@ from collections.abc import AsyncIterator
 from enum import StrEnum
 
 from agency import prompts
-from agency.case_record import DEMO_CASE
 from agency.config import MockAgencySettings, Mode
 from agency.ivr import IvrTurn, PhoneTree
 from line.agent import TurnEnv
@@ -52,7 +51,8 @@ class MockAgencyLine:
         self.settings = settings
         self.call_id = call_id
         self.phase = Phase.IVR
-        self.tree = PhoneTree(DEMO_CASE)
+        self.case = settings.case_record
+        self.tree = PhoneTree(self.case)
         self.officer: LlmAgent | None = None
         self.agent_speaking = False
 
@@ -198,7 +198,7 @@ class MockAgencyLine:
         self.phase = Phase.OFFICER
         logger.info(f"officer_joined call_id={self.call_id} info={ivr_summary!r}")
         yield AgentSendText(
-            text=prompts.OFFICER_INTRO.format(officer=self.settings.officer_name)
+            text=prompts.officer_intro(self.case, self.settings.officer_name)
         )
 
     def _build_officer(self, ivr_summary: str) -> LlmAgent:
@@ -209,7 +209,7 @@ class MockAgencyLine:
             tools=[end_call],
             config=LlmConfig(
                 system_prompt=prompts.officer_system_prompt(
-                    case=DEMO_CASE,
+                    case=self.case,
                     officer=self.settings.officer_name,
                     reference_number=reference_number,
                     ivr_summary=ivr_summary,
@@ -227,4 +227,6 @@ async def get_agent(env: AgentEnv, call_request: CallRequest):
 app = VoiceAgentApp(get_agent=get_agent)
 
 if __name__ == "__main__":
+    # A bad env (e.g. an unknown MOCK_AGENCY_CASE) fails here, not on the first call.
+    MockAgencySettings.from_env()
     app.run()

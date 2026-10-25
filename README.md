@@ -108,7 +108,7 @@ To run the whole flow (photo → research → consent → call → summary): [do
 
 The webhook returns empty TwiML at once and handles the message in a background task (`orchestrator/pipe.py`); every reply goes out through the Twilio REST API (`relay/whatsapp.py`) and is logged to `messages`. The pipe needs `DATABASE_URL`; without `ANTHROPIC_API_KEY`, language detection is skipped and first contact always gets the language menu. What a new number sees:
 
-- **Language pick:** a text first message gets a one-tap confirm in the detected language; a photo-only one gets the menu (1 Español, 2 English, 3 دری). Dari (`fa`) is the demo language; replies in Persian digits (`۱`) work too.
+- **Language pick:** a clear first message sets the language and gets an answer, with one line saying they can switch (Plan.md C45); an unclear one ("ok", a photo with no text) gets a multilingual question (Español · English · دری) that takes a language's name, a number, or a sentence in it. Dari (`fa`) is the demo language; Persian digits (`۱`) work too.
 - **Photos:** photos sent within 6 s of each other become one letter (`documents` row), and the orchestrator queues the research fast pass for it. Once research has started, a new photo gets "same letter or new?".
 - **Results:** the letter is checked before it's explained (Plan.md C46). Signs of a scam right after reading get a warning and no explanation; otherwise "I'm just double-checking…", then the explanation (interview date and time, checklist) and the verdict in one message, or the explanation with a caution after 60 s. A verified letter gets "it's genuine" with no call offer; the bot offers a call only when the user asks or says something only the agency can fix (e.g. "I can't go that day"), and only the user's yes queues it. After the call, a summary with the reference number and next steps.
 - **Other text:** answered by the orchestrator's Claude turn (it explains letters, never gives legal advice). Replies are written in English and translated into the user's language. Without `ANTHROPIC_API_KEY`, text is echoed back instead.
@@ -227,6 +227,7 @@ Checks before recording: `http://localhost:8000/health` and `https://<your-name>
 | `backend/tests/` | Backend tests | Everyone |
 | `dashboard/` | Next.js dashboard ([build guide](docs/specs/dashboard-build.md)) | 1 |
 | `mock_agency/` | Mock USCIS line on Cartesia; deploys on its own | 3 |
+| `demo/letters/` | Letters for the demo video, each next to the script that renders it ([e2e-run.md](docs/e2e-run.md#the-flow)) | Team |
 | `spikes/` | Throwaway experiments (`dtmf/`: key presses on the mock line; `bridge/`: bridging the user into the agency call); not imported by the backend | Spike owner |
 | `docs/specs/` | Build specs that implement Plan.md | Spec owner |
 | `docs/whatsapp-pipe.md` | WhatsApp side: what works, notes for teammates, concerns | 2 |
