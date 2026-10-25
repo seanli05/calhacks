@@ -61,7 +61,7 @@ export function LiveTranscript({
               )}
               {!line.done && <span className={styles.caret} aria-hidden />}
             </p>
-            {lang !== "en" && <p className={styles.en}>{line.en}</p>}
+            {lang !== "en" && <p className={styles.en} lang="en">{line.en}</p>}
           </div>
         </div>
       ))}

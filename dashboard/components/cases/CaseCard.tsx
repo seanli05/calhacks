@@ -6,7 +6,7 @@ import { MiniLetter } from "@/components/MiniLetter";
 import { Tracker } from "@/components/Tracker";
 import { useNow } from "@/lib/api/hooks";
 import type { CaseSummary } from "@/lib/api/types";
-import { clockTime, daysUntil, duration, longDate, relativeTime } from "@/lib/format";
+import { clockTime, daysUntil, duration, intlLocale, longDate, relativeTime } from "@/lib/format";
 import { useLang, useStrings } from "@/lib/i18n";
 import { isHumanMoment, isLive, isWarning } from "@/lib/stage";
 
@@ -14,7 +14,7 @@ import styles from "./CaseCard.module.css";
 
 /** "in 20 days", "mañana": the appointment countdown, worded by `Intl`. */
 function countdown(date: string, lang: string, now: number): string {
-  return new Intl.RelativeTimeFormat(lang, { numeric: "auto" }).format(daysUntil(date, now), "day");
+  return new Intl.RelativeTimeFormat(intlLocale(lang), { numeric: "auto" }).format(daysUntil(date, now), "day");
 }
 
 /**

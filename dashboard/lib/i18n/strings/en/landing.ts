@@ -36,7 +36,7 @@ export const landing = {
       { k: "Time on hold", v: "ours, not yours" },
       { k: "Your OK", v: "asked first, every time" },
       { k: "Your A-Number", v: "never said" },
-      { k: "Languages", v: "Español · English" },
+      { k: "Languages", v: "Español · English · دری" },
     ],
   },
 
@@ -121,7 +121,7 @@ export const landing = {
 
   closing: {
     title: ["Got a letter?", "Send us a photo."],
-    sub: "All it takes is one photo. Spanish and English today.",
+    sub: "All it takes is one photo. Spanish, English and Dari today.",
   },
 };
 

@@ -96,7 +96,7 @@
   display: inline-flex;
   align-items: baseline;
   gap: 8px;
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .t {
@@ -161,6 +161,6 @@
   }
 
   .timer {
-    margin-left: 0;
+    margin-inline-start: 0;
   }
 }

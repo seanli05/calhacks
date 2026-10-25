@@ -13,6 +13,7 @@ Only fixed text and the logged query, page and check names reach the screen;
 from typing import Any
 from urllib.parse import urlsplit
 
+from app.api.common import localize
 from app.api.models import FeedStep, Localized
 from app.contracts import Event
 
@@ -23,7 +24,8 @@ STEP_TYPES = frozenset(
 MAX_DETAIL = 90
 
 Pair = tuple[str, str]
-"""(English, Spanish). Other languages get the English, like the feed templates."""
+"""(English, Spanish). Other languages go through the translation cache, like the
+feed templates."""
 
 SEARCHING: Pair = ("Searching", "Buscando")
 READING: Pair = ("Reading", "Leyendo")
@@ -140,7 +142,9 @@ def _step(
 
 def _localized(pair: Pair, lang: str) -> Localized:
     en, es = pair
-    return Localized(text=es if lang == "es" else en, en=en)
+    if lang == "es":
+        return Localized(text=es, en=en)
+    return localize(en, lang)
 
 
 def _text(value: Any) -> str | None:

@@ -67,7 +67,7 @@
 
 .title {
   margin: 0;
-  padding-right: 48px;
+  padding-inline-end: 48px;
   font-size: var(--fs-xl);
   font-weight: 650;
   line-height: 1.25;
@@ -83,7 +83,7 @@
 .arrow {
   position: absolute;
   top: 24px;
-  right: 24px;
+  inset-inline-end: 24px;
   width: 36px;
   height: 36px;
   display: grid;

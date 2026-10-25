@@ -210,3 +210,22 @@ def test_a_failed_lookup_is_marked(monkeypatch: pytest.MonkeyPatch) -> None:
         "blocked",
         "example.com/x",
     )
+
+
+def test_a_language_without_templates_goes_through_the_translator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.api import translations
+
+    monkeypatch.setattr(translations, "cached", lambda en, lang: f"[{lang}] {en}")
+    events = [
+        _event(EventType.CONSENT_GIVEN),
+        _event(EventType.RESEARCH_SEARCH, query="USCIS phone"),
+    ]
+    consent, search = _texts(_serve(monkeypatch, events), "?lang=fa&steps=true")
+    assert consent["text"] == {
+        "text": "[fa] You said yes to the call",
+        "en": "You said yes to the call",
+    }
+    assert search["step"]["action"]["text"] == "[fa] Searching"
+    assert search["step"]["detail"] == '"USCIS phone"'

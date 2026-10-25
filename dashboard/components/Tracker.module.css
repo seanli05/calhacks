@@ -37,8 +37,7 @@
   content: "";
   position: absolute;
   top: 9px;
-  left: 20px;
-  right: 0;
+  inset-inline: 20px 0;
   height: 1.5px;
   background: var(--t-line);
 }

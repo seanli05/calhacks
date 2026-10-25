@@ -44,7 +44,7 @@ export function LetterPanel({ detail, compact = false }: { detail: CaseDetail; c
         {head && <span className={`mono ${styles.code}`}>{head.form}</span>}
       </div>
 
-      <div className={styles.paper} aria-hidden="true">
+      <div className={styles.paper} aria-hidden="true" dir="ltr">
         <div className={styles.pHead}>
           <span className={styles.seal} />
           <span className={styles.agency}>

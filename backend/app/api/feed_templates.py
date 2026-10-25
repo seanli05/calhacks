@@ -31,6 +31,8 @@ from `app.db.deletes`.
 
 from string import Formatter
 
+from app.api.common import localize
+
 Variants = dict[str, list[str]]
 
 HIDDEN: frozenset[str] = frozenset(
@@ -256,11 +258,11 @@ def render(
 ) -> tuple[str, str] | None:
     """`(text in lang, English)`, or None when the type has no template. `values`
     fill the text in `lang`, `values_en` the English. A language without templates
-    gets the English."""
+    (Dari) gets the English through the translation cache, English until it lands."""
     variants = TEMPLATES.get(event_type)
     if variants is None:
         return None
     en = fill(variants["en"], values_en)
     if lang not in variants:
-        return en, en
+        return localize(en, lang).text, en
     return fill(variants[lang], values), en

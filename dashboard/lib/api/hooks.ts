@@ -81,7 +81,12 @@ export function usePoll<T>(load: () => Promise<T>, key: string, intervalMs = 100
  * The user's feed, oldest first. Polls with `since` set to the newest item's time
  * and appends; starts over when the language changes (the text is per language).
  * `steps` adds the step logs behind each task (the case view's live activity).
+ * Text without a template is translated in the background (Dari), so while any
+ * line is still in English the whole feed is fetched again every few seconds.
  */
+/** Polls between full refetches while feed text still waits for its translation. */
+const RETRANSLATE_EVERY = 3;
+
 export function useFeed(userId: string, steps = false): { items: FeedItem[]; error: Error | null } {
   const { lang } = useLang();
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -96,9 +101,12 @@ export function useFeed(userId: string, steps = false): { items: FeedItem[]; err
   useEffect(() => {
     let alive = true;
     let since: string | null = null;
+    let untranslated = false;
+    let tick = 0;
     setItems([]);
-    const run = () =>
-      api.feed(userId, since, lang, steps).then(
+    const run = () => {
+      const refetch = untranslated && tick++ % RETRANSLATE_EVERY === 0;
+      return api.feed(userId, refetch ? null : since, lang, steps).then(
         (fresh) => {
           if (!alive) return;
           setError(null);
@@ -106,13 +114,16 @@ export function useFeed(userId: string, steps = false): { items: FeedItem[]; err
           since = fresh[fresh.length - 1].at;
           setItems((prev) => {
             const seen = new Set(prev.map((i) => i.id));
-            return [...prev, ...fresh.filter((i) => !seen.has(i.id))];
+            const next = refetch ? fresh : [...prev, ...fresh.filter((i) => !seen.has(i.id))];
+            untranslated = lang !== "en" && next.some((i) => !i.step && i.text.text === i.text.en);
+            return next;
           });
         },
         (err: unknown) => {
           if (alive) setError(err instanceof Error ? err : new Error(String(err)));
         },
       );
+    };
     const stop = repeat(run, 1000);
     return () => {
       alive = false;

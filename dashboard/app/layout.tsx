@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
+import { IBM_Plex_Mono, Instrument_Sans, Vazirmatn } from "next/font/google";
 
 import { FixtureBar } from "@/components/FixtureBar";
 import { LanguageProvider } from "@/lib/i18n";
@@ -19,6 +19,14 @@ const mono = IBM_Plex_Mono({
   display: "swap",
 });
 
+// Dari's script; Instrument Sans has no Arabic-script glyphs, so this is its fallback.
+const dari = Vazirmatn({
+  subsets: ["arabic"],
+  variable: "--font-dari",
+  display: "swap",
+  preload: false,
+});
+
 export const metadata: Metadata = {
   title: "[App]",
   description: "Immigration letters, explained in your language. We call the agency and wait on hold for you.",
@@ -26,7 +34,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={`${sans.variable} ${mono.variable}`}>
+    <html lang="es" className={`${sans.variable} ${mono.variable} ${dari.variable}`}>
       <body>
         <LanguageProvider>
           {children}

@@ -56,8 +56,12 @@ class _Texts:
         )
 
     def raw(self, key: str, **values: str) -> str:
-        texts = TEXTS.get(self.lang, TEXTS["en"])
-        return texts.get(key, TEXTS["en"][key]).format(**values)
+        """The text in `lang`; a language without templates (Dari) gets the English
+        through the translation cache."""
+        template = TEXTS.get(self.lang, {}).get(key)
+        if template is None:
+            return localize(TEXTS["en"][key].format(**values), self.lang).text
+        return template.format(**values)
 
 
 def _countdown(

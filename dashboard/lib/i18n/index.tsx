@@ -19,10 +19,16 @@ import { casesPage as esCases } from "./strings/es/cases";
 import { common as esCommon } from "./strings/es/common";
 import { landing as esLanding } from "./strings/es/landing";
 import { memoryPage as esMemory } from "./strings/es/memory";
+import { caseView as faCase } from "./strings/fa/case";
+import { casesPage as faCases } from "./strings/fa/cases";
+import { common as faCommon } from "./strings/fa/common";
+import { landing as faLanding } from "./strings/fa/landing";
+import { memoryPage as faMemory } from "./strings/fa/memory";
 
 const STRINGS = {
   en: { common: enCommon, case: enCase, cases: enCases, memory: enMemory, landing: enLanding },
   es: { common: esCommon, case: esCase, cases: esCases, memory: esMemory, landing: esLanding },
+  fa: { common: faCommon, case: faCase, cases: faCases, memory: faMemory, landing: faLanding },
 };
 
 export type Strings = (typeof STRINGS)["en"];
@@ -31,7 +37,11 @@ export type Strings = (typeof STRINGS)["en"];
 export const LANGUAGES: { code: string; label: string }[] = [
   { code: "es", label: "Español" },
   { code: "en", label: "English" },
+  { code: "fa", label: "دری" },
 ];
+
+/** Languages written right to left: the page flips with `dir`. */
+const RTL = new Set(["fa"]);
 
 const STORAGE_KEY = "dashboard.lang";
 
@@ -58,7 +68,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [picked, setPicked] = useState(false);
 
   useEffect(() => {
-    const stored = readStored();
+    // `?lang=fa` opens a page in that language (a link for a Dari speaker).
+    const param = new URLSearchParams(window.location.search).get("lang");
+    const stored = param && param in STRINGS ? param : readStored();
     if (stored) {
       setLangState(stored);
       setPicked(true);
@@ -67,6 +79,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = lang;
+    document.documentElement.dir = RTL.has(lang) ? "rtl" : "ltr";
   }, [lang]);
 
   const setLang = useCallback((next: string) => {

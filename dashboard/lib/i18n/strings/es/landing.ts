@@ -35,7 +35,7 @@ export const landing: LandingStrings = {
       { k: "Tiempo en espera", v: "nuestro, no tuyo" },
       { k: "Tu permiso", v: "lo pedimos siempre" },
       { k: "Tu A-Number", v: "nunca lo decimos" },
-      { k: "Idiomas", v: "Español · English" },
+      { k: "Idiomas", v: "Español · English · دری" },
     ],
   },
 
@@ -120,6 +120,6 @@ export const landing: LandingStrings = {
 
   closing: {
     title: ["¿Te llegó una carta?", "Envíanos una foto."],
-    sub: "Solo necesitas una foto. Español e inglés por ahora.",
+    sub: "Solo necesitas una foto. Español, inglés y dari por ahora.",
   },
 };

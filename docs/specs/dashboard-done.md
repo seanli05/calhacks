@@ -35,12 +35,11 @@ Every page and every API route is built and on `main`. This is the non-design wo
 
 - **Live call view:** streamed translation of both sides, tips, the translation book (resizable left split). Spec: [dashboard-build.md](dashboard-build.md), [dashboard-api.md → Live call](dashboard-api.md#live-call). Sean's live transcript save is merged (#27).
 - **Live activity in the feed:** research and call steps as cards that fold when done ([dashboard-build.md](dashboard-build.md)).
-- **Language dropdown** in the header.
+- **Language dropdown with Dari** (`fa`, the team's second language): Dari UI strings (`strings/fa/`), right-to-left layout (`dir` follows the language; CSS uses logical properties), Afghan Gregorian dates (`intlLocale` in `lib/format.ts`: "۱۲ نومبر، ۸:۳۰ صبح") and Vazirmatn for the script. Text without a Dari template (feed, suggestions, step rows) goes through the translation cache and shows English until it lands; the feed refetches until then. `?lang=fa` opens any page in Dari. The UI strings want the same fluent-speaker check as the WhatsApp templates ([docs/dari-review.md](../dari-review.md)).
 
 ## Can wait
 
 - [ ] **Landing QR.** Set `TWILIO_SANDBOX_JOIN_CODE` in `.env` (the code from Twilio's sandbox page, without "join"). Until then the QR has no join message.
 - [ ] **Product name.** `[App]` is a placeholder in `common.appName` and `case.speakers.agent` in `dashboard/lib/i18n/strings/*/`.
 - [x] **Real translation.** `localize` translates text outside the seed with person 2's translator in the background and caches it (`translations.py`); the stand-in stays for the seed's text so it shows at once.
-- [ ] **More UI languages.** The header is a dropdown (`LANGUAGES` in `lib/i18n/index.tsx`). Adding Farsi or Nepali means `strings/<code>/` files and right-to-left layout for Farsi. The live call, translation book and data text already follow any language.
 - [ ] **Optional speed-up.** A Neon project in `us-west-2` would cut every database round trip about 5× from California. It changes the URLs for the whole team.

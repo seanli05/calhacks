@@ -8,12 +8,12 @@
 .sheet {
   position: fixed;
   top: 0;
-  right: 0;
+  inset-inline-end: 0;
   bottom: 0;
   width: min(560px, 100%);
   z-index: 51;
   background: var(--card);
-  border-left: 1px solid var(--line);
+  border-inline-start: 1px solid var(--line);
   box-shadow: -20px 0 60px rgba(15, 26, 20, 0.12);
   padding: calc(22px + env(safe-area-inset-top, 0px)) max(22px, env(safe-area-inset-right, 0px))
     calc(22px + env(safe-area-inset-bottom, 0px)) 26px;

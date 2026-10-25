@@ -117,7 +117,7 @@ export function CallHero({
           <h1>{copy.title}</h1>
           {copy.sub && <p>{copy.sub}</p>}
           {lang !== "en" && (
-            <p className={styles.en}>
+            <p className={styles.en} lang="en">
               {copyEn.title}
               {copyEn.sub ? `. ${copyEn.sub}` : ""}
             </p>
