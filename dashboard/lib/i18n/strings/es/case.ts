@@ -94,7 +94,7 @@ export const caseView: CaseStrings = {
   viewTranscript: "Ver transcripción",
   transcript: "Transcripción",
   transcriptNote: "La llamada fue en inglés. No guardamos el audio.",
-  speakers: { agent: "[App]", agency: "Agencia", user: "Tú" },
+  speakers: { agent: "Avocado", agency: "Agencia", user: "Tú" },
   live: {
     title: "Traducción en vivo",
     waiting: "Escuchando. Lo que tú y el oficial digan aparece aquí en tu idioma.",

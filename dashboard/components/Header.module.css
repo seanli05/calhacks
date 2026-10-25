@@ -20,22 +20,14 @@
 }
 
 .mark {
-  width: 28px;
-  height: 28px;
-  background: var(--forest);
-  display: grid;
-  place-items: center;
-}
-
-.mark::after {
-  content: "";
-  width: 11px;
-  height: 11px;
-  background: var(--lime);
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border: 1px solid var(--line);
 }
 
 .name {
-  color: var(--muted);
+  color: var(--ink);
 }
 
 .nav {

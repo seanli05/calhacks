@@ -28,7 +28,7 @@ const dari = Vazirmatn({
 });
 
 export const metadata: Metadata = {
-  title: "[App]",
+  title: "Avocado",
   description: "Immigration letters, explained in your language. We call the agency and wait on hold for you.",
 };
 

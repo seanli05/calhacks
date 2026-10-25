@@ -2,7 +2,7 @@ import type { CommonStrings } from "../en/common";
 
 /** Afghan Dari, following the register in `backend/app/translation/translate.py`. */
 export const common: CommonStrings = {
-  appName: "[App]",
+  appName: "Avocado",
   nav: {
     cases: "دوسیه‌های من",
     memory: "معلوماتی که از شما داریم",

@@ -93,7 +93,7 @@ export const caseView = {
   viewTranscript: "View transcript",
   transcript: "Transcript",
   transcriptNote: "The call was in English. We don't keep the audio.",
-  speakers: { agent: "[App]", agency: "Agency", user: "You" },
+  speakers: { agent: "Avocado", agency: "Agency", user: "You" },
   live: {
     title: "Live translation",
     waiting: "Listening. What you and the officer say shows up here in your language.",

@@ -40,6 +40,6 @@ Every page and every API route is built and on `main`. This is the non-design wo
 ## Can wait
 
 - [ ] **Landing QR.** Set `TWILIO_SANDBOX_JOIN_CODE` in `.env` (the code from Twilio's sandbox page, without "join"). Until then the QR has no join message.
-- [ ] **Product name.** `[App]` is a placeholder in `common.appName` and `case.speakers.agent` in `dashboard/lib/i18n/strings/*/`.
+- [x] **Product name.** Avocado (`common.appName`, `case.speakers.agent`, the page title), with the logo in the header (`public/logo.png`) and as the tab icon (`app/icon.png`, `app/apple-icon.png`).
 - [x] **Real translation.** `localize` translates text outside the seed with person 2's translator in the background and caches it (`translations.py`); the stand-in stays for the seed's text so it shows at once.
 - [ ] **Optional speed-up.** A Neon project in `us-west-2` would cut every database round trip about 5× from California. It changes the URLs for the whole team.

@@ -1,7 +1,7 @@
 /** Labels shared by every page. The English file defines the shape; every other
  * language mirrors it (`CommonStrings`). */
 export const common = {
-  appName: "[App]",
+  appName: "Avocado",
   nav: {
     cases: "My cases",
     memory: "What we know about you",

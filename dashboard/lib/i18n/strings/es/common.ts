@@ -1,7 +1,7 @@
 import type { CommonStrings } from "../en/common";
 
 export const common: CommonStrings = {
-  appName: "[App]",
+  appName: "Avocado",
   nav: {
     cases: "Mis trámites",
     memory: "Lo que sabemos de ti",

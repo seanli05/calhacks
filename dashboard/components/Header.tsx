@@ -17,7 +17,8 @@ export function Header({ userId, back = false }: { userId?: string; back?: boole
   return (
     <header className={styles.top}>
       <Link href={casesHref ?? "/"} className={styles.brand}>
-        <span className={styles.mark} aria-hidden="true" />
+        {/* eslint-disable-next-line @next/next/no-img-element -- a 32px mark; next/image adds nothing here */}
+        <img className={styles.mark} src="/logo.png" alt="" width={32} height={32} />
         <span className={styles.name}>{t.appName}</span>
       </Link>
       <nav className={styles.nav}>
