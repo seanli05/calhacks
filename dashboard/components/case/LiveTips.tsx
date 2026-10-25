@@ -26,7 +26,11 @@ export function LiveTips({ tips }: { tips: LiveCall["tips"] }) {
           className={`${styles.tip} ${tip.kind === "yourself" ? styles.yourself : ""} ${tip.used ? styles.used : ""}`}
         >
           <span className={styles.kind}>{tip.used ? `✓ ${t.used}` : tip.kind === "ask" ? t.ask : t.yourself}</span>
-          {tip.say_en && <p className={styles.say}>“{tip.say_en}”</p>}
+          {tip.say_en && (
+            <p className={styles.say} lang="en">
+              “{tip.say_en}”
+            </p>
+          )}
           {(!tip.say_en || englishBelow(tip.meaning, lang)) && <p className={styles.meaning}>{tip.meaning.text}</p>}
         </article>
       ))}

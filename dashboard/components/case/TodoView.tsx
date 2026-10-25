@@ -110,7 +110,7 @@ export function TodoView({ detail, onViewLetter }: { detail: CaseDetail; onViewL
           <section className={`card ${styles.checklist}`} aria-labelledby="checklist-title">
             <div className={styles.listHead}>
               <span className="label" id="checklist-title">
-                {t.appt.beforeYouGo}
+                {appt ? t.appt.beforeYouGo : t.appt.youNeed}
               </span>
               <span className={styles.progress}>{t.appt.ready(done, detail.checklist.length)}</span>
             </div>

@@ -4,7 +4,7 @@ const n = (count: number) => count.toLocaleString("fa-AF");
 
 export const memoryPage: MemoryStrings = {
   title: "پروفایل",
-  subtitle: "این‌ها چیزهایی است که Avocado برای کمک به قضیهٔ شما ذخیره می‌کند. هر وقت بخواهید، هر چیزی را می‌توانید حذف کنید.",
+  subtitle: "این‌ها چیزهایی است که Avocado برای کمک به دوسیهٔ شما ذخیره می‌کند. هر وقت بخواهید، هر چیزی را می‌توانید حذف کنید.",
   separator: "، ",
   counts: {
     facts: (count: number) => `${n(count)} چیز که گفتید`,

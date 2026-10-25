@@ -122,6 +122,7 @@ export const caseView = {
     title: "Your appointment",
     maps: "Open in Maps",
     beforeYouGo: "Before you go",
+    youNeed: "What you need",
     ready: (done: number, total: number) => `${done} of ${total} ready`,
     says: "What this letter says",
     viewLetter: "View your letter",

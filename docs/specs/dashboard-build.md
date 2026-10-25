@@ -13,7 +13,7 @@ npm run dev            # http://localhost:3000
 npm run build          # type-checks every page; must pass before merging
 ```
 
-Pages run on **live data** by default. With `NEXT_PUBLIC_DATA=fixtures` they use fake data from `lib/api/fixtures.ts` instead, with no backend needed. A **Fixtures** bar at the bottom steps the demo call through its states (◀ ▶ or the arrow keys): waiting for consent → dialing → menu → on hold → person answered → connected → call ended. Deletes work in fixtures too.
+Pages run on **live data** by default. With `NEXT_PUBLIC_DATA=fixtures` they use fake data from `lib/api/fixtures.ts` instead, with no backend needed. A **Fixtures** bar at the bottom steps the demo call through its states (◀ ▶ or the arrow keys): waiting for consent → dialing → menu → on hold → person answered → connected → call ended. On a case page it plays that case's call, and each case keeps its own step: the asylum interview starts on hold, the Request for Evidence (`case_demo000000000003`, a deadline instead of an appointment) starts waiting for consent, and the scam letter has no call. Deletes work in fixtures too.
 
 Before that, the feed shows the agents' work live (`ActivityFeed`, grouping in `lib/activity.ts`): each research job or call is a card whose steps (searches, pages read, checks, menus heard; `?steps=true`) stream in under a spinner and shimmering title, then fold behind the result 1.2 s after it finishes ("11 pasos · 0:41 · ver pasos"; the header reopens it). A job that finished with no steps stays plain feed items. Research cards stop spinning after 10 min without news; a call runs until it ends.
 

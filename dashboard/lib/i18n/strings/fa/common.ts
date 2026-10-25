@@ -11,6 +11,7 @@ export const common: CommonStrings = {
   languageSwitch: "زبان",
   docTypes: {
     uscis_i797c_asylum_interview: "مصاحبهٔ پناهندگی",
+    uscis_i797e_request_for_evidence: "درخواست شواهد",
   } as Record<string, string>,
   docTypeFallback: "نامه",
   stages: {

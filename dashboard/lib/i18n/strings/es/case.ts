@@ -123,6 +123,7 @@ export const caseView: CaseStrings = {
     title: "Tu cita",
     maps: "Abrir en Mapas",
     beforeYouGo: "Antes de ir",
+    youNeed: "Lo que necesitas",
     ready: (done: number, total: number) => `${done} de ${total} listos`,
     says: "Qué dice esta carta",
     viewLetter: "Ver tu carta",

@@ -91,6 +91,14 @@ export function CaseCard({ userId, summary }: { userId: string; summary: CaseSum
             </span>
           </p>
         )}
+        {!appt && !scam && summary.deadline && (
+          <p className={styles.appt}>
+            <span className={styles.k}>{t.respondBy}</span>
+            <span>
+              <b>{longDate(summary.deadline, lang)}</b> · {countdown(summary.deadline, lang, now)}
+            </span>
+          </p>
+        )}
 
         {!scam && <Tracker stage={summary.stage} call={summary.latest_call} onDark={moment} />}
       </div>
