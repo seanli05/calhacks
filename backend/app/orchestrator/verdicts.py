@@ -2,22 +2,29 @@
 Goal 6.2).
 
 Research queues `research_deep` itself, so the orchestrator never learns the job's
-ID. It does log `research.deep_done` with the job's ID when it finishes, so after the
-explanation goes out, one watcher per case polls the user's events for that, then
-reads R2 from the job. Same pattern as the call-status watcher; held in memory, so a
-restart forgets it.
+ID. It does log `research.deep_done` with the job's ID when it finishes, so once the
+letter is read, one watcher per case polls the user's events for that, then reads R2
+from the job. Same pattern as the call-status watcher; held in memory, so a restart
+forgets it.
 
-- Verified: say so, and nothing more. A call is offered only when the user's
-  messages show they need one (the turn's `request_consent`), never because the
-  letter checked out: most letters need no call.
-- Verified with no official number to call: say so, and that no call is needed.
-- Suspicious: warn with the red flags; never offer a call.
-- Unknown: explain, no call offer, and ask what the user wants.
+C46: the letter is checked before it's explained. The watcher holds the explanation
+(`explain`) and sends it with the verdict, in one message, as the lead of the
+verdict's template:
+- Verified: the explanation, then "it's genuine", and nothing more. A call is
+  offered only when the user's messages show they need one (the turn's
+  `request_consent`, C44), never because the letter checked out.
+- Verified with no official number to call: the explanation, then that no call
+  is needed.
+- Unknown, or the deep pass failed: the explanation, then a gentle caution.
+- Suspicious: the warning with the red flags, never the explanation or a call.
+If no verdict comes within `explain_after_s`, the explanation goes out with "still
+checking, don't pay or call yet", and the verdict follows alone when it comes.
 """
 
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 
 from pydantic import ValidationError
@@ -37,7 +44,13 @@ POLL_INTERVAL_S = 1.0
 # Plan.md's target is 1–3 minutes; past this the case stops being watched (Plan.md
 # has no failure rule for a deep pass that never finishes yet).
 MAX_WATCH_S = 15 * 60.0
+# C46: how long the explanation waits for the verdict.
+EXPLAIN_AFTER_S = 60.0
 _TICK = timedelta(microseconds=1)
+_TYPING = "verdict"
+
+# Builds the letter's explanation in the user's language, and its English.
+Explain = Callable[[tables.User], Awaitable[tuple[str, str]]]
 
 
 class Verdicts:
@@ -49,18 +62,34 @@ class Verdicts:
         max_watch_s: float = MAX_WATCH_S,
         *,
         conversation: Conversation,
+        explain_after_s: float = EXPLAIN_AFTER_S,
     ) -> None:
         self._whatsapp = whatsapp
         self._translator = translator
         self._conversation = conversation
         self._poll_interval_s = poll_interval_s
         self._max_watch_s = max_watch_s
+        self._explain_after_s = explain_after_s
         self._watching: dict[CaseId, asyncio.Task[None]] = {}
         self._watching_users: dict[CaseId, UserId] = {}
+        # The explanation each case still owes the user.
+        self._explain: dict[CaseId, Explain] = {}
 
-    def watch(self, user_id: UserId, case_id: CaseId, since: datetime) -> None:
+    def watch(
+        self,
+        user_id: UserId,
+        case_id: CaseId,
+        since: datetime,
+        *,
+        explain: Explain | None = None,
+    ) -> None:
         """Tell the user the verdict of the case's next deep pass to finish after
-        `since`. Watching a case twice does nothing."""
+        `since`, after `explain`'s explanation in the same message. Watching a case
+        twice keeps one watcher; a new `explain` (the letter was read again)
+        replaces the one still owed."""
+        if explain is not None:
+            self._explain[case_id] = explain
+            self._conversation.typing(user_id, _TYPING, self._explain_after_s)
         task = self._watching.get(case_id)
         if task is not None and not task.done():
             return
@@ -72,6 +101,7 @@ class Verdicts:
     def _forget(self, case_id: CaseId) -> None:
         self._watching.pop(case_id, None)
         self._watching_users.pop(case_id, None)
+        self._explain.pop(case_id, None)
 
     def is_watching(self, case_id: CaseId) -> bool:
         return case_id in self._watching
@@ -81,8 +111,8 @@ class Verdicts:
         return user_id in self._watching_users.values()
 
     async def _run(self, user_id: UserId, case_id: CaseId, since: datetime) -> None:
-        deadline = time.monotonic() + self._max_watch_s
-        while time.monotonic() < deadline:
+        start = time.monotonic()
+        while time.monotonic() < start + self._max_watch_s:
             try:
                 deep = await self._finished_deep(user_id, case_id, since)
             except (SQLAlchemyError, OSError):
@@ -91,8 +121,29 @@ class Verdicts:
             if deep is not None:
                 await self._tell(user_id, case_id, deep)
                 return
+            if (
+                case_id in self._explain
+                and time.monotonic() >= start + self._explain_after_s
+            ):
+                await self._explain_while_checking(user_id, case_id)
             await asyncio.sleep(self._poll_interval_s)
         logger.warning("Verdict: no deep pass finished case_id=%s", case_id)
+
+    async def _explain_while_checking(self, user_id: UserId, case_id: CaseId) -> None:
+        """C46: no verdict in time; explain now, with a caution not to pay or call
+        yet. The verdict follows alone."""
+        explain = self._explain.pop(case_id)
+        self._conversation.done_typing(user_id, _TYPING)
+        user = await reads.get_user(user_id)
+        if user is None:
+            return
+        logger.info("Explaining before the verdict case_id=%s", case_id)
+        async with self._conversation.speaking(user.id):
+            try:
+                lead = await explain(user)
+                await self._send(user, "letter.still_checking", case_id, lead)
+            except WhatsAppSendError as exc:
+                logger.error("Explanation not sent case_id=%s: %s", case_id, exc)
 
     async def _finished_deep(
         self, user_id: UserId, case_id: CaseId, since: datetime
@@ -110,38 +161,48 @@ class Verdicts:
         return None
 
     async def _tell(self, user_id: UserId, case_id: CaseId, job: tables.Job) -> None:
+        explain = self._explain.pop(case_id, None)
+        self._conversation.done_typing(user_id, _TYPING)
         user = await reads.get_user(user_id)
         if user is None:
             return
+        deep = None
         if job.status == JobStatus.FAILED:
-            # Plan.md has no failure rule for a failed deep pass yet (Goal 8).
             logger.error("Deep pass failed case_id=%s job_id=%s", case_id, job.id)
-            return
-        try:
-            deep = DeepResult.model_validate(job.result)
-        except ValidationError:
-            logger.exception("Bad R2 case_id=%s job_id=%s", case_id, job.id)
-            return
+        else:
+            try:
+                deep = DeepResult.model_validate(job.result)
+            except ValidationError:
+                logger.exception("Bad R2 case_id=%s job_id=%s", case_id, job.id)
         async with self._conversation.speaking(user.id):
             try:
-                await self.react(user, deep)
+                lead = await explain(user) if explain is not None else None
+                if deep is None:
+                    # No verdict will come: as for unknown (C46).
+                    await self._send(user, "verification.unknown", case_id, lead)
+                else:
+                    await self.react(user, deep, lead)
             except WhatsAppSendError as exc:
                 logger.error("Verdict not sent case_id=%s: %s", case_id, exc)
 
-    async def react(self, user: tables.User, deep: DeepResult) -> None:
-        """R2's three branches (Plan.md → R2, Failure rules)."""
+    async def react(
+        self, user: tables.User, deep: DeepResult, lead: tuple[str, str] | None = None
+    ) -> None:
+        """R2's three branches (Plan.md → R2, Failure rules), after `lead` (the
+        letter's explanation, if it hasn't gone out yet) in the same message. A
+        suspicious letter is never explained."""
         status = deep.verification.status
         case_id = deep.case_id
         logger.info("Verdict case_id=%s status=%s", case_id, status)
         if status == VerificationStatus.VERIFIED:
             if not deep.call_recommended:
-                await self._send(user, "verification.verified_no_call", case_id)
+                await self._send(user, "verification.verified_no_call", case_id, lead)
                 return
-            await self._send(user, "verification.verified", case_id)
+            await self._send(user, "verification.verified", case_id, lead)
         elif status == VerificationStatus.SUSPICIOUS:
             await self._warn(user, deep)
         elif status == VerificationStatus.UNKNOWN:
-            await self._send(user, "verification.unknown", case_id)
+            await self._send(user, "verification.unknown", case_id, lead)
 
     async def _warn(self, user: tables.User, deep: DeepResult) -> None:
         flags_en = "\n".join(f"- {flag}" for flag in deep.verification.red_flags)
@@ -161,5 +222,11 @@ class Verdicts:
             case_id=deep.case_id,
         )
 
-    async def _send(self, user: tables.User, template: str, case_id: CaseId) -> None:
-        await send_template(self._whatsapp, user, template, case_id=case_id)
+    async def _send(
+        self,
+        user: tables.User,
+        template: str,
+        case_id: CaseId,
+        lead: tuple[str, str] | None = None,
+    ) -> None:
+        await send_template(self._whatsapp, user, template, case_id=case_id, lead=lead)

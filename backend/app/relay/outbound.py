@@ -22,22 +22,28 @@ async def send_template(
     language: LanguageCode | None = None,
     case_id: CaseId | None = None,
     question_id: QuestionId | None = None,
+    lead: tuple[str, str] | None = None,
 ) -> tables.Message:
     """Send a pre-translated template in `language` (default: the user's). Before
     the user has picked a language, it goes out in every supported language.
     `values_en` replaces `values` in the logged English when a value was translated
-    (rule 6)."""
+    (rule 6). `lead` is the orchestrator's own text and its English, sent above the
+    template in the same message (only the orchestrator passes one, rule 1)."""
     values = values or {}
     language = language or user.language
     body = render(template_id, language, **values)
+    body_en = render(template_id, "en", **(values_en or values))
+    if lead is not None:
+        body = f"{lead[0]}\n\n{body}"
+        body_en = f"{lead[1]}\n\n{body_en}"
     sids = await whatsapp.send(user.whatsapp_number, body)
     return await append_message(
         user.id,
         MessageDirection.OUT,
-        MessageSender.RELAY,
+        MessageSender.RELAY if lead is None else MessageSender.ORCHESTRATOR,
         body,
         language or LANGUAGES[0],
-        body_en=render(template_id, "en", **(values_en or values)),
+        body_en=body_en,
         case_id=case_id,
         template=template_id,
         question_id=question_id,

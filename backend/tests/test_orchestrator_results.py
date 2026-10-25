@@ -81,16 +81,20 @@ async def finished_fast_job(
 
 
 async def deep_done(
-    db: FakeDB, user: tables.User, case_id: str, result: DeepResult
+    db: FakeDB, user: tables.User, case_id: str, result: DeepResult | None
 ) -> None:
-    """Research finishing its deep pass: the job's R2, then `research.deep_done`."""
+    """Research finishing its deep pass: the job's R2 (or a failed job, with no
+    result), then `research.deep_done`."""
     job = await db.enqueue(
         ResearchDeepJob(case_id=case_id, user_id=user.id, document_ids=["doc_1"]),
         Component.RESEARCH_AGENT,
         user.id,
         case_id,
     )
-    db.finish_job(job.id, result)
+    if result is None:
+        db.fail_job(job.id, "deep pass exceeded 180 s")
+    else:
+        db.finish_job(job.id, result)
     await db.append_event(
         Event(
             event_id=new_id("event"),
@@ -147,7 +151,24 @@ def test_no_supported_language_gets_an_iso_date() -> None:
         assert "-" not in format_date(dt.date(2026, 1, 5), language), language
 
 
-# R1 (6.1)
+# R1 (6.1) and the check before explaining (C46)
+
+
+async def explained(
+    db: FakeDB,
+    letter_results: LetterResults,
+    user: tables.User,
+    result: FastResult,
+    status: VerificationStatus = VerificationStatus.UNKNOWN,
+) -> tables.Message:
+    """The letter read ("double-checking…"), then the verdict, which carries the
+    explanation: the message that went out with it."""
+    job = await finished_fast_job(db, user, result.case_id, result)
+    await letter_results.fast_done(job)
+    assert db.outbound_templates() == ["letter.double_checking"]
+    await deep_done(db, user, result.case_id, deep_result(result.case_id, status))
+    await until(lambda: len(db.messages) == 2)
+    return db.messages[-1]
 
 
 async def test_explanation_carries_the_date_checklist_and_closing(
@@ -159,11 +180,11 @@ async def test_explanation_carries_the_date_checklist_and_closing(
     user = await use_spanish(db)
     result = FastResult.model_validate(fixture("fast_result.json", case_id="case_1"))
 
-    await letter_results.fast_done(await finished_fast_job(db, user, "case_1", result))
+    message = await explained(db, letter_results, user, result)
 
-    [message] = db.messages
     assert message.sender == "orchestrator"
     assert message.case_id == "case_1"
+    assert message.template == "verification.unknown"
     # Only the summary paragraph; the details repeat the date line and checklist (C41).
     summary, details = result.explanation_en.split("\n\n")
     assert message.body_original.startswith(f"[es] {summary}\n\n")
@@ -179,12 +200,12 @@ async def test_explanation_carries_the_date_checklist_and_closing(
         in message.body_original
     )
     assert "[es] Who must come:\n- All dependents" in message.body_original
-    assert message.body_original.endswith(render("letter.checking", "es"))
+    assert message.body_original.endswith(render("verification.unknown", "es"))
     assert message.body_en is not None
     assert "Wednesday, November 18, 2026, at 8:30 AM" in message.body_en
     assert "What to bring:" in message.body_en
     assert "<ref:" not in message.body_original
-    assert verdicts.is_watching("case_1")
+    assert not verdicts.is_watching("case_1")
 
 
 async def test_explanation_without_a_summary_paragraph_is_sent_whole(
@@ -196,9 +217,8 @@ async def test_explanation_without_a_summary_paragraph_is_sent_whole(
         fixture("fast_result.json", case_id="case_1", explanation_en=one_paragraph)
     )
 
-    await letter_results.fast_done(await finished_fast_job(db, user, "case_1", result))
+    message = await explained(db, letter_results, user, result)
 
-    [message] = db.messages
     assert message.body_original.startswith(f"[es] {one_paragraph}\n\n")
 
 
@@ -208,12 +228,10 @@ async def test_untranslated_explanation_falls_back_to_templates_never_english(
     user = await use_spanish(db)
     result = FastResult.model_validate(fixture("fast_result.json", case_id="case_1"))
     failing: Any = FakeTranslator(fail=True)
+    results = LetterResults(whatsapp, failing, verdicts, conversation=conversation)
 
-    await LetterResults(
-        whatsapp, failing, verdicts, conversation=conversation
-    ).fast_done(await finished_fast_job(db, user, "case_1", result))
+    message = await explained(db, results, user, result)
 
-    [message] = db.messages
     assert message.body_original.startswith(render("letter.explain_failed", "es"))
     assert "18 de noviembre" in message.body_original
     assert "This is a notice" not in message.body_original
@@ -226,15 +244,14 @@ async def test_dari_explanation_dates_the_interview_in_dari(
     user.language = "fa"
     result = FastResult.model_validate(fixture("fast_result.json", case_id="case_1"))
 
-    await letter_results.fast_done(await finished_fast_job(db, user, "case_1", result))
+    message = await explained(db, letter_results, user, result)
 
-    [message] = db.messages
     body = message.body_original
     summary = (result.explanation_en or "").split("\n\n")[0]
     assert body.startswith(f"[fa] {summary}\n\n")
     assert "مصاحبهٔ شما: چهارشنبه ۱۸ نومبر ۲۰۲۶، ساعت ۸:۳۰ صبح" in body
     assert "2026-11-18" not in body and "8:30" not in body
-    assert body.endswith(render("letter.checking", "fa"))
+    assert body.endswith(render("verification.unknown", "fa"))
     assert "Wednesday, November 18, 2026, at 8:30 AM" in (message.body_en or "")
 
 
@@ -253,6 +270,134 @@ async def test_unreadable_photo_asks_for_a_retake_with_the_tip(
     assert "[es] It's blurry." in message.body_original
     assert message.body_en == render("letter.retake_tip", "en", tip="It's blurry.")
     assert not verdicts.is_watching("case_1")  # no deep pass for an unreadable photo
+
+
+async def test_letter_with_scam_signs_is_warned_about_and_never_explained(
+    db: FakeDB, letter_results: LetterResults, verdicts: Verdicts
+) -> None:
+    """Research's instant checks flagged it (R1 suspicious): a warm warning at
+    once, no explanation, no call offer, and no second warning from the deep pass."""
+    user = await use_spanish(db)
+    result = FastResult.model_validate(
+        fixture("fast_result.json", case_id="case_1", verification="suspicious")
+    )
+
+    await letter_results.fast_done(await finished_fast_job(db, user, "case_1", result))
+
+    assert db.outbound_templates() == ["letter.looks_like_scam"]
+    assert "This is a USCIS notice" not in (db.messages[-1].body_en or "")
+    assert not verdicts.is_watching("case_1")
+
+
+async def test_verified_letter_is_explained_and_called_genuine_in_one_message(
+    db: FakeDB,
+    letter_results: LetterResults,
+    consent: ConsentGate,
+    conversation: Conversation,
+) -> None:
+    """No call offer with the verdict (C44): the turn offers one if the user needs
+    it."""
+    user = await use_spanish(db)
+    case = db.add_verified_case(user)
+    result = FastResult.model_validate(fixture("fast_result.json", case_id=case.id))
+    await letter_results.fast_done(await finished_fast_job(db, user, case.id, result))
+    assert conversation.is_typing(user.id)  # while it checks
+
+    await deep_done(
+        db, user, case.id, deep_result(case.id, VerificationStatus.VERIFIED)
+    )
+    await until(lambda: len(db.messages) == 2)
+
+    assert db.outbound_templates() == [
+        "letter.double_checking",
+        "verification.verified",
+    ]
+    body = db.messages[-1].body_original
+    summary = (result.explanation_en or "").split("\n\n")[0]
+    assert body.startswith(f"[es] {summary}")
+    assert body.endswith(render("verification.verified", "es"))
+    assert consent.pending(user.id) is None
+    assert not conversation.is_typing(user.id)
+
+
+async def test_suspicious_verdict_warns_and_never_explains(
+    db: FakeDB, letter_results: LetterResults
+) -> None:
+    user = await use_spanish(db)
+    result = FastResult.model_validate(fixture("fast_result.json", case_id="case_1"))
+    await letter_results.fast_done(await finished_fast_job(db, user, "case_1", result))
+
+    await deep_done(
+        db,
+        user,
+        "case_1",
+        deep_result(
+            "case_1",
+            VerificationStatus.SUSPICIOUS,
+            verification={"red_flags": ["Asks for a fee by phone"]},
+            call_recommended=False,
+            brief_id=None,
+        ),
+    )
+    await until(lambda: len(db.messages) == 2)
+
+    assert db.outbound_templates() == [
+        "letter.double_checking",
+        "verification.suspicious",
+    ]
+    assert "This is a USCIS notice" not in (db.messages[-1].body_en or "")
+
+
+async def test_failed_check_explains_with_a_caution(
+    db: FakeDB, letter_results: LetterResults
+) -> None:
+    user = await use_spanish(db)
+    result = FastResult.model_validate(fixture("fast_result.json", case_id="case_1"))
+    await letter_results.fast_done(await finished_fast_job(db, user, "case_1", result))
+
+    await deep_done(db, user, "case_1", None)
+    await until(lambda: len(db.messages) == 2)
+
+    message = db.messages[-1]
+    assert message.template == "verification.unknown"
+    assert (message.body_en or "").startswith("This is a USCIS notice")
+
+
+async def test_no_verdict_in_time_explains_with_a_caution_then_follows_up(
+    db: FakeDB,
+    whatsapp: FakeWhatsApp,
+    translator: FakeTranslator,
+    conversation: Conversation,
+) -> None:
+    """C46: the explanation waits at most `explain_after_s` for the verdict."""
+    fake: Any = translator
+    verdicts = Verdicts(
+        whatsapp,
+        fake,
+        poll_interval_s=0.01,
+        conversation=conversation,
+        explain_after_s=0.05,
+    )
+    results = LetterResults(whatsapp, fake, verdicts, conversation=conversation)
+    user = await use_spanish(db)
+    case = db.add_verified_case(user)
+    result = FastResult.model_validate(fixture("fast_result.json", case_id=case.id))
+
+    await results.fast_done(await finished_fast_job(db, user, case.id, result))
+    await until(lambda: len(db.messages) == 2)
+
+    explanation = db.messages[-1]
+    assert explanation.template == "letter.still_checking"
+    assert (explanation.body_en or "").startswith("This is a USCIS notice")
+
+    await deep_done(
+        db, user, case.id, deep_result(case.id, VerificationStatus.VERIFIED)
+    )
+    await until(lambda: len(db.messages) == 3)
+
+    verdict = db.messages[-1]
+    assert verdict.template == "verification.verified"
+    assert "This is a USCIS notice" not in (verdict.body_en or "")  # not twice
 
 
 def test_date_only_appointment_leaves_the_time_out() -> None:
@@ -396,10 +541,11 @@ async def test_explanation_waits_for_a_turn_in_progress(
     release.set()
     await asyncio.gather(handling, explaining)
 
-    assert not conversation.is_typing(user.id)
+    # The turn is done; "typing…" stays on while the letter is checked (C46).
+    assert conversation.is_typing(user.id)
     first, second = [m.body_original for m in db.messages if m.direction == "out"]
     assert first == "turn reply"
-    assert second.startswith("[es] This is a USCIS notice")
+    assert second == render("letter.double_checking", "es")
 
 
 @pytest.mark.parametrize(
