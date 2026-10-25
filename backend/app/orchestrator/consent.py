@@ -115,14 +115,11 @@ class ConsentGate:
         case_id: CaseId,
         *,
         goal_en: str | None = None,
-        verified: bool = False,
         template: str = "consent.request",
         send: bool = True,
     ) -> str | None:
-        """Ask the user whether to call about this case. With `verified`, the same
-        message leads with "it's genuine" (one message for the verdict and the
-        question, Verdicts); `template` names another lead the same way (it and its
-        `_generic` form end with the request). With `send=False`, the request opens
+        """Ask the user whether to call about this case. `template` names a lead
+        for the question (it and its `_generic` form end with the request). With `send=False`, the request opens
         but nothing is sent: the turn asks in its own words, then calls `asked`.
         Returns None once asked, or the reason (English, for the model) the call
         can't be offered."""
@@ -143,8 +140,6 @@ class ConsentGate:
         if brief is None:
             return "The call plan isn't ready yet."
         goal_en = goal_en or _call_goal_en(brief)
-        if verified:
-            template = "verification.verified_call"
         pending = PendingConsent(case_id, utcnow(), goal_en, _agency(case))
         if send:
             asked = await self._send_question(user, pending, template)
@@ -351,6 +346,10 @@ class ConsentGate:
             except WhatsAppSendError as exc:
                 logger.error("Consent ack not sent case_id=%s: %s", case_id, exc)
         return "consent.given"
+
+    async def can_call(self, case_id: CaseId) -> bool:
+        """A call could be offered for this case now, if the user needs one."""
+        return await self._refusal(case_id) is None
 
     async def _refusal(self, case_id: CaseId) -> str | None:
         """Why no call can be offered for this case right now, or None."""

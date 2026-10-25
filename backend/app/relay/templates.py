@@ -421,16 +421,6 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
     "consent.request_generic": {
         lang: _WANT_CALL_GENERIC[lang] + _CALL_ASK[lang] for lang in _CALL_ASK
     },
-    # The verdict and the consent request in one message, so the user has one thing
-    # to answer (conversation.py).
-    "verification.verified_call": {
-        lang: _VERIFIED[lang] + "\n" + _WANT_CALL[lang] + _CALL_ASK[lang]
-        for lang in _CALL_ASK
-    },
-    "verification.verified_call_generic": {
-        lang: _VERIFIED[lang] + "\n" + _WANT_CALL_GENERIC[lang] + _CALL_ASK[lang]
-        for lang in _CALL_ASK
-    },
     "consent.reprompt": {
         "es": "Por favor responda 1 si quiere que llame a USCIS, o 2 si no.",
         "en": "Please reply 1 if you'd like me to call USCIS, or 2 if not.",
