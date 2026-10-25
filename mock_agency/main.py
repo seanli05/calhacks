@@ -103,8 +103,7 @@ class MockAgencyLine:
             return
 
         if isinstance(event, CallStarted):
-            if self.settings.ivr_voice_id:
-                yield AgentUpdateCall(voice_id=self.settings.ivr_voice_id)
+            yield AgentUpdateCall(voice_id=self.settings.ivr_voice_id)
             turn = self.tree.start()
         elif isinstance(event, UserDtmfSent):
             turn = self.tree.press(event.button)
@@ -182,8 +181,7 @@ class MockAgencyLine:
                 yield AgentSendText(text=text, interruptible=False)
 
         self.officer = self._build_officer()
-        if self.settings.officer_voice_id:
-            yield AgentUpdateCall(voice_id=self.settings.officer_voice_id)
+        yield AgentUpdateCall(voice_id=self.settings.officer_voice_id)
         self.phase = Phase.OFFICER
         logger.info(f"officer_joined call_id={self.call_id} info={self.tree.info}")
         yield AgentSendText(

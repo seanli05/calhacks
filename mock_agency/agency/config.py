@@ -8,6 +8,13 @@ import os
 
 from pydantic import BaseModel
 
+# Two clearly different voices, so the officer picking up sounds like a new person,
+# as on a real line. Both English Cartesia voices; override with the env vars.
+IVR_VOICE_ID = "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4"
+"""Skylar - Friendly Guide: the phone tree and hold announcements."""
+OFFICER_VOICE_ID = "a5136bf9-224c-4d76-b823-52bd5efcffcc"
+"""Jameson - Easygoing Support: Officer Daniel Reyes."""
+
 
 class MockAgencySettings(BaseModel):
     anthropic_api_key: str
@@ -16,8 +23,8 @@ class MockAgencySettings(BaseModel):
     hold_seconds: float = 45.0
     hold_announce_every_s: float = 15.0
     no_input_seconds: float = 12.0
-    ivr_voice_id: str | None = None
-    officer_voice_id: str | None = None
+    ivr_voice_id: str = IVR_VOICE_ID
+    officer_voice_id: str = OFFICER_VOICE_ID
 
     @classmethod
     def from_env(cls) -> "MockAgencySettings":

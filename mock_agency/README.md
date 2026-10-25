@@ -65,8 +65,8 @@ This folder deploys to Cartesia as its own project, with its own [pyproject.toml
 | `MOCK_AGENCY_HOLD_ANNOUNCE_EVERY_S` | no | `15` | Gap between hold announcements |
 | `MOCK_AGENCY_NO_INPUT_SECONDS` | no | `12` | Silence before a reprompt, counted only once the line stops talking |
 | `MOCK_AGENCY_OFFICER_NAME` | no | `Daniel Reyes` | |
-| `MOCK_AGENCY_IVR_VOICE_ID` | no | agent's default voice | Cartesia voice for the menu |
-| `MOCK_AGENCY_OFFICER_VOICE_ID` | no | agent's default voice | Use a different, warmer voice so the human pickup is obvious on video |
+| `MOCK_AGENCY_IVR_VOICE_ID` | no | Skylar - Friendly Guide (`db6b0ed5-d5d3-463d-ae85-518a07d3c2b4`) | Cartesia voice for the menu and hold announcements |
+| `MOCK_AGENCY_OFFICER_VOICE_ID` | no | Jameson - Easygoing Support (`a5136bf9-224c-4d76-b823-52bd5efcffcc`) | A different voice, so the officer picking up sounds like a new person, as on a real line |
 
 ## Run locally
 
@@ -95,6 +95,8 @@ cartesia init                               # link to a new agent (first time on
 cartesia env set ANTHROPIC_API_KEY=... MOCK_AGENCY_OFFICER_MODEL=anthropic/claude-haiku-5-5
 cartesia deploy && cartesia status
 ```
+
+The menu and the officer use two different voices by default (Environment, above). If `MOCK_AGENCY_IVR_VOICE_ID` or `MOCK_AGENCY_OFFICER_VOICE_ID` was set on Cartesia earlier, it still wins: `cartesia env rm <name>` to use the defaults, then deploy again.
 
 Then attach a phone number to the agent in the [Cartesia dashboard](https://play.cartesia.ai). That number is the mock agency's number (`MOCK_AGENCY_NUMBER` in the backend `.env`). Test it by calling it from your own phone.
 
