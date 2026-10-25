@@ -38,6 +38,17 @@ export const LANGUAGES: { code: string; label: string }[] = [
   { code: "es", label: "Español" },
   { code: "en", label: "English" },
   { code: "fa", label: "دری" },
+  // Listed to show where the product goes; no UI strings yet, so they show English.
+  { code: "ps", label: "پښتو" },
+  { code: "ar", label: "العربية" },
+  { code: "ht", label: "Kreyòl ayisyen" },
+  { code: "vi", label: "Tiếng Việt" },
+  { code: "zh", label: "中文" },
+  { code: "tl", label: "Tagalog" },
+  { code: "pt", label: "Português" },
+  { code: "fr", label: "Français" },
+  { code: "ru", label: "Русский" },
+  { code: "uk", label: "Українська" },
 ];
 
 /** Languages written right to left: the page flips with `dir`. */
