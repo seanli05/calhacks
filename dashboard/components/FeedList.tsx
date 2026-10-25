@@ -35,7 +35,7 @@ export function FeedList({ items, className = "" }: { items: FeedItem[]; classNa
             <span className={styles.ic}>
               <Icon name={iconForEvent(item.type)} />
             </span>
-            <span className={styles.what}>
+            <span className={styles.what} dir="auto">
               {item.text.text}
               {item.deleted_at && (
                 <span className={styles.deleted}> {t.deleted(shortDate(item.deleted_at, lang))}</span>

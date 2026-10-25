@@ -59,7 +59,7 @@ Conventions:
 
 Server-side, so the dashboard stays simple (C23, C27).
 
-- **`api/feed_templates.py`:** a template per language for each event type shown on the demo screen, filled from the event's `data`. At minimum `case.created`, `research.fast_done`, `verification.*`, `consent.*`, every `call.*` type, `memory.fact_*`, the four delete types. Spanish and English first.
+- **`api/feed_templates.py`:** a template per language for each event type shown on the demo screen, filled from the event's `data`. At minimum `case.created`, `research.fast_done`, `verification.*`, `consent.*`, every `call.*` type, `memory.fact_*`, the four delete types. English, Spanish (formal *usted*) and Dari for every type; a bare number filled in is written in the language's digits.
 - **Missing `data` fields never break the feed.** Each type has a variant with no variables. For example, `call.menu_choice` renders "We chose option {option} in the menu" when `data.option` exists and "We chose an option in the menu" when it doesn't. Other components emit these events, so don't assume their `data`.
 - **Other types:** `summary_en`, translated the same way (English until the translation lands).
 - **References (C27):** an event whose `data` has `fact_id` or `document_id` shows that row's text, looked up at render time. Once the row is gone, set `deleted_at` (the time of the matching `fact.deleted` / `document.deleted` event) and render the text without the content. Event rows never contain the content itself.

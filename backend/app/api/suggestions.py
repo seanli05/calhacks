@@ -13,6 +13,7 @@ from app.api.models import Localized, Suggestion
 from app.api.suggestion_templates import TEXTS
 from app.contracts import ChecklistKind, FastResult
 from app.db import reads, tables
+from app.translation.script import local_digits
 
 router = APIRouter()
 
@@ -56,12 +57,16 @@ class _Texts:
         )
 
     def raw(self, key: str, **values: str) -> str:
-        """The text in `lang`; a language without templates (Dari) gets the English
-        through the translation cache."""
+        """The text in `lang`, a bare number ("20") in its digits; a language
+        without templates gets the English through the translation cache."""
         template = TEXTS.get(self.lang, {}).get(key)
         if template is None:
             return localize(TEXTS["en"][key].format(**values), self.lang).text
-        return template.format(**values)
+        local = {
+            k: local_digits(v, self.lang) if v.isdigit() else v
+            for k, v in values.items()
+        }
+        return template.format(**local)
 
 
 def _countdown(

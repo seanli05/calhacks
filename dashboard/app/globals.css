@@ -191,6 +191,38 @@ img {
   unicode-bidi: plaintext;
 }
 
+/* Dari: Vazirmatn first (its subset covers only Arabic script, so Latin still falls
+   through to Instrument Sans), small text a step up and taller lines, since Arabic
+   script at 12px is hard to read. Letter-spacing tears joined letters apart, so it's
+   off everywhere the text is Dari; English inside keeps its own. */
+:root:lang(fa) {
+  --font-ui: var(--font-dari), var(--font-sans), "Noto Sans Arabic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fs-xs: 13px;
+  --fs-sm: 14px;
+}
+
+body:lang(fa) {
+  line-height: 1.6;
+}
+
+/* Headings are set tight for Latin; Arabic script's dots and descenders need room. */
+:root:lang(fa) :is(h1, h2, h3) {
+  line-height: 1.3;
+}
+
+:lang(fa) {
+  letter-spacing: 0 !important;
+}
+
+/* Arrows point the way their line reads (`:dir` follows `dir="auto"` too). */
+.flip-rtl {
+  display: inline-block;
+}
+
+.flip-rtl:dir(rtl) {
+  transform: scaleX(-1);
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

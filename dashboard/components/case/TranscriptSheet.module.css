@@ -24,6 +24,22 @@
   animation: slide 260ms ease both;
 }
 
+[dir="rtl"] .sheet {
+  box-shadow: 20px 0 60px rgba(15, 26, 20, 0.12);
+  animation-name: slide-rtl;
+}
+
+@keyframes slide-rtl {
+  from {
+    transform: translateX(-40px);
+    opacity: 0.4;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
 @keyframes slide {
   from {
     transform: translateX(40px);

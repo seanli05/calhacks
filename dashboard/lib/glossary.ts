@@ -1,9 +1,20 @@
 import type { GlossaryEntry } from "./api/types";
 
+/**
+ * Dari typed on an Arabic keyboard (ي, ك) reads as the Persian letters, and the
+ * zero-width non-joiner as a space, so "دوسیه ها" finds "دوسیه‌ها".
+ */
+const PERSIAN_FOLD: Record<string, string> = { "ي": "ی", "ى": "ی", "ك": "ک", "‌": " " };
+
 /** Lowercase without accents, one UTF-16 unit per unit in, so indexes line up. */
 function fold(text: string): string {
   let out = "";
   for (let i = 0; i < text.length; i++) {
+    const persian = PERSIAN_FOLD[text[i]];
+    if (persian) {
+      out += persian;
+      continue;
+    }
     const c = text[i].normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
     out += c[0] ?? text[i];
   }

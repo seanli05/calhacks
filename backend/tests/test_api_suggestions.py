@@ -53,17 +53,26 @@ def test_demo_case_gets_all_three_in_order(monkeypatch: pytest.MonkeyPatch) -> N
         glossary=("asylum interview", "interpreter", "dependent"),
     )
     countdown, glossary, checklist = _get(case)
-    assert countdown["title"]["text"] == "Tu entrevista es en 20 días"
+    assert countdown["title"]["text"] == "Su entrevista es en 20 días"
     assert countdown["title"]["en"] == "Your interview is in 20 days"
     assert countdown["prefill"] == "¿Qué tengo que llevar a mi entrevista?"
     assert glossary["detail"]["text"] == "asylum interview · interpreter · dependent"
     assert checklist["title"] == {
-        "text": "No olvides: un intérprete calificado si no hablas inglés con fluidez",
+        "text": "No olvide: un intérprete calificado si no habla inglés con fluidez",
         "en": "Don't forget: a qualified interpreter if you are not fluent in English",
     }
     assert checklist["prefill"] == (
-        "¿Cómo consigo un intérprete calificado si no hablas inglés con fluidez?"
+        "¿Cómo consigo un intérprete calificado si no habla inglés con fluidez?"
     )
+
+
+def test_dari_cards_use_persian_digits(monkeypatch: pytest.MonkeyPatch) -> None:
+    case = _serve(monkeypatch, demo_fast_result("case_1"), demo_brief("case_1", "b"))
+    countdown = client.get(f"/api/users/{case.user_id}/suggestions?lang=fa").json()[0]
+    assert countdown["title"] == {
+        "text": "مصاحبهٔ شما ۲۰ روز بعد است",
+        "en": "Your interview is in 20 days",
+    }
 
 
 def test_rules_without_data_are_skipped(monkeypatch: pytest.MonkeyPatch) -> None:

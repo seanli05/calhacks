@@ -161,7 +161,9 @@ export function CaseLiveView({ userId, caseId }: { userId: string; caseId: strin
                       <button type="button" className={`btn ${styles.bookButton}`} onClick={() => setPanel("book")}>
                         <Icon name="book" size={16} />
                         {s.case.live.book}
-                        <span aria-hidden="true">→</span>
+                        <span aria-hidden="true" className="flip-rtl">
+                          →
+                        </span>
                       </button>
                       {pastTips.length > 0 && <LiveTips tips={pastTips} />}
                     </>
@@ -261,7 +263,11 @@ function DatePeek({ detail, onOpen }: { detail: CaseDetail; onOpen: () => void }
         {new Intl.RelativeTimeFormat(intlLocale(lang), { numeric: "auto" }).format(daysUntil(date, now), "day")}
         {appt?.location && ` · ${appt.location}`}
       </span>
-      {detail.checklist.length > 0 && <span className={styles.peekLink}>{t.appt.seeChecklist} →</span>}
+      {detail.checklist.length > 0 && (
+        <span className={styles.peekLink}>
+          {t.appt.seeChecklist} <span className="flip-rtl">→</span>
+        </span>
+      )}
     </button>
   );
 }
@@ -281,7 +287,7 @@ function WordsPeek({ entries, onOpen }: { entries: GlossaryEntry[]; onOpen: () =
         ))}
       </ul>
       <button type="button" className={styles.peekLink} onClick={onOpen}>
-        {t.words.seeAll} →
+        {t.words.seeAll} <span className="flip-rtl">→</span>
       </button>
     </section>
   );

@@ -32,7 +32,9 @@ export function FactTag({
       aria-hidden={leaving || undefined}
     >
       <div className={styles.body}>
-        <span className={styles.text}>{text}</span>
+        <span className={styles.text} dir="auto">
+          {text}
+        </span>
         {english && <small className={styles.en}>{english}</small>}
         <span className={styles.meta}>
           {isPrivate && (

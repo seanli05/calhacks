@@ -1,12 +1,12 @@
 import type { LandingStrings } from "../en/landing";
 
 export const landing: LandingStrings = {
-  headline: ["Tu carta, explicada.", "Tu llamada, hecha."],
-  sub: "Leemos cartas de inmigración en tu idioma, verificamos que son reales y esperamos en la línea con la agencia por ti.",
-  tryIt: "Pruébalo en WhatsApp",
+  headline: ["Su carta, explicada.", "Su llamada, hecha."],
+  sub: "Leemos cartas de inmigración en su idioma, verificamos que son reales y esperamos en la línea con la agencia por usted.",
+  tryIt: "Pruébelo en WhatsApp",
   watch: "Ver una llamada en vivo",
-  scan: "O escanea con tu teléfono",
-  thenSend: "El mensaje ya está escrito. Solo presiona enviar:",
+  scan: "O escanee con su teléfono",
+  thenSend: "El mensaje ya está escrito. Solo presione enviar:",
 
   demo: {
     live: "Llamada en curso",
@@ -16,13 +16,13 @@ export const landing: LandingStrings = {
     menu: "Pasando el menú telefónico",
     hold: "Estamos en espera con USCIS",
     human: "Contestó una persona",
-    humanSub: "Te estamos llamando para que te unas.",
+    humanSub: "Le estamos llamando para que se una.",
     feed: {
       verified: "Confirmamos el número oficial en uscis.gov",
       dialing: "Llamamos a USCIS",
       menu: "Elegimos la opción 2 del menú",
-      hold: "Estamos en espera. Tú no tienes que esperar.",
-      human: "Contestó una persona. Te estamos llamando.",
+      hold: "Estamos en espera. Usted no tiene que esperar.",
+      human: "Contestó una persona. Le estamos llamando.",
     },
     ago: (min: number) => (min === 0 ? "ahora" : `hace ${min} min`),
   },
@@ -32,21 +32,21 @@ export const landing: LandingStrings = {
     items: [
       { k: "Número marcado", v: "verificado en uscis.gov" },
       { k: "Menú telefónico", v: "lo pasamos nosotros" },
-      { k: "Tiempo en espera", v: "nuestro, no tuyo" },
-      { k: "Tu permiso", v: "lo pedimos siempre" },
-      { k: "Tu A-Number", v: "nunca lo decimos" },
+      { k: "Tiempo en espera", v: "nuestro, no suyo" },
+      { k: "Su permiso", v: "lo pedimos siempre" },
+      { k: "Su A-Number", v: "nunca lo decimos" },
       { k: "Idiomas", v: "Español · English · دری" },
     ],
   },
 
   bento: {
-    title: ["Todo lo que una carta te pide.", "Resuelto por WhatsApp."],
+    title: ["Todo lo que una carta le pide.", "Resuelto por WhatsApp."],
     explain: {
-      lead: "Tu carta, explicada",
-      rest: " en tu idioma: la fecha, el lugar y qué llevar.",
+      lead: "Su carta, explicada",
+      rest: " en su idioma: la fecha, el lugar y qué llevar.",
       docType: "Aviso de entrevista de asilo",
-      bubble: "Es tu entrevista de asilo: jueves 12 de noviembre a las 9:00 a. m. Lleva tu pasaporte y un intérprete.",
-      ask: "¿Quieres que llamemos a USCIS por ti?",
+      bubble: "Es su entrevista de asilo: jueves 12 de noviembre a las 9:00 a. m. Lleve su pasaporte y un intérprete.",
+      ask: "¿Quiere que llamemos a USCIS por usted?",
       yes: "Sí, por favor",
     },
     verify: {
@@ -59,7 +59,7 @@ export const landing: LandingStrings = {
         "El número de recibo tiene el formato correcto",
         "No pide pagos ni tarjetas de regalo",
         "Sin amenazas de arresto o deportación",
-        "Sin ofertas de \"notarios\"",
+        "Sin ofertas de “notarios”",
       ],
       official: "Número oficial encontrado en uscis.gov",
     },
@@ -76,34 +76,34 @@ export const landing: LandingStrings = {
     },
     hold: {
       lead: "Esperamos en la línea.",
-      rest: " Tú sigues con tu día.",
+      rest: " Usted sigue con su día.",
       onHold: "en espera",
     },
     ring: {
-      lead: "Tu teléfono suena",
+      lead: "Su teléfono suena",
       rest: " en cuanto contesta una persona.",
       answered: "Contestó una persona",
-      calling: "Te estamos llamando",
+      calling: "Le estamos llamando",
       cta: "Ver una llamada en vivo",
     },
     prep: {
       lead: "Listo para la entrevista.",
       rest: " Palabras clave en inglés y qué llevar.",
-      days: "días para tu entrevista",
+      days: "días para su entrevista",
       words: [
         { term: "interpreter", meaning: "intérprete" },
         { term: "receipt notice", meaning: "aviso de recibo" },
       ],
-      checklist: ["Lleva tu pasaporte", "Lleva un intérprete", "Tu cónyuge e hijos deben venir"],
+      checklist: ["Lleve su pasaporte", "Lleve un intérprete", "Su cónyuge e hijos deben venir"],
     },
     memory: {
-      lead: "Tus datos, tu decisión.",
-      rest: " Mira lo que se guarda. Quita lo que quieras.",
+      lead: "Sus datos, su decisión.",
+      rest: " Vea lo que se guarda. Quite lo que quiera.",
       facts: ["Prefiere español", "Tiene dos hijos", "Entrevista el 12 de nov.", "Necesita intérprete", "Pidió llamadas después de las 5 p. m."],
       deleteAll: "Borrar mi perfil",
       delete: "Quitar",
       deleted: "(quitado)",
-      cta: "Ver tu perfil",
+      cta: "Ver su perfil",
     },
   },
 
@@ -112,14 +112,14 @@ export const landing: LandingStrings = {
     sub: "Son reglas en nuestro código, no ajustes.",
     items: [
       { title: "Marcar un número sin verificar", body: "Solo el número oficial, del sitio de la propia agencia." },
-      { title: "Hablar por ti", body: "Nunca decimos tu A-Number, número de recibo ni fecha de nacimiento. Contestas tú." },
-      { title: "Llamar sin tu permiso", body: "Te preguntamos antes de cada llamada y guardamos tu respuesta." },
-      { title: "Guardar lo que borras", body: "Borra lo que quieras, o todo, cuando quieras." },
+      { title: "Hablar por usted", body: "Nunca decimos su A-Number, número de recibo ni fecha de nacimiento. Usted contesta." },
+      { title: "Llamar sin su permiso", body: "Le preguntamos antes de cada llamada y guardamos su respuesta." },
+      { title: "Guardar lo que usted borra", body: "Borre lo que quiera, o todo, cuando quiera." },
     ],
   },
 
   closing: {
-    title: ["¿Te llegó una carta?", "Envíanos una foto."],
-    sub: "Solo necesitas una foto. Español, inglés y dari por ahora.",
+    title: ["¿Le llegó una carta?", "Envíenos una foto."],
+    sub: "Solo necesita una foto. Español, inglés y dari por ahora.",
   },
 };

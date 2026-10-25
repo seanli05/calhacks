@@ -1,6 +1,10 @@
 import type { CommonStrings } from "../en/common";
 
-/** Afghan Dari, following the register in `backend/app/translation/translate.py`. */
+/**
+ * Afghan Dari, in the register of `REGISTERS["fa"]` in
+ * `backend/app/translation/translate.py` and the WhatsApp templates: دوسیه, تیلفون,
+ * معلومات, ضرورت, «ادارهٔ USCIS», "on hold" as پشت خط منتظر, Persian digits.
+ */
 export const common: CommonStrings = {
   appName: "Avocado",
   nav: {
@@ -23,12 +27,12 @@ export const common: CommonStrings = {
     unknown: "تأیید نشد",
     awaiting_consent: "منتظر اجازهٔ شما",
     calling: "در حال تماس",
-    on_hold: "در انتظار",
-    connected: "صحبت با یک شخص",
+    on_hold: "پشت خط منتظر",
+    connected: "در حال صحبت با یک شخص",
     call_ended: "تماس ختم شد",
     closed: "بسته شد",
   },
-  trackerSteps: ["نامه", "تأیید شد", "تماس", "در انتظار", "شخص"],
+  trackerSteps: ["نامه", "تأیید شد", "تماس", "پشت خط", "شخص"],
   assistant: {
     title: "دستیار",
     viaWhatsApp: "از طریق واتس‌اپ",
@@ -37,6 +41,7 @@ export const common: CommonStrings = {
     you: "شما",
   },
   deleted: (date: string) => `(در ${date} پاک شد)`,
+  quote: (text: string) => `«${text}»`,
   loading: "در حال بارگذاری…",
   loadError: "به سرور وصل نمی‌شود. دوباره کوشش می‌کنیم…",
   notFound: "آن را پیدا نکردیم.",
