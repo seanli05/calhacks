@@ -31,6 +31,7 @@ from app.db.engine import get_engine, session
 from app.db.schema import create_all, drop_all
 from app.db.seed_story import Story, placeholder_letter_png
 from app.db.tables import utcnow
+from app.db.writes import glossary as glossary_writes
 from app.glossary import load as glossary_load
 from app.settings import get_settings
 
@@ -349,7 +350,7 @@ async def reset(
             case_id = await seed(after_call)
             print(f"Seeded demo case {case_id}.")
         # After the seed: the loader replaces the seed's few placeholder terms.
-        terms = await glossary_load.load(glossary_load.read_rows())
+        terms = await glossary_writes.add_terms(glossary_load.read_rows())
         print(f"Loaded {terms} glossary terms.")
     finally:
         await get_engine().dispose()

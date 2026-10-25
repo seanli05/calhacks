@@ -36,6 +36,7 @@ from app.db.schema import create_all, drop_all
 from app.db.tables import utcnow
 from app.db.writes import memory, orchestrator, phone, research
 from app.settings import Settings, get_settings, to_asyncpg_url
+from sqlalchemy import delete as sa_delete
 from sqlmodel import select
 
 TEST_DATABASE_URL = Settings().test_database_url
@@ -298,6 +299,22 @@ async def test_resolve_ref_accepts_placeholder() -> None:
     assert await reads.resolve_ref(case.id, "<ref:receipt_number>") == "ZLA2690012345"
     async with session() as db:
         assert await db.get(tables.CaseRef, (case.id, "receipt_number")) is not None
+
+
+async def test_add_terms_loads_the_preset_glossary_in_one_go() -> None:
+    from app.db.writes import glossary as glossary_writes
+    from app.glossary import load as glossary_load
+
+    rows = glossary_load.read_rows()
+    assert await glossary_writes.add_terms(rows) == len(rows)
+    # Again, as a reset over a loaded glossary would: replaced, not duplicated.
+    assert await glossary_writes.add_terms(rows) == len(rows)
+    dari = await reads.get_glossary("fa")
+    assert len(dari) == sum(1 for r in rows if r.language == "fa")
+    async with session() as db:
+        # Other tests seed their own few terms, so leave the table as it was.
+        await db.execute(sa_delete(tables.GlossaryTerm))
+        await db.commit()
 
 
 async def test_mariam_seed_is_a_finished_verified_case_in_dari() -> None:
