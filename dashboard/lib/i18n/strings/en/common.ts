@@ -20,6 +20,7 @@ export const common = {
     checking: "Checking it's real",
     suspicious: "Might not be real",
     unknown: "Couldn't confirm",
+    verified: "Letter is real",
     awaiting_consent: "Waiting for your OK",
     calling: "Calling",
     on_hold: "On hold",

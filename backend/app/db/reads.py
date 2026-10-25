@@ -149,6 +149,13 @@ async def _latest_job_status(
     return (await db.execute(query)).scalar_one_or_none()
 
 
+_CONSENT_EVENTS = (
+    EventType.CONSENT_REQUESTED,
+    EventType.CONSENT_GIVEN,
+    EventType.CONSENT_DECLINED,
+)
+
+
 async def case_progress(case_id: CaseId) -> CaseStage:
     """The case's stage, computed from its jobs, verdict, and calls (C17)."""
     async with session() as db:
@@ -167,6 +174,16 @@ async def case_progress(case_id: CaseId) -> CaseStage:
         verification = await _latest_verification(db, case_id)
         fast_job = await _latest_job_status(db, case_id, JobType.RESEARCH_FAST)
         deep_job = await _latest_job_status(db, case_id, JobType.RESEARCH_DEEP)
+        consent_query = (
+            select(tables.Event.type)
+            .where(
+                tables.Event.case_id == case_id,
+                tables.Event.type.in_(_CONSENT_EVENTS),
+            )
+            .order_by(tables.Event.created_at.desc())
+            .limit(1)
+        )
+        last_consent = (await db.execute(consent_query)).scalar_one_or_none()
     return compute_stage(
         closed=closed,
         latest_call_state=call_state,
@@ -174,6 +191,8 @@ async def case_progress(case_id: CaseId) -> CaseStage:
         fast_job=fast_job,
         deep_job=deep_job,
         fast_result=(case.fast_result or {}).get("status"),
+        call_offered=last_consent
+        in (EventType.CONSENT_REQUESTED, EventType.CONSENT_GIVEN),
     )
 
 

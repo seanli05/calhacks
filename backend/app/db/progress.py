@@ -17,6 +17,7 @@ class CaseStage(StrEnum):
     CHECKING = "checking"
     SUSPICIOUS = "suspicious"
     UNKNOWN = "unknown"
+    VERIFIED = "verified"
     AWAITING_CONSENT = "awaiting_consent"
     CALLING = "calling"
     ON_HOLD = "on_hold"
@@ -39,7 +40,7 @@ _CALL_STAGES = {
 }
 
 _VERDICT_STAGES = {
-    VerificationStatus.VERIFIED: CaseStage.AWAITING_CONSENT,
+    VerificationStatus.VERIFIED: CaseStage.VERIFIED,
     VerificationStatus.SUSPICIOUS: CaseStage.SUSPICIOUS,
     VerificationStatus.UNKNOWN: CaseStage.UNKNOWN,
 }
@@ -55,13 +56,18 @@ def compute_stage(
     fast_job: JobStatus | None,
     deep_job: JobStatus | None,
     fast_result: FastResultStatus | None,
+    call_offered: bool = False,
 ) -> CaseStage:
     """Inputs are the latest of each (job status, call state, verdict) for the case.
-    Later stages win: a call outranks the verdict, which outranks research."""
+    Later stages win: a call outranks the verdict, which outranks research.
+    `call_offered`: the orchestrator offered a call and the user hasn't said no. A
+    verified letter waits for consent only then; most letters need no call."""
     if closed:
         return CaseStage.CLOSED
     if latest_call_state is not None:
         return _CALL_STAGES[CallState(latest_call_state)]
+    if latest_verification == VerificationStatus.VERIFIED and call_offered:
+        return CaseStage.AWAITING_CONSENT
     if latest_verification in _VERDICT_STAGES:
         return _VERDICT_STAGES[VerificationStatus(latest_verification)]
     if fast_job in _ACTIVE:

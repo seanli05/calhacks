@@ -4,6 +4,7 @@ set, and it must not be the shared database: the tables are dropped and rebuilt.
 import asyncio
 import secrets
 from collections.abc import AsyncIterator
+from datetime import timedelta
 from urllib.parse import urlsplit
 
 import pytest
@@ -189,7 +190,15 @@ async def test_case_progress_through_the_demo() -> None:
     assert await reads.case_progress(case.id) == CaseStage.CHECKING
 
     await research.save_verification(case.id, _verification("verified"))
+    assert await reads.case_progress(case.id) == CaseStage.VERIFIED
+    offer = _event(EventType.CONSENT_REQUESTED, user.id, case_id=case.id)
+    await append_event(offer)
     assert await reads.case_progress(case.id) == CaseStage.AWAITING_CONSENT
+    no = _event(EventType.CONSENT_DECLINED, user.id, case_id=case.id)
+    await append_event(
+        no.model_copy(update={"created_at": offer.created_at + timedelta(seconds=1)})
+    )
+    assert await reads.case_progress(case.id) == CaseStage.VERIFIED
 
     brief = await research.save_brief(case.id, {}, "note")
     yes = await append_message(

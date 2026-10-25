@@ -190,7 +190,8 @@ Reads plus `app.db.deletes`: `delete_fact`, `delete_document` (and its images), 
 | `needs_answer` | R1 came back `needs_user_input` (C39): waiting for the user's answer |
 | `checking` | Deep pass queued or running, verification pending, or R1 ok with no verdict yet |
 | `suspicious` / `unknown` | Latest verification says so |
-| `awaiting_consent` | Verified, no call yet |
+| `verified` | Verified, no call offered (most letters need none), or the user said no |
+| `awaiting_consent` | Verified, and the latest consent event is `consent.requested` or `consent.given`, with no call yet |
 | `calling` | Latest call is `dialing` or `menu` |
 | `on_hold` | Latest call is `hold` |
 | `connected` | Latest call is `human_detected`, `bridging`, or `connected` |

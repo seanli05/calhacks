@@ -67,7 +67,12 @@ def _stage(**overrides: object) -> CaseStage:
         ({"latest_verification": "pending"}, CaseStage.CHECKING),
         ({"latest_verification": "suspicious"}, CaseStage.SUSPICIOUS),
         ({"latest_verification": "unknown"}, CaseStage.UNKNOWN),
-        ({"latest_verification": "verified"}, CaseStage.AWAITING_CONSENT),
+        ({"latest_verification": "verified"}, CaseStage.VERIFIED),
+        (
+            {"latest_verification": "verified", "call_offered": True},
+            CaseStage.AWAITING_CONSENT,
+        ),
+        ({"latest_verification": "unknown", "call_offered": True}, CaseStage.UNKNOWN),
         ({"latest_call_state": "dialing"}, CaseStage.CALLING),
         ({"latest_call_state": "menu"}, CaseStage.CALLING),
         ({"latest_call_state": "hold"}, CaseStage.ON_HOLD),

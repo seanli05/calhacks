@@ -21,6 +21,7 @@ export const common: CommonStrings = {
     checking: "بررسی اصلی بودن نامه",
     suspicious: "شاید اصلی نباشد",
     unknown: "تأیید نشد",
+    verified: "نامه تأیید شد",
     awaiting_consent: "منتظر اجازهٔ شما",
     calling: "در حال تماس",
     on_hold: "در انتظار",

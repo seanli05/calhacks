@@ -325,8 +325,8 @@ class Rehearsal:
         research.start(run_for_s=60)
         await self._until_stage("checking")
         await self.check("explained", "checking")
-        await self._until_stage("awaiting_consent")
-        await self.check("verified", "awaiting_consent")
+        await self._until_stage("verified")
+        await self.check("verified", "verified")
 
     async def _consent(self) -> tables.Job:
         """What the orchestrator's consent gate writes, minus WhatsApp: the request,

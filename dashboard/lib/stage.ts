@@ -2,7 +2,7 @@ import type { CallState, CallSummary, CaseStage } from "./api/types";
 
 /**
  * The five-step tracker (Letter → Verified → Calling → On hold → Person) collapses
- * the 13 case stages. Returns the index of the current step; 5 means all done.
+ * the 14 case stages. Returns the index of the current step; 5 means all done.
  * After a failed or cancelled call, only the steps the call really reached count as done.
  */
 export function trackerIndex(stage: CaseStage, call?: CallSummary | null): number {
@@ -19,6 +19,7 @@ export function trackerIndex(stage: CaseStage, call?: CallSummary | null): numbe
     case "suspicious":
     case "unknown":
       return 1;
+    case "verified":
     case "awaiting_consent":
     case "calling":
       return 2;

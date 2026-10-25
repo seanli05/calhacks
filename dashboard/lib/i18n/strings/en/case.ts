@@ -43,6 +43,10 @@ export const caseView = {
       title: "We couldn't confirm this letter",
       sub: "We won't call anyone until we're sure. We'll tell you what to do on WhatsApp.",
     },
+    verified: {
+      title: "This letter is real",
+      sub: "We explained it on WhatsApp. If you need something from the agency, ask us there and we can call for you.",
+    },
     awaiting_consent: {
       title: (agency: string) => `Should we call ${agency} for you?`,
       sub: "Reply YES on WhatsApp. This is what we'll ask:",

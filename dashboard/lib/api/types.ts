@@ -29,6 +29,7 @@ export type CaseStage =
   | "checking"
   | "suspicious"
   | "unknown"
+  | "verified"
   | "awaiting_consent"
   | "calling"
   | "on_hold"

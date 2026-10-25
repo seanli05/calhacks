@@ -20,6 +20,7 @@ export const common: CommonStrings = {
     checking: "Verificando la carta",
     suspicious: "Podría no ser real",
     unknown: "No pudimos confirmarla",
+    verified: "Carta verificada",
     awaiting_consent: "Esperando tu permiso",
     calling: "Llamando",
     on_hold: "En espera",

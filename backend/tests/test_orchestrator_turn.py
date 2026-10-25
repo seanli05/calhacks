@@ -62,7 +62,7 @@ async def test_case_status_explains_the_letter_and_keeps_refs(
 
     status = json.loads(await CaseTools(user, whatsapp).get_case_status(case.id))
 
-    assert status["stage"] == "awaiting_consent"
+    assert status["stage"] == "verified"
     assert status["verification"] == {"status": "verified", "red_flags": []}
     letter = status["letter"]
     assert letter["doc_type"] == "uscis_i797c_asylum_interview"

@@ -60,7 +60,7 @@ One module per writer, plus shared reads. Every component imports only its own w
 
 Key behaviors:
 - **`official_dial_number(case_id)`** returns the latest verification's `official_phone` only when its status is `verified`, and raises otherwise. It's the only way the phone agent gets a number (product rule 2).
-- **`case_progress(case_id)`** computes the stage (C17); no status column. Values: `received`, `explaining` (fast pass queued or running), `needs_better_image`, `checking` (deep pass running or verification pending), `suspicious`, `unknown`, `awaiting_consent` (verified, no call yet), `calling` / `on_hold` / `connected` (from the latest call's state), `call_ended`, `closed` (a `case.closed` event exists). `list_active_cases` is every case not `closed`. This is a new shape person 2 consumes through `get_case_status`; tell Chris to relay it once it lands.
+- **`case_progress(case_id)`** computes the stage (C17); no status column. Values: `received`, `explaining` (fast pass queued or running), `needs_better_image`, `checking` (deep pass running or verification pending), `suspicious`, `unknown`, `verified` (no call offered), `awaiting_consent` (verified and a call offered, no call yet), `calling` / `on_hold` / `connected` (from the latest call's state), `call_ended`, `closed` (a `case.closed` event exists). `list_active_cases` is every case not `closed`. This is a new shape person 2 consumes through `get_case_status`; tell Chris to relay it once it lands.
 - **`list_events(user_id, since)`** is what the dashboard feed polls.
 - **`delete_everything(user_id)`** erases the user's rows in every table except `events` and the `users` row, then logs `user.deleted_all`.
 
