@@ -195,6 +195,7 @@ class _CallRunner(MenuSteps):
         try:
             self._stop_background()
             await self._hang_up()
+            await self._settle_live_save(cancel=False)
             transcript_id = await self._retry_once(
                 lambda: self.deps.calls.save_transcript(self.call_id, self.transcript)
             )
@@ -252,6 +253,7 @@ class _CallRunner(MenuSteps):
 
     async def _stop_tasks(self) -> None:
         self._stop_background()
+        await self._settle_live_save(cancel=True)
         tasks = [*self._dropped, *([self.pump] if self.pump else [])]
         for task in tasks:
             task.cancel()

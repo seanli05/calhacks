@@ -876,3 +876,39 @@ async def test_leaving_the_menu_drops_a_held_answer() -> None:
     assert _said(call) == []
     assert S.HOLD in call.record.states
     assert any("held_dropped" in step.flags for step in call.steps)
+
+
+async def test_the_transcript_is_saved_as_lines_arrive_during_the_bridge() -> None:
+    """The dashboard's live view reads the transcript row while the call is on."""
+    llm = FakeLlm(_menu_by_text({"press 2": _press("2")}))
+    base = _to_rep(Said("two"))
+
+    def tree(action: Action) -> list[Step]:
+        if isinstance(action, ConnectedUser):
+            return [
+                Step(2, Overheard(speaker="agency", text="Can I have your name?")),
+                Step(3, Overheard(speaker="user", text="Ana Morales.")),
+                Step(9, Overheard(speaker="agency", text="Your reference is C447.")),
+                Step(5, UserLeft()),
+            ]
+        return base(action)
+
+    call = Call()
+    deps = call.deps(_opening(), tree, (), True)
+    saved: list[list[str]] = []
+    save = deps.calls.save_transcript
+
+    async def recording_save(call_id: str, lines: Any) -> str:
+        saved.append([line.text for line in lines])
+        return await save(call_id, lines)
+
+    deps.calls.save_transcript = recording_save  # type: ignore[method-assign]
+    await call.clock.run(
+        run_call("job_12", _job(), deps, llm=llm, observer=call.steps.append)
+    )
+
+    # A save before the call ended already held the first overheard line...
+    assert any("Can I have your name?" in texts for texts in saved[:-1])
+    # ...and the last save is the whole transcript, written at wrap-up.
+    assert saved[-1] == [line.text for line in call.record.transcript]
+    assert saved[-1][-1] == "Your reference is C447."
