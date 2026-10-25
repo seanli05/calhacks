@@ -60,6 +60,16 @@ def user_gate_twiml(prompt: JoinPrompt, joined_url: str, missed_url: str) -> str
     return str(response)
 
 
+def listen_stream_twiml(stream_url: str) -> str:
+    """The listen leg after its key press: a media stream we only write to. Nothing
+    the user says goes anywhere (`listen_audio.run_listener` ignores it)."""
+    response = VoiceResponse()
+    connect = Connect()
+    connect.stream(url=stream_url)
+    response.append(connect)
+    return str(response)
+
+
 def conference_twiml(name: str, fork_url: str) -> str:
     """Puts a leg in the call's conference, with a listen-only fork of its own voice
     for the transcript. Each leg forks only its `inbound_track`, so each fork carries

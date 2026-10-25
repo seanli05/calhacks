@@ -5,6 +5,8 @@
 
 After the bridge, each leg also runs a listen-only fork (`run_fork`): the same ears
 with no mouth, whose finished turns become `Overheard` lines for the transcript.
+Two taps around the agency stream copy both sides' audio to the user when they sit
+in (`listen_audio.py`).
 
 No model decides anything here; the call runner does. Learned from
 `spikes/dtmf/server.py`, not imported from it. What the source taught us:
@@ -44,6 +46,7 @@ from pipecat.transports.websocket.fastapi import (
 from pipecat.workers.runner import WorkerRunner
 from pydantic import BaseModel
 
+from app.phone.listen_audio import ListenTap
 from app.phone.listener import LineListener, PlaybackMarkFrame, overheard
 from app.phone.twilio_line import TwilioTelephony
 from app.settings import Settings
@@ -218,6 +221,7 @@ async def run_stream(
     worker = _worker(
         [
             transport.input(),
+            ListenTap(line.listen_mixer, "agency"),
             *_ears(settings),
             listener,
             CartesiaTTSService(
@@ -227,6 +231,7 @@ async def run_stream(
                     voice=settings.cartesia_agent_voice_id,
                 ),
             ),
+            ListenTap(line.listen_mixer, "agent"),
             transport.output(),
         ]
     )

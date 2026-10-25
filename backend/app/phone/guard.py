@@ -102,6 +102,9 @@ class GuardedTelephony:
     async def connect_user(self) -> None:
         await self._inner.connect_user()
 
+    async def listen_in(self, call_id: CallId, user_id: UserId) -> None:
+        await self._inner.listen_in(call_id, user_id)
+
     async def hang_up(self) -> None:
         await self._inner.hang_up()
 

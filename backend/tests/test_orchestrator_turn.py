@@ -297,6 +297,8 @@ async def test_turn_replies_in_the_users_language_with_english_logged(
         "close_case",
         "request_consent",
         "ask_official_source",
+        "listen_to_call",
+        "hang_up_call",
         "set_language",
     }  # no start_call: only the user's numbered YES starts one (rule 4)
     # Goal 6.5: the memory writer runs on the user's message after each reply.

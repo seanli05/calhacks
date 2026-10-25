@@ -67,6 +67,8 @@ class CallOutcome(StrEnum):
     PARTIAL = "partial"
     FAILED = "failed"
     USER_UNREACHABLE = "user_unreachable"
+    CANCELLED = "cancelled"
+    """The user asked us to end the call before they were on it (over WhatsApp)."""
 
 
 class QuestionStatus(StrEnum):

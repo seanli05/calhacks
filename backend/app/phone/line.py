@@ -87,6 +87,33 @@ class Overheard(_LineEvent):
     text: str
 
 
+class ListenRequested(_LineEvent):
+    """The user asked to sit in (`control.request_listen_in`): ring them on a
+    listen-only leg. The runner dials, since it holds the `user_id`."""
+
+    kind: Literal["listen_requested"] = "listen_requested"
+
+
+class ListenStarted(_LineEvent):
+    """The user pressed a key on the listen leg and hears the call, muted."""
+
+    kind: Literal["listen_started"] = "listen_started"
+
+
+class ListenEnded(_LineEvent):
+    """The listen leg is over before the bridge: the user hung up (`hung_up`), never
+    answered or joined, or ringing failed. The agency leg goes on."""
+
+    kind: Literal["listen_ended"] = "listen_ended"
+    reason: Literal["hung_up", "busy", "no_answer", "failed", "no_key_press"]
+
+
+class HangUpRequested(_LineEvent):
+    """The user asked over WhatsApp to end the call (`control.request_hang_up`)."""
+
+    kind: Literal["hang_up_requested"] = "hang_up_requested"
+
+
 LineEvent = Annotated[
     AgencyAnswered
     | AgencyUnreachable
@@ -97,6 +124,10 @@ LineEvent = Annotated[
     | UserAnswered
     | UserUnreachable
     | UserLeft
-    | Overheard,
+    | Overheard
+    | ListenRequested
+    | ListenStarted
+    | ListenEnded
+    | HangUpRequested,
     Field(discriminator="kind"),
 ]

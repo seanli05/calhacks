@@ -8,7 +8,7 @@ The call runner talks to the outside world only through the Protocols in `ports.
 
 | Port | What it is | Real adapter | Fake |
 |---|---|---|---|
-| `Telephony` | One call's line: `dial_agency`, `say`, `press_keys`, `ring_user`, `connect_user`, `hang_up`, plus `events()`, the stream of everything that happens (`line.py`) | `TwilioTelephony` (`twilio_line.py`: the agency leg, and the applicant's leg bridged into it) | `FakeTelephony`: a script, plus an optional `responder` that reacts to actions (how the simulator plugs in a phone tree) |
+| `Telephony` | One call's line: `dial_agency`, `say`, `press_keys`, `ring_user`, `connect_user`, `listen_in`, `hang_up`, plus `events()`, the stream of everything that happens (`line.py`) | `TwilioTelephony` (`twilio_line.py`: the agency leg, and the applicant's leg bridged into it) | `FakeTelephony`: a script, plus an optional `responder` that reacts to actions (how the simulator plugs in a phone tree) |
 | `Relay` | `ask_user` (P1) | `RelayAskUser` → `app.relay.ask_user` | `FakeRelay`: scripted `Answer` / `NoAnswer` |
 | `CaseReader` | The brief | `DbCaseReader` | `FakeCaseReader` |
 | `CallStore` | `calls`, `transcripts` (only the phone agent writes them) | `DbCallStore` → `writes.phone` | `FakeCallStore` |
@@ -24,7 +24,7 @@ The call runner talks to the outside world only through the Protocols in `ports.
 | 2. Only the verified number | No `Telephony` method takes a number (a test checks). Adapters read `official_dial_number` at dial time; `UnverifiedNumber` propagates, with no fallback |
 | 4. Recorded consent | `dial_agency` needs a `call_id`, which only `create_call` mints, from the `CallJob` and its `consent_message_id` |
 | C35. No identifiers on the line | The runner can't resolve refs. `GuardedTelephony` checks every `say` and `press_keys` against the case's real receipt number, A-Number, and date of birth (`adapters.load_blocked_values`), across the whole call |
-| C6. User's number stays out | Only `ring_user`'s adapter reads it |
+| C6. User's number stays out | Only the adapters of `ring_user` and `listen_in` read it |
 
 ## Conventions for the runner
 
@@ -114,6 +114,41 @@ When a person is detected, the runner says the intro (in the background) and cal
 | Not stored | No `record` anywhere (C29). The applicant's number is never logged |
 
 Manual checks on real phones, and their results: [phone-live-checks.md](phone-live-checks.md).
+
+## Listening in (sitting in on the call)
+
+The user can ask over WhatsApp ("sit in", "dial me in") to hear the call while it runs: the menus, the agent's choices, the hold music. They're muted. The orchestrator's `listen_to_call(case_id)` tool checks the case is theirs, finds its live call, and calls `app.phone.control.request_listen_in(call_id)`. That's in process, like `ask_user` going the other way. It returns `ringing`, `already_listening`, `rep_on_line` (the bridge will ring them), or `call_over`.
+
+The flow: `request_listen_in` → the line emits `ListenRequested` → the runner calls `telephony.listen_in(call_id, user_id)` → their own number (C6) rings on a **separate call** with a listen gate (`call_lines.LISTEN_PROMPTS`, any key) → `ListenStarted`, and the leg goes on a media stream we only write to. The runner only logs `ListenStarted`/`ListenEnded`. No call state changes, so nothing a listener does can end or steer the agency call.
+
+| Route | What arrives | Becomes |
+|---|---|---|
+| `POST /phone/calls/{call_id}/listen/status` | The listen leg's status callbacks | Before a key: unreached → `ListenEnded(busy/no_answer/failed)`, `completed` → `ListenEnded("no_key_press")`. Listening: ended → `ListenEnded("hung_up")`. Once the leg has joined the bridge, they go to the applicant's handling (`UserLeft`) |
+| `POST /phone/calls/{call_id}/listen/joined` | The listen gate's key press | `ListenStarted`, and `<Connect><Stream>` to the listen stream. Too late → `<Hangup/>` |
+| `POST /phone/calls/{call_id}/listen/missed` | No key in time | `ListenEnded("no_key_press")`, `<Hangup/>` |
+| `WS /phone/calls/{call_id}/listen/stream` | The listen leg's stream | `listen_audio.run_listener`: we write the call into it. What the user says is read only to notice the end, never kept or forwarded |
+
+| Piece | What it does |
+|---|---|
+| Audio | Two `ListenTap`s on the agency stream feed a `ListenMixer` on the line: the agency's frames as they arrive, and the agent's TTS buffered and laid over them. The agency's real-time frames set the pace, so TTS that comes faster than it plays doesn't run ahead. A `ListenSink` writes μ-law `media` messages from its own task and drops audio rather than slow the agency pipeline. About 2 s of silence during each `press_keys` stream swap |
+| Hanging up | Ends only the listen leg (a separate call). The agent keeps its line, and the user can ask again |
+| A person picks up | `ring_user` sees a listening leg and moves it into the conference (with its user fork) instead of ringing: `UserAnswered` follows at once, with no second ring and no gate, and the rest of the bridge is unchanged. They hear the intro live. A leg still at its gate is ended and the user is rung as usual. A failed move ends the leg and rings |
+| Gate | Voicemail would otherwise record the agency (C29) |
+| `hang_up` | Also ends a listen leg that's ringing or listening |
+
+## Hanging up on request
+
+The user can tell the WhatsApp agent "hang up now". The orchestrator's `hang_up_call(case_id)` tool checks the case is theirs, finds its live call, and calls `app.phone.control.request_hang_up(call_id)`, which returns `ending` or `call_over`. The line emits `HangUpRequested`, and the runner fires `Trigger.USER_ENDED`, so the call ends through wrap-up with a saved report like any other.
+
+| State | What happens |
+|---|---|
+| `dialing`, `menu`, `hold` | Wrap-up hangs up. Outcome `cancelled` |
+| `human_detected`, `bridging` | The agent cuts off what it's saying and tells the rep `call_lines.USER_ENDED` (fixed text: the applicant asked to end the call and will call back), then hangs up every leg, the applicant's ringing one included. Outcome `cancelled` |
+| `connected` | The agent stays silent (rule 3); wrap-up hangs up both legs. No outcome from the state machine: the report reads the conversation |
+
+`call.ended` carries `cause: "user_ended"`. A `cancelled` report gets `summary.cancelled` on WhatsApp ("I ended the call, as you asked") and no automatic retry offer.
+
+**Open, for the team:** no `call.listen_in_*` event types yet (a shared-contract change, plus feed templates), so the dashboard doesn't show listening; it's in the logs and the runner's steps. The user's own WhatsApp request is what consents to the ring (rule 4).
 
 **Open, for the team:**
 - **The any-key gate is the current choice, not a team decision yet.** It means "answered" in the Plan.md failure rules is "pressed a key", and the worst case before the call-back line is about 55 s (30 s ringing, the prompt twice, 15 s). Alternatives if the team objects: answering-machine detection, or detecting voicemail after bridging.

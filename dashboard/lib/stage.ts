@@ -3,10 +3,10 @@ import type { CallState, CallSummary, CaseStage } from "./api/types";
 /**
  * The five-step tracker (Letter → Verified → Calling → On hold → Person) collapses
  * the 13 case stages. Returns the index of the current step; 5 means all done.
- * After a failed call, only the steps the call really reached count as done.
+ * After a failed or cancelled call, only the steps the call really reached count as done.
  */
 export function trackerIndex(stage: CaseStage, call?: CallSummary | null): number {
-  if (stage === "call_ended" && call?.outcome === "failed") {
+  if (stage === "call_ended" && (call?.outcome === "failed" || call?.outcome === "cancelled")) {
     return call.hold_started_at ? 4 : 3;
   }
   switch (stage) {

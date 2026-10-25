@@ -286,11 +286,20 @@ class ConnectedUser:
 
 
 @dataclass(frozen=True)
+class RangListener:
+    call_id: CallId
+    user_id: UserId
+    number: str
+
+
+@dataclass(frozen=True)
 class HungUp:
     pass
 
 
-type Action = Dialed | Said | PressedKeys | RangUser | ConnectedUser | HungUp
+type Action = (
+    Dialed | Said | PressedKeys | RangUser | ConnectedUser | RangListener | HungUp
+)
 type Responder = Callable[[Action], Iterable[Step]]
 
 
@@ -348,6 +357,11 @@ class FakeTelephony:
     async def connect_user(self) -> None:
         self._require_agency()
         self._act(ConnectedUser())
+
+    async def listen_in(self, call_id: CallId, user_id: UserId) -> None:
+        self._require_agency()
+        number = await self._numbers.user_number(user_id)
+        self._act(RangListener(call_id, user_id, number))
 
     async def hang_up(self) -> None:
         if self._hung_up:

@@ -45,6 +45,10 @@ class Trigger(StrEnum):
     still gets written and the cause isn't blamed on the agency."""
     CALL_FINISHED = "call_finished"
     """The bridged conversation ended normally."""
+    USER_ENDED = "user_ended"
+    """The user asked over WhatsApp to end the call (`control.request_hang_up`).
+    Before they're on it, the call is `cancelled`; once they are, the report
+    reads the conversation like any other."""
     REPORT_SAVED = "report_saved"
 
 
@@ -53,6 +57,7 @@ type _Rule = tuple[CallState, CallOutcome | None, EventType | None]
 S = CallState
 T = Trigger
 FAILED = CallOutcome.FAILED
+CANCELLED = CallOutcome.CANCELLED
 
 TRANSITIONS: dict[tuple[CallState, Trigger], _Rule] = {
     # (from, trigger):                  (to, outcome, event to log)
@@ -82,6 +87,12 @@ TRANSITIONS: dict[tuple[CallState, Trigger], _Rule] = {
     (S.HOLD, T.AGENT_ABORTED): (S.WRAP_UP, FAILED, None),
     (S.HUMAN_DETECTED, T.AGENT_ABORTED): (S.WRAP_UP, FAILED, None),
     (S.BRIDGING, T.AGENT_ABORTED): (S.WRAP_UP, FAILED, None),
+    (S.DIALING, T.USER_ENDED): (S.WRAP_UP, CANCELLED, None),
+    (S.MENU, T.USER_ENDED): (S.WRAP_UP, CANCELLED, None),
+    (S.HOLD, T.USER_ENDED): (S.WRAP_UP, CANCELLED, None),
+    (S.HUMAN_DETECTED, T.USER_ENDED): (S.WRAP_UP, CANCELLED, None),
+    (S.BRIDGING, T.USER_ENDED): (S.WRAP_UP, CANCELLED, None),
+    (S.CONNECTED, T.USER_ENDED): (S.WRAP_UP, None, None),
     # Once the user is on, resolved vs. partial is the call report's call.
     (S.CONNECTED, T.CALL_FINISHED): (S.WRAP_UP, None, None),
     (S.CONNECTED, T.AGENCY_HUNG_UP): (S.WRAP_UP, None, None),

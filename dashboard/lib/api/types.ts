@@ -46,7 +46,7 @@ export type CallState =
   | "wrap_up"
   | "ended";
 
-export type CallOutcome = "resolved" | "partial" | "failed" | "user_unreachable";
+export type CallOutcome = "resolved" | "partial" | "failed" | "user_unreachable" | "cancelled";
 export type VerificationStatus = "pending" | "verified" | "suspicious" | "unknown";
 export type Urgency = "low" | "medium" | "high";
 export type ChecklistKind = "who_must_come" | "bring" | "deadline";

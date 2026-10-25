@@ -7,13 +7,16 @@ wired into the app (a test checks nothing in `app` imports it).
     python -m app.phone.smoke --case CASE_ID  # another case (still the mock line only)
     python -m app.phone.smoke --runner --bridge   # your phone plays the applicant
     python -m app.phone.smoke --bridge --language en  # the join prompt in English
+    python -m app.phone.smoke --runner --bridge   # then type `listen` to sit in
 
 It serves the phone routes itself, in this process, because a call's line lives
 in memory: stop the backend first, and point ngrok and `PUBLIC_BASE_URL` at
 `--port`. Interactive commands: `say <text>`, `keys <digits>`, `bridge` (with
 `--bridge`: ring your phone; a key press there joins you, and the agency leg
-follows), `hangup`. With `--runner`, type a number to answer the applicant's
-question, or `hangup`.
+follows), `listen` (with `--bridge`: ring your phone to sit in, muted, the way a
+user's WhatsApp request does), `hangup`. With `--runner`, type a number to answer
+the applicant's question, `listen`, `end` (end the call the way a user's WhatsApp
+"hang up now" does), or `hangup`.
 
 What it may dial, without weakening rule 2:
 
@@ -23,7 +26,8 @@ What it may dial, without weakening rule 2:
 - with `--own-number`, `PHONE_SMOKE_DIAL_NUMBER` from your `.env`, through
   `SmokeNumberSource`, which exists only here. The number is never printed.
 
-It rings only `PHONE_SMOKE_USER_NUMBER` as the applicant, and only with `--bridge`
+It rings only `PHONE_SMOKE_USER_NUMBER` as the applicant (or listener), and only
+with `--bridge`
 (C6 holds: the line reads it from the number source; it's never printed).
 
 Smoke calls are ours to our own lines, not a user's call, so no `calls` row or
@@ -54,9 +58,17 @@ from app.db.reset import demo_brief
 from app.phone.adapters import DbCaseReader, DbNumberSource, load_blocked_values
 from app.phone.call_lines import JOIN_PROMPTS
 from app.phone.clock import SystemClock
+from app.phone.control import request_hang_up, request_listen_in
 from app.phone.fakes import FakeCallStore, FakeCaseReader, FakeEventLog
 from app.phone.guard import BlockedIdentifier, GuardedTelephony
-from app.phone.line import Heard, LineEvent, NonSpeech, Overheard, UserAnswered
+from app.phone.line import (
+    Heard,
+    LineEvent,
+    ListenRequested,
+    NonSpeech,
+    Overheard,
+    UserAnswered,
+)
 from app.phone.observe import StepRecord
 from app.phone.playground.render import clip, describe
 from app.phone.playground.tap import ConsoleRelay
@@ -284,11 +296,19 @@ async def interactive(
 ) -> None:
     call_id = new_id("call")
     sid = await line.dial_agency(call_id, case_id)
-    out.line(f"dialed (call_id={call_id} sid={sid}); type say/keys/bridge/hangup")
+    out.line(
+        f"dialed (call_id={call_id} sid={sid}); type say/keys/bridge/listen/hangup"
+    )
 
     async def watch() -> None:
         async for event in line.events():
             out.event(event)
+            if isinstance(event, ListenRequested):
+                # What the runner does with it, since none runs here.
+                try:
+                    await line.listen_in(call_id, SMOKE_USER)
+                except (LineClosed, SmokeRefused) as exc:
+                    out.line(f"not ringing to listen: {exc}")
             if isinstance(event, UserAnswered):
                 try:
                     await line.connect_user()
@@ -314,8 +334,12 @@ async def interactive(
                 elif verb == "bridge":
                     await line.ring_user(call_id, SMOKE_USER)
                     out.line("ringing you; press any key when you pick up")
+                elif verb == "listen":
+                    out.line(f"listen-in: {request_listen_in(call_id)}")
                 elif verb:
-                    out.line("commands: say <text> · keys <digits> · bridge · hangup")
+                    out.line(
+                        "commands: say <text> · keys <digits> · bridge · listen · hangup"
+                    )
             except (
                 BlockedIdentifier,
                 LineClosed,
@@ -361,14 +385,22 @@ async def with_runner(
     )
     call = asyncio.create_task(run_call("job_smoke", job, deps, observer=out.step))
     asker = asyncio.create_task(_show_questions(relay, out))
-    out.line("runner started; type a number to answer a question, or hangup")
+    out.line(
+        "runner started; type a number to answer a question, listen, end, or hangup"
+    )
     try:
         while not call.done():
             command = await keyboard.line(call)
             if command is None or command in ("hangup", "quit"):
                 call.cancel()
                 break
-            if command.isdigit():
+            if command == "listen":
+                for call_id in store.calls:
+                    out.line(f"listen-in: {request_listen_in(call_id)}")
+            elif command == "end":
+                for call_id in store.calls:
+                    out.line(f"hang-up: {request_hang_up(call_id)}")
+            elif command.isdigit():
                 try:
                     relay.answer(int(command))
                 except ValueError as exc:

@@ -323,7 +323,7 @@ Trigger: call ends. Orchestrator sends the summary in the user's language; the m
 
 ```json
 { "call_id": "call_5", "case_id": "case_123",
-  "outcome": "resolved | partial | failed | user_unreachable",
+  "outcome": "resolved | partial | failed | user_unreachable | cancelled",
   "reference_number": "R-55821", "rep_name": "Maria",
   "next_steps_en": ["Interview is still on for Nov 18", "If the interpreter can't come, contact the asylum office before the interview to ask to reschedule"],
   "new_deadlines": ["2026-11-17"], "transcript_id": "transcript_5",
@@ -427,6 +427,7 @@ Decided now so nobody improvises during the build.
 | Hold exceeds max | Hang up, report failed, offer to retry later (a retry asks for consent again **[C21]**) |
 | ask_user answered after timeout | Tell the user what the agent already chose and why; show it in the feed **[C24]** |
 | User doesn't answer bridged call in 30 s | `user_unreachable`: tell the representative the account holder will call back, end call, orchestrator follows up |
+| User asks on WhatsApp to hang up | End every leg. If a representative is waiting for the user, tell them first that the applicant asked to end the call. Before the user joined: `cancelled`, confirmed on WhatsApp, no automatic retry offer. Once they're on: the report reads the call as usual |
 | Representative asks for identity verification (A-Number, receipt number, date of birth) | The user handles it in their own voice; the agent never answers for them |
 
 ## Tech stack and sponsor tracks

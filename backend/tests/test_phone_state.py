@@ -112,6 +112,24 @@ def test_agent_abort_before_user_joins_fails_through_wrap_up(
     assert machine.outcome == CallOutcome.FAILED
 
 
+@pytest.mark.parametrize("steps_before_end", range(5))
+def test_the_user_ending_the_call_before_joining_cancels_it(
+    steps_before_end: int,
+) -> None:
+    """Covers dialing, menu, hold, human_detected, and bridging."""
+    machine = run(*HAPPY_PATH[:steps_before_end])
+
+    assert machine.fire(Trigger.USER_ENDED).to_state == CallState.WRAP_UP
+    machine.fire(Trigger.REPORT_SAVED)
+    assert machine.outcome == CallOutcome.CANCELLED
+
+
+def test_the_user_ending_a_connected_call_leaves_the_outcome_to_the_report() -> None:
+    machine = run(*HAPPY_PATH[:5])
+    assert machine.fire(Trigger.USER_ENDED).to_state == CallState.WRAP_UP
+    assert machine.outcome is None
+
+
 def test_false_human_returns_to_hold_and_can_still_reach_a_human() -> None:
     machine = run(Trigger.AGENCY_ANSWERED, Trigger.HOLD_STARTED, Trigger.HUMAN_DETECTED)
 

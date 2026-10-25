@@ -48,6 +48,9 @@ async def send_call_summary(
     if report is None or report.outcome == CallOutcome.FAILED:
         await send_template(whatsapp, user, "summary.call_failed", case_id=case_id)
         return
+    if report.outcome == CallOutcome.CANCELLED:
+        await send_template(whatsapp, user, "summary.cancelled", case_id=case_id)
+        return
     if report.outcome == CallOutcome.USER_UNREACHABLE:
         # The status watcher already said we couldn't reach them (P2).
         await send_template(
