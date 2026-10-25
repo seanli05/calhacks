@@ -115,18 +115,12 @@ class ConsentGate:
         case_id: CaseId,
         *,
         goal_en: str | None = None,
-        verified: bool = False,
         template: str = "consent.request",
         send: bool = True,
-        lead: tuple[str, str] | None = None,
     ) -> str | None:
-        """Ask the user whether to call about this case. With `verified`, the same
-        message leads with "it's genuine" (one message for the verdict and the
-        question, Verdicts); `template` names another lead the same way (it and its
-        `_generic` form end with the request). With `send=False`, the request opens
+        """Ask the user whether to call about this case. `template` names a lead
+        for the question (it and its `_generic` form end with the request). With `send=False`, the request opens
         but nothing is sent: the turn asks in its own words, then calls `asked`.
-        `lead` (text and its English) goes above the question in the same message:
-        the letter's explanation, when the verdict and the explanation go together.
         Returns None once asked, or the reason (English, for the model) the call
         can't be offered."""
         case = await reads.get_case(case_id)
@@ -146,11 +140,9 @@ class ConsentGate:
         if brief is None:
             return "The call plan isn't ready yet."
         goal_en = goal_en or _call_goal_en(brief)
-        if verified:
-            template = "verification.verified_call"
         pending = PendingConsent(case_id, utcnow(), goal_en, _agency(case))
         if send:
-            asked = await self._send_question(user, pending, template, lead)
+            asked = await self._send_question(user, pending, template)
             pending = replace(pending, asked_at=asked.created_at)
         self._pending[user.id] = pending
         extra = {} if send else {"via": "words"}
@@ -194,11 +186,7 @@ class ConsentGate:
         self.asked(user.id, asked.created_at)
 
     async def _send_question(
-        self,
-        user: tables.User,
-        pending: PendingConsent,
-        template: str,
-        lead: tuple[str, str] | None = None,
+        self, user: tables.User, pending: PendingConsent, template: str
     ) -> tables.Message:
         goal_en = pending.goal_en
         language = user.language or "en"
@@ -215,14 +203,9 @@ class ConsentGate:
                 {"goal": goal},
                 values_en={"goal": goal_en},
                 case_id=pending.case_id,
-                lead=lead,
             )
         return await send_template(
-            self._whatsapp,
-            user,
-            f"{template}_generic",
-            case_id=pending.case_id,
-            lead=lead,
+            self._whatsapp, user, f"{template}_generic", case_id=pending.case_id
         )
 
     async def answer(
@@ -363,6 +346,10 @@ class ConsentGate:
             except WhatsAppSendError as exc:
                 logger.error("Consent ack not sent case_id=%s: %s", case_id, exc)
         return "consent.given"
+
+    async def can_call(self, case_id: CaseId) -> bool:
+        """A call could be offered for this case now, if the user needs one."""
+        return await self._refusal(case_id) is None
 
     async def _refusal(self, case_id: CaseId) -> str | None:
         """Why no call can be offered for this case right now, or None."""

@@ -9,7 +9,15 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from app.contracts import CallOutcome, FactSource, FactStatus, JobType, Sensitivity
+from app.contracts import (
+    CallOutcome,
+    FactSource,
+    FactStatus,
+    JobType,
+    MessageDirection,
+    MessageSender,
+    Sensitivity,
+)
 from app.db import tables
 from app.dev import fake_call, fake_research
 from app.dev.fake_phone import FakePhone
@@ -266,8 +274,8 @@ async def _demo_path(
     *,
     question_after: bool = False,
 ) -> None:
-    """Letter → explanation → verdict + consent → YES → the fake call → summary;
-    with `question_after`, the user then asks something."""
+    """Letter → explanation → verdict → the user needs a call → consent → YES →
+    the fake call → summary; with `question_after`, the user then asks something."""
     user = await use_spanish(db)
     research = FakeResearch(
         "+15005550006",
@@ -282,7 +290,19 @@ async def _demo_path(
     phone.start(5)
 
     await pipe.handle(inbound(photos=1))
-    await _until(lambda: consent.pending(user.id) is not None)
+    await _until(lambda: "verification.verified" in db.outbound_templates())
+    await asyncio.sleep(USER_READS_S * SCALE)
+    # The user says they can't make the date; the turn's request_consent asks.
+    await db.append_message(
+        user.id,
+        MessageDirection.IN,
+        MessageSender.USER,
+        "No puedo ir ese día",
+        "es",
+        body_en="I can't go that day",
+    )
+    [case] = db.cases
+    assert await consent.request(user, case.id) is None
     await asyncio.sleep(USER_READS_S * SCALE)
     await pipe.handle(inbound("1"))
     await _until(lambda: "ask_user.menu_choice" in db.outbound_templates())

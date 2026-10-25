@@ -1,6 +1,6 @@
-"""Turning R1 into the user's explanation (Plan.md → R1, C9, C31, C45; Goal 6.1).
+"""Turning R1 into the user's explanation (Plan.md → R1, C9, C31, C46; Goal 6.1).
 
-C45: the letter is checked before it's explained. If research's instant checks
+C46: the letter is checked before it's explained. If research's instant checks
 already found signs of a scam (R1 `verification` is suspicious), the user gets a warm
 warning at once and never the explanation. Otherwise "I'm just double-checking it's
 really from USCIS", and the explanation waits for the verdict (verdicts.py), which
@@ -138,7 +138,7 @@ class LetterResults:
             if not readable:
                 await self._retake(user, result)
             elif scam:
-                # C45: never explained; the deep pass's verdict isn't sent either.
+                # C46: never explained; the deep pass's verdict isn't sent either.
                 await send_template(
                     self._whatsapp,
                     user,

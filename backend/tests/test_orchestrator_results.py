@@ -151,7 +151,7 @@ def test_no_supported_language_gets_an_iso_date() -> None:
         assert "-" not in format_date(dt.date(2026, 1, 5), language), language
 
 
-# R1 (6.1) and the check before explaining (C45)
+# R1 (6.1) and the check before explaining (C46)
 
 
 async def explained(
@@ -289,12 +289,14 @@ async def test_letter_with_scam_signs_is_warned_about_and_never_explained(
     assert not verdicts.is_watching("case_1")
 
 
-async def test_verified_letter_is_explained_with_the_call_offer_in_one_message(
+async def test_verified_letter_is_explained_and_called_genuine_in_one_message(
     db: FakeDB,
     letter_results: LetterResults,
     consent: ConsentGate,
     conversation: Conversation,
 ) -> None:
+    """No call offer with the verdict (C44): the turn offers one if the user needs
+    it."""
     user = await use_spanish(db)
     case = db.add_verified_case(user)
     result = FastResult.model_validate(fixture("fast_result.json", case_id=case.id))
@@ -304,17 +306,17 @@ async def test_verified_letter_is_explained_with_the_call_offer_in_one_message(
     await deep_done(
         db, user, case.id, deep_result(case.id, VerificationStatus.VERIFIED)
     )
-    await until(lambda: consent.pending(user.id) is not None)
+    await until(lambda: len(db.messages) == 2)
 
     assert db.outbound_templates() == [
         "letter.double_checking",
-        "verification.verified_call",
+        "verification.verified",
     ]
-    offer = db.messages[-1].body_original
+    body = db.messages[-1].body_original
     summary = (result.explanation_en or "").split("\n\n")[0]
-    assert offer.startswith(f"[es] {summary}")
-    assert render("verification.verified", "es") in offer
-    assert consent.pending(user.id).asked_at == db.messages[-1].created_at
+    assert body.startswith(f"[es] {summary}")
+    assert body.endswith(render("verification.verified", "es"))
+    assert consent.pending(user.id) is None
     assert not conversation.is_typing(user.id)
 
 
@@ -365,15 +367,13 @@ async def test_no_verdict_in_time_explains_with_a_caution_then_follows_up(
     db: FakeDB,
     whatsapp: FakeWhatsApp,
     translator: FakeTranslator,
-    consent: ConsentGate,
     conversation: Conversation,
 ) -> None:
-    """C45: the explanation waits at most `explain_after_s` for the verdict."""
+    """C46: the explanation waits at most `explain_after_s` for the verdict."""
     fake: Any = translator
     verdicts = Verdicts(
         whatsapp,
         fake,
-        consent,
         poll_interval_s=0.01,
         conversation=conversation,
         explain_after_s=0.05,
@@ -393,11 +393,11 @@ async def test_no_verdict_in_time_explains_with_a_caution_then_follows_up(
     await deep_done(
         db, user, case.id, deep_result(case.id, VerificationStatus.VERIFIED)
     )
-    await until(lambda: consent.pending(user.id) is not None)
+    await until(lambda: len(db.messages) == 3)
 
-    offer = db.messages[-1]
-    assert offer.template == "verification.verified_call"
-    assert "This is a USCIS notice" not in (offer.body_en or "")  # not twice
+    verdict = db.messages[-1]
+    assert verdict.template == "verification.verified"
+    assert "This is a USCIS notice" not in (verdict.body_en or "")  # not twice
 
 
 def test_date_only_appointment_leaves_the_time_out() -> None:
@@ -450,9 +450,10 @@ async def test_research_question_survives_a_payload_that_no_longer_validates(
 # R2 (6.2)
 
 
-async def test_verified_letter_gets_the_verdict_and_consent_request_in_one_message(
-    db: FakeDB, verdicts: Verdicts, consent: ConsentGate, translator: FakeTranslator
+async def test_verified_letter_gets_the_verdict_without_a_call_offer(
+    db: FakeDB, verdicts: Verdicts, consent: ConsentGate
 ) -> None:
+    """A call is offered only for a need the user shows, never for the verdict."""
     user = await use_spanish(db)
     case = db.add_verified_case(user)
     verdicts.watch(user.id, case.id, since=utcnow())
@@ -460,21 +461,31 @@ async def test_verified_letter_gets_the_verdict_and_consent_request_in_one_messa
     await deep_done(
         db, user, case.id, deep_result(case.id, VerificationStatus.VERIFIED)
     )
-    await until(lambda: consent.pending(user.id) is not None)
+    await until(lambda: db.outbound_templates() != [])
 
-    assert db.outbound_templates() == ["verification.verified_call"]
-    asked = db.messages[-1]
-    assert asked.body_original.startswith(render("verification.verified", "es"))
-    assert "[es] Confirm the interview is still scheduled" in asked.body_original
-    assert asked.body_en is not None and "Confirm the interview" in asked.body_en
+    assert db.outbound_templates() == ["verification.verified"]
+    assert consent.pending(user.id) is None
+    assert not [e for e in db.events if e.type == EventType.CONSENT_REQUESTED]
+    assert await consent.can_call(case.id)  # the turn can still offer one
+
+
+async def test_consent_request_states_what_the_call_is_for(
+    db: FakeDB, consent: ConsentGate, translator: FakeTranslator
+) -> None:
+    await asked(db, consent)
+
+    assert db.outbound_templates() == ["consent.request"]
+    request = db.messages[-1]
+    assert "[es] Confirm the interview is still on" in request.body_original
+    assert request.body_en is not None and "Confirm the interview" in request.body_en
     # Rule 4: the goal reads as what the call is for, not as a request to the user.
     assert translator.contexts[-1] == GOAL_CONTEXT
     [requested] = [e for e in db.events if e.type == EventType.CONSENT_REQUESTED]
     assert requested.data == {"agency": "USCIS"}
 
 
-async def test_consent_request_waits_while_another_question_is_open(
-    db: FakeDB, pipe: InboundPipe, verdicts: Verdicts, consent: ConsentGate
+async def test_consent_request_refused_while_another_question_is_open(
+    db: FakeDB, pipe: InboundPipe, consent: ConsentGate
 ) -> None:
     """One numbered question at a time: a "1" must answer exactly one."""
     user = await use_spanish(db)
@@ -486,15 +497,11 @@ async def test_consent_request_waits_while_another_question_is_open(
     refusal = await consent.request(user, case.id)  # the turn's tool
     assert refusal is not None and "Another numbered question" in refusal
 
-    await verdicts.react(user, deep_result(case.id, VerificationStatus.VERIFIED))
-    assert db.outbound_templates() == ["letter.same_or_new", "verification.verified"]
-    assert consent.pending(user.id) is None
-
     await pipe.handle(inbound("1"))  # answers the photo question, not the call
 
-    assert db.outbound_templates()[-2:] == ["letter.pages_added", "consent.request"]
-    assert consent.pending(user.id) is not None
+    assert db.outbound_templates()[-1] == "letter.pages_added"
     assert db.jobs_of(JobType.CALL) == []
+    assert await consent.request(user, case.id) is None
 
 
 async def test_explanation_waits_for_a_turn_in_progress(
@@ -534,7 +541,7 @@ async def test_explanation_waits_for_a_turn_in_progress(
     release.set()
     await asyncio.gather(handling, explaining)
 
-    # The turn is done; "typing…" stays on while the letter is checked (C45).
+    # The turn is done; "typing…" stays on while the letter is checked (C46).
     assert conversation.is_typing(user.id)
     first, second = [m.body_original for m in db.messages if m.direction == "out"]
     assert first == "turn reply"

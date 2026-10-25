@@ -98,9 +98,23 @@ async def test_fast_happy_path(store: FakeResearchDB) -> None:
         ev.FAST_STARTED,
         ev.CHECK,
         ev.CASE_CREATED,
+        ev.CHECK,
+        ev.CHECK,
+        ev.CHECK,
         ev.FAST_DONE,
     ]
-    assert r1.verification == "pending"  # nothing flagged by the instant checks
+    # The read's steps carry counts and codes, never the values themselves.
+    steps = [e.data for e in store.events if e.type == ev.CHECK]
+    assert [s["check"] for s in steps] == [
+        "scam_rules",
+        "letter_read",
+        "private_values",
+        "urgency",
+    ]
+    assert steps[0]["red_flags"] == []  # nothing flagged by the instant checks
+    assert r1.verification == "pending"
+    assert steps[2]["count"] == 1
+    assert SECRET not in str(steps)
     assert store.events[-1].data == {
         "status": "ok",
         "doc_type": "generic_agency_notice",
@@ -112,7 +126,7 @@ async def test_fast_happy_path(store: FakeResearchDB) -> None:
 async def test_scam_signs_mark_r1_suspicious_and_still_queue_deep(
     store: FakeResearchDB,
 ) -> None:
-    """C45: a letter that asks for gift cards is flagged before it's explained. The
+    """C46: a letter that asks for gift cards is flagged before it's explained. The
     deep pass still runs: it records the verdict the consent gate reads."""
 
     async def fast(blocks: list[Any], *, case_id: str, **_: Any) -> FastPassOutput:
@@ -129,8 +143,7 @@ async def test_scam_signs_mark_r1_suspicious_and_still_queue_deep(
     assert r1.verification == "suspicious"
     assert store.cases["case_1"].fast_result["verification"] == "suspicious"
     assert "research_deep" in store.job_types()
-    [check] = [e for e in store.events if e.type == ev.CHECK]
-    assert check.data["check"] == "instant"
+    [check] = [e for e in store.events if e.data.get("check") == "scam_rules"]
     assert any("gift card" in flag for flag in check.data["red_flags"])
 
 
@@ -140,7 +153,7 @@ async def test_instant_checks_skip_an_unreadable_letter(store: FakeResearchDB) -
     await handle_research_fast(job, deps())
 
     assert FastResult.model_validate(job.result).status == "needs_better_image"
-    assert ev.CHECK not in store.event_types()
+    assert all(e.data.get("check") != "scam_rules" for e in store.events)
 
 
 async def test_fast_rerun_reuses_the_case(store: FakeResearchDB) -> None:
@@ -213,6 +226,9 @@ async def test_slow_fast_pass_emits_fast_slow_then_succeeds(
         ev.FAST_SLOW,
         ev.CHECK,
         ev.CASE_CREATED,
+        ev.CHECK,
+        ev.CHECK,
+        ev.CHECK,
         ev.FAST_DONE,
     ]
 

@@ -211,7 +211,7 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         "en": "📅 Deadline: {date}.",
         "fa": "📅 مهلت: {date}.",
     },
-    # C45: the letter is read; the explanation waits for the legitimacy check.
+    # C46: the letter is read; the explanation waits for the legitimacy check.
     "letter.double_checking": {
         "es": (
             "Gracias, ya leí su carta. Solo estoy verificando que de verdad venga "
@@ -226,7 +226,7 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "USCIS باشد. چند لحظه بعد دوباره برایتان می‌نویسم."
         ),
     },
-    # C45: research's instant checks found signs of a scam. No explanation, never a
+    # C46: research's instant checks found signs of a scam. No explanation, never a
     # call; the reasons come from the deep pass only if the user asks.
     "letter.looks_like_scam": {
         "es": (
@@ -249,7 +249,7 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
             "بنویسید."
         ),
     },
-    # C45: the end of an explanation sent before the verdict came.
+    # C46: the end of an explanation sent before the verdict came.
     "letter.still_checking": {
         "es": (
             "⚠️ Todavía estoy verificando que esta carta de verdad venga de USCIS. "
@@ -440,7 +440,7 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
         ),
     },
     # Plan.md → Failure rules: verification unknown. No call offer, and a gentle
-    # caution; it ends the explanation, or follows it alone (C45).
+    # caution; it ends the explanation, or follows it alone (C46).
     "verification.unknown": {
         "es": (
             "No pude confirmar que esta carta de verdad venga de USCIS, así que "
@@ -463,16 +463,6 @@ TEMPLATES: dict[str, dict[LanguageCode, str]] = {
     "consent.request": {lang: _WANT_CALL[lang] + _CALL_ASK[lang] for lang in _CALL_ASK},
     "consent.request_generic": {
         lang: _WANT_CALL_GENERIC[lang] + _CALL_ASK[lang] for lang in _CALL_ASK
-    },
-    # The verdict and the consent request in one message, so the user has one thing
-    # to answer (conversation.py).
-    "verification.verified_call": {
-        lang: _VERIFIED[lang] + "\n" + _WANT_CALL[lang] + _CALL_ASK[lang]
-        for lang in _CALL_ASK
-    },
-    "verification.verified_call_generic": {
-        lang: _VERIFIED[lang] + "\n" + _WANT_CALL_GENERIC[lang] + _CALL_ASK[lang]
-        for lang in _CALL_ASK
     },
     "consent.reprompt": {
         "es": "Por favor responda 1 si quiere que llame a USCIS, o 2 si no.",

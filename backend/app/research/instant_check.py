@@ -1,4 +1,4 @@
-"""The checks that need no model and no web, run right after the fast pass (C45).
+"""The checks that need no model and no web, run right after the fast pass (C46).
 
 The same rules the deep pass starts with (`deep_pass._early_checks`): scam red flags
 (payment demands, threats, notario offers) and the offline signals, of which any

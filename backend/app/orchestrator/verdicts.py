@@ -7,13 +7,14 @@ letter is read, one watcher per case polls the user's events for that, then read
 from the job. Same pattern as the call-status watcher; held in memory, so a restart
 forgets it.
 
-C45: the letter is checked before it's explained. The watcher holds the explanation
+C46: the letter is checked before it's explained. The watcher holds the explanation
 (`explain`) and sends it with the verdict, in one message, as the lead of the
 verdict's template:
-- Verified and a call recommended: the explanation, then "it's genuine" and the
-  consent request. If another numbered question is open, the request waits until the
-  user has answered (conversation.py).
-- Verified, no call needed: the explanation, then "it's genuine, no need to call".
+- Verified: the explanation, then "it's genuine", and nothing more. A call is
+  offered only when the user's messages show they need one (the turn's
+  `request_consent`, C44), never because the letter checked out.
+- Verified with no official number to call: the explanation, then that no call
+  is needed.
 - Unknown, or the deep pass failed: the explanation, then a gentle caution.
 - Suspicious: the warning with the red flags, never the explanation or a call.
 If no verdict comes within `explain_after_s`, the explanation goes out with "still
@@ -25,7 +26,6 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
-from functools import partial
 
 from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
@@ -33,7 +33,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.contracts import DeepResult, EventType, JobStatus, VerificationStatus
 from app.contracts.common import CaseId, UserId
 from app.db import reads, tables
-from app.orchestrator.consent import ConsentGate
 from app.orchestrator.conversation import Conversation
 from app.relay.outbound import send_template
 from app.relay.whatsapp import WhatsApp, WhatsAppSendError
@@ -45,7 +44,7 @@ POLL_INTERVAL_S = 1.0
 # Plan.md's target is 1–3 minutes; past this the case stops being watched (Plan.md
 # has no failure rule for a deep pass that never finishes yet).
 MAX_WATCH_S = 15 * 60.0
-# C45: how long the explanation waits for the verdict.
+# C46: how long the explanation waits for the verdict.
 EXPLAIN_AFTER_S = 60.0
 _TICK = timedelta(microseconds=1)
 _TYPING = "verdict"
@@ -59,7 +58,6 @@ class Verdicts:
         self,
         whatsapp: WhatsApp,
         translator: Translator | None,
-        consent: ConsentGate,
         poll_interval_s: float = POLL_INTERVAL_S,
         max_watch_s: float = MAX_WATCH_S,
         *,
@@ -68,7 +66,6 @@ class Verdicts:
     ) -> None:
         self._whatsapp = whatsapp
         self._translator = translator
-        self._consent = consent
         self._conversation = conversation
         self._poll_interval_s = poll_interval_s
         self._max_watch_s = max_watch_s
@@ -133,7 +130,7 @@ class Verdicts:
         logger.warning("Verdict: no deep pass finished case_id=%s", case_id)
 
     async def _explain_while_checking(self, user_id: UserId, case_id: CaseId) -> None:
-        """C45: no verdict in time; explain now, with a caution not to pay or call
+        """C46: no verdict in time; explain now, with a caution not to pay or call
         yet. The verdict follows alone."""
         explain = self._explain.pop(case_id)
         self._conversation.done_typing(user_id, _TYPING)
@@ -181,7 +178,7 @@ class Verdicts:
             try:
                 lead = await explain(user) if explain is not None else None
                 if deep is None:
-                    # No verdict will come: as for unknown (C45).
+                    # No verdict will come: as for unknown (C46).
                     await self._send(user, "verification.unknown", case_id, lead)
                 else:
                     await self.react(user, deep, lead)
@@ -201,40 +198,11 @@ class Verdicts:
             if not deep.call_recommended:
                 await self._send(user, "verification.verified_no_call", case_id, lead)
                 return
-            await self._verified(user, deep, lead)
+            await self._send(user, "verification.verified", case_id, lead)
         elif status == VerificationStatus.SUSPICIOUS:
             await self._warn(user, deep)
         elif status == VerificationStatus.UNKNOWN:
             await self._send(user, "verification.unknown", case_id, lead)
-
-    async def _verified(
-        self, user: tables.User, deep: DeepResult, lead: tuple[str, str] | None
-    ) -> None:
-        case_id = deep.case_id
-        if await self._conversation.question_open(user.id):
-            await self._send(user, "verification.verified", case_id, lead)
-            self._conversation.send_when_free(
-                user.id, partial(self._request_consent, user.id, deep)
-            )
-            logger.info("Consent request waits for an answer case_id=%s", case_id)
-            return
-        refusal = await self._consent.request(
-            user, case_id, goal_en=deep.call_goal_en, verified=True, lead=lead
-        )
-        if refusal is not None:
-            logger.error("Consent not requested case_id=%s: %s", case_id, refusal)
-            await self._send(user, "verification.verified", case_id, lead)
-
-    async def _request_consent(self, user_id: UserId, deep: DeepResult) -> None:
-        """The consent request that waited for another question's answer."""
-        user = await reads.get_user(user_id)  # the language may have changed
-        if user is None:
-            return
-        refusal = await self._consent.request(
-            user, deep.case_id, goal_en=deep.call_goal_en
-        )
-        if refusal is not None:
-            logger.error("Consent not requested case_id=%s: %s", deep.case_id, refusal)
 
     async def _warn(self, user: tables.User, deep: DeepResult) -> None:
         flags_en = "\n".join(f"- {flag}" for flag in deep.verification.red_flags)

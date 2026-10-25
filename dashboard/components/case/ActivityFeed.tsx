@@ -19,6 +19,7 @@ const COLLAPSE_AFTER_MS = 1200;
  * The case feed with its work shown as it happens: each research check or call is
  * a card whose steps (searches, pages read, checks, menus heard) stream in while it
  * runs, then fold away behind the result. Newest at the bottom, like `FeedList`.
+ * Each step shows its why (`step.reason`) on a short line under it.
  */
 export function ActivityFeed({ items, className = "" }: { items: FeedItem[]; className?: string }) {
   const t = useStrings().case.activity;
@@ -145,6 +146,7 @@ const STEP_ICONS: Record<string, IconName> = {
 
 function StepRow({ row, active }: { row: FeedItem; active: boolean }) {
   const { lang } = useLang();
+  const t = useStrings().case.activity;
   const step = row.step;
   const icon = STEP_ICONS[row.type] ?? iconForEvent(row.type);
   if (!step) {
@@ -173,6 +175,11 @@ function StepRow({ row, active }: { row: FeedItem; active: boolean }) {
         <span className={styles.spin} aria-hidden="true" />
       ) : (
         step.result && <span className={`${styles.result} ${tone}`}>{step.result.text}</span>
+      )}
+      {step.reason && (
+        <span className={styles.why} lang="en">
+          <b>{t.why}:</b> {step.reason}
+        </span>
       )}
     </li>
   );
