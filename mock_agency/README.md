@@ -56,7 +56,7 @@ The fictional case data (receipt number, A-number, name, date of birth, intervie
 | `demo` (default) | `DEMO_CASE`: Ana Morales, Los Angeles Asylum Office, November 12. The backend's database seed and tests depend on it | `backend/tests/fixtures/research/letters/i797c_asylum_interview/page_1.png` (a research fixture; its name, office and dates differ from this case) |
 | `sf_demo` | `SF_DEMO_CASE`: Mariam Namuna, San Francisco Asylum Office, November 25 | `demo/letters/i797c_mariam_namuna.png`, which matches it value for value (the demo video) |
 
-**The officer** never asks for a name, date of birth, or case number, takes answers at face value, and asks only simple questions one at a time. It works the call to a resolution: it confirms the interview, answers the interpreter question (bring another qualified interpreter, or request a reschedule in writing for good cause), notes requests on the case, gives a reference number, and ends the call.
+**The officer** never asks for a name, date of birth, or case number, takes answers at face value, and asks only simple questions one at a time. It keeps each turn to a sentence or two and works the call to a resolution: it confirms the interview, and for a reschedule (or an interpreter who can't come) it moves the interview on the call into one of the case's two fixed openings (`reschedule_slots` in [agency/case_record.py](agency/case_record.py)), with no written request. Then it gives a reference number and ends the call.
 
 ## Layout
 

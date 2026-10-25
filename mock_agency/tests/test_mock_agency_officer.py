@@ -43,3 +43,24 @@ def test_officer_resolves_and_ends_the_call():
     prompt = officer_prompt()
     assert "sr123456" in prompt
     assert "end_call" in prompt
+
+
+@pytest.mark.parametrize("case", [DEMO_CASE, SF_DEMO_CASE])
+def test_officer_reschedules_into_the_cases_own_slots_on_the_call(
+    case: MockCase,
+) -> None:
+    prompt = prompts.officer_system_prompt(
+        case=case,
+        officer="Daniel Reyes",
+        reference_number="SR123456",
+        ivr_summary=prompts.QUICK_IVR_SUMMARY,
+    )
+    assert len(case.reschedule_slots) == 2
+    for slot in case.reschedule_slots:
+        assert slot in prompt
+    assert "cannot pick a new date" not in prompt
+    assert "nothing needs to be sent in writing" in prompt
+
+
+def test_officer_is_told_to_keep_turns_short():
+    assert "one or two short sentences per turn" in officer_prompt()
