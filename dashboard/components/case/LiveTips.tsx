@@ -31,7 +31,11 @@ export function LiveTips({ tips }: { tips: LiveCall["tips"] }) {
               “{tip.say_en}”
             </p>
           )}
-          {(!tip.say_en || englishBelow(tip.meaning, lang)) && <p className={styles.meaning}>{tip.meaning.text}</p>}
+          {(!tip.say_en || englishBelow(tip.meaning, lang)) && (
+            <p className={styles.meaning} dir="auto">
+              {tip.meaning.text}
+            </p>
+          )}
         </article>
       ))}
     </section>

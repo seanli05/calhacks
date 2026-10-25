@@ -46,6 +46,12 @@ function heroCopy(t: CaseStrings, detail: CaseDetail, call: CallSummary | null, 
   }
 }
 
+/** "Should we call USCIS for you? Reply YES…": a period only where the title has none. */
+function joinSentences(title: string, sub?: string): string {
+  if (!sub) return title;
+  return /[.?!]$/.test(title) ? `${title} ${sub}` : `${title}. ${sub}`;
+}
+
 /** How long the full "person answered" moment stays up once the user is on the call. */
 const COLLAPSE_AFTER_MS = 3000;
 
@@ -70,7 +76,7 @@ export function CallHero({
   const en = stringsFor("en").case;
   const now = useNow();
   const call = detail.calls.length ? detail.calls[detail.calls.length - 1] : null;
-  const agency = detail.issuer ?? t.agencyFallback;
+  const agency = detail.issuer ? t.agencyName(detail.issuer) : t.agencyFallback;
   const copy = heroCopy(t, detail, call, agency);
   const copyEn = heroCopy(en, detail, call, detail.issuer ?? en.agencyFallback);
   const moment = detail.stage === "connected" && isHumanMoment(call?.state);
@@ -118,20 +124,19 @@ export function CallHero({
           {copy.sub && <p>{copy.sub}</p>}
           {lang !== "en" && (
             <p className={styles.en} lang="en">
-              {copyEn.title}
-              {copyEn.sub ? `${/[.?!]$/.test(copyEn.title) ? "" : "."} ${copyEn.sub}` : ""}
+              {joinSentences(copyEn.title, copyEn.sub)}
             </p>
           )}
         </div>
         {bridged && call && (
           <div className={styles.timer}>
-            <span className={styles.t}>{duration((now - new Date(call.started_at).getTime()) / 1000)}</span>
+            <span className={styles.t}>{duration((now - new Date(call.started_at).getTime()) / 1000, lang)}</span>
             <span className={styles.tl}>{t.live.onCall}</span>
           </div>
         )}
         {showTimer && (
           <div className={styles.timer}>
-            <span className={styles.t}>{duration((now - new Date(call!.hold_started_at!).getTime()) / 1000)}</span>
+            <span className={styles.t}>{duration((now - new Date(call!.hold_started_at!).getTime()) / 1000, lang)}</span>
             <span className={styles.tl}>{t.onHold}</span>
           </div>
         )}
@@ -142,7 +147,7 @@ export function CallHero({
           {detail.brief.questions_to_ask.map((q, i) => (
             <li key={i}>
               <span className={styles.bullet}>?</span>
-              <span>
+              <span dir="auto">
                 {q.text}
                 {englishBelow(q, lang) && <small>{q.en}</small>}
               </span>
@@ -154,7 +159,7 @@ export function CallHero({
       {report && (
         <>
           {report.summary && (
-            <p className={styles.summary}>
+            <p className={styles.summary} dir="auto">
               {report.summary.text}
               {englishBelow(report.summary, lang) && <small>{report.summary.en}</small>}
             </p>
@@ -163,7 +168,7 @@ export function CallHero({
             {report.next_steps.map((step, i) => (
               <li key={i}>
                 <span className={styles.bullet}>✓</span>
-                <span>
+                <span dir="auto">
                   {step.text}
                   {englishBelow(step, lang) && <small>{step.en}</small>}
                 </span>
@@ -173,7 +178,7 @@ export function CallHero({
           {report.reference_number && <p className={styles.ref}>{t.reference(report.reference_number)}</p>}
           {call?.transcript_id && (
             <button type="button" className="btn primary" onClick={() => onOpenTranscript(call.id)}>
-              {t.viewTranscript} →
+              {t.viewTranscript} <span className="flip-rtl">→</span>
             </button>
           )}
         </>

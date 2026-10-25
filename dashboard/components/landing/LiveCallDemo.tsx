@@ -7,7 +7,7 @@ import { Tracker } from "@/components/Tracker";
 import { useNow } from "@/lib/api/hooks";
 import type { CaseStage } from "@/lib/api/types";
 import { duration } from "@/lib/format";
-import { useStrings } from "@/lib/i18n";
+import { useLang, useStrings } from "@/lib/i18n";
 
 import styles from "./LiveCallDemo.module.css";
 
@@ -34,6 +34,7 @@ const FEED_ICONS: Record<"verified" | Phase, IconName> = {
 
 /** The hero picture: a call card that plays dialing → menu → hold → a person answers, on loop. */
 export function LiveCallDemo() {
+  const { lang } = useLang();
   const t = useStrings().landing.demo;
   const [step, setStep] = useState(0);
   const [phaseStart, setPhaseStart] = useState(() => Date.now());
@@ -72,7 +73,7 @@ export function LiveCallDemo() {
         </div>
         {phase === "hold" && (
           <div className={styles.timer}>
-            <span className={styles.t}>{duration(held)}</span>
+            <span className={styles.t}>{duration(held, lang)}</span>
             <span className={styles.tl}>{t.onHold}</span>
           </div>
         )}

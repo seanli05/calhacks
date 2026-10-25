@@ -33,12 +33,14 @@ EMPLOYMENT_INFO = (
 
 RETURNING_TO_MAIN = "Returning to the main menu."
 
-APPOINTMENT_MENU = (
+APPOINTMENT_OPTIONS = (
     "If your notice is for a biometrics appointment, press 1. "
     "For an asylum interview, press 2. "
-    "For a naturalization interview, press 3. "
-    "To return to the main menu, press star."
+    "For a naturalization interview, press 3."
 )
+"""The short tree opens on these; it has no main menu to return to."""
+
+APPOINTMENT_MENU = APPOINTMENT_OPTIONS + " To return to the main menu, press star."
 
 NOT_ASYLUM_INFO = (
     "Appointment details for that notice are listed on the notice itself and in "

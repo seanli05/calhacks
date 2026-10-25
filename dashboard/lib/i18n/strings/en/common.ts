@@ -37,6 +37,8 @@ export const common = {
     you: "You",
   },
   deleted: (date: string) => `(deleted ${date})`,
+  /** Quotation marks around something the user said. */
+  quote: (text: string) => `“${text}”`,
   loading: "Loading…",
   loadError: "Can't reach the server. Retrying…",
   notFound: "We couldn't find that.",

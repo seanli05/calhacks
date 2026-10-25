@@ -21,7 +21,9 @@ export function VerdictSummary({ verification }: { verification: NonNullable<Cas
       <ul>
         {verified && verification.evidence[0] && <li>{t.officialSource(domainOf(verification.evidence[0]))}</li>}
         {verification.red_flags.map((f, i) => (
-          <li key={i}>{f.text}</li>
+          <li key={i} dir="auto">
+            {f.text}
+          </li>
         ))}
       </ul>
     </section>

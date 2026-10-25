@@ -63,7 +63,7 @@ export function GlossaryBook({
             <b>{e.translation}</b>
             <span className={`${styles.trust} ${styles[e.trust_level]}`}>{t.trust[e.trust_level]}</span>
             {/* The source sits under the word, so a long domain never squeezes it. */}
-            <span className={styles.term}>
+            <span className={styles.term} lang="en">
               {e.term}
               {e.source_url && (
                 <>

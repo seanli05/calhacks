@@ -26,7 +26,7 @@ const ASYLUM_SCRIPT: ScriptLine[] = [
     tip: {
       kind: "yourself",
       say_en: null,
-      es: "Te preguntan tu nombre y fecha de nacimiento. Contesta tú; nosotros nunca respondemos por ti.",
+      es: "Le preguntan su nombre y fecha de nacimiento. Conteste usted; nosotros nunca respondemos por usted.",
       en: "They're asking your name and date of birth. Answer yourself; we never answer for you.",
     },
   },
@@ -92,7 +92,7 @@ const RFE_SCRIPT: ScriptLine[] = [
     tip: {
       kind: "yourself",
       say_en: null,
-      es: "Te piden el número de recibo. Está arriba en tu carta; léelo tú.",
+      es: "Le piden el número de recibo. Está arriba en su carta; léalo usted.",
       en: "They're asking for the receipt number. It's at the top of your letter; read it yourself.",
     },
   },

@@ -55,11 +55,13 @@ export function AssistantPanel({ userId, className = "" }: { userId: string; cla
             target="_blank"
             rel="noopener noreferrer"
           >
-            <span>
+            <span dir="auto">
               <b>{s.title.text}</b>
               <span>{s.detail.text}</span>
             </span>
-            <span className={styles.go}>{s.action.text} →</span>
+            <span className={styles.go} dir="auto">
+              {s.action.text} <span className="flip-rtl">→</span>
+            </span>
           </a>
         ))}
       </div>
@@ -71,7 +73,7 @@ export function AssistantPanel({ userId, className = "" }: { userId: string; cla
               <MiniLetter mediaId={m.media_ids[0]} />
             </div>
           ) : (
-            <div key={m.id} className={`${styles.msg} ${m.direction === "in" ? styles.in : styles.out}`}>
+            <div key={m.id} className={`${styles.msg} ${m.direction === "in" ? styles.in : styles.out}`} dir="auto">
               {m.body}
               {m.body_en && m.language !== "en" && m.body_en !== m.body && <small>{m.body_en}</small>}
             </div>

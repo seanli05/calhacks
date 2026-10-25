@@ -67,9 +67,25 @@
   font-size: var(--fs-sm);
 }
 
+/* The mono face has no Arabic script, and its wide spaces pull Dari words apart. */
+.v:lang(fa) {
+  font-family: var(--font-ui);
+}
+
 @keyframes scroll {
   to {
     transform: translateX(-50%);
+  }
+}
+
+/* Right to left the track starts at the right edge, so it scrolls the other way. */
+[dir="rtl"] .track {
+  animation-name: scroll-rtl;
+}
+
+@keyframes scroll-rtl {
+  to {
+    transform: translateX(50%);
   }
 }
 

@@ -71,7 +71,7 @@ export function CaseCard({ userId, summary }: { userId: string; summary: CaseSum
             )}
             {holdStart && (
               <span className={styles.timer}>
-                <span className={styles.t}>{duration((now - new Date(holdStart).getTime()) / 1000)}</span>
+                <span className={styles.t}>{duration((now - new Date(holdStart).getTime()) / 1000, lang)}</span>
                 <span className={styles.tl}>{t.onHold}</span>
               </span>
             )}
@@ -87,7 +87,11 @@ export function CaseCard({ userId, summary }: { userId: string; summary: CaseSum
                 {appt.time && `, ${clockTime(appt.time, lang)}`}
               </b>{" "}
               · {countdown(appt.date, lang, now)}
-              {appt.location && <span className={styles.loc}>{appt.location}</span>}
+              {appt.location && (
+                <span className={styles.loc} dir="auto">
+                  {appt.location}
+                </span>
+              )}
             </span>
           </p>
         )}
@@ -103,7 +107,9 @@ export function CaseCard({ userId, summary }: { userId: string; summary: CaseSum
         {!scam && <Tracker stage={summary.stage} call={summary.latest_call} onDark={moment} />}
       </div>
 
-      <span className={styles.open}>{t.open} →</span>
+      <span className={styles.open}>
+        {t.open} <span className="flip-rtl">→</span>
+      </span>
     </Link>
   );
 }

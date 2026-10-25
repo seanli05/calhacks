@@ -43,7 +43,7 @@ const FA: Record<string, string> = {
 
   // Scam letter
   "It asks you to pay a fine with gift cards. USCIS never takes gift cards.":
-    "از شما می‌خواهد که جریمه را با کارت هدیه بپردازید. ادارهٔ USCIS هرگز کارت هدیه قبول نمی‌کند.",
+    "از شما می‌خواهد که جریمه را با کارت تحفه بپردازید. ادارهٔ USCIS هرگز کارت تحفه قبول نمی‌کند.",
   "The phone number on the letter isn't a USCIS number.": "شمارهٔ تیلفون روی نامه، شمارهٔ USCIS نیست.",
   "It threatens deportation within 48 hours if you don't pay.":
     "تهدید می‌کند که اگر پول ندهید، در ۴۸ ساعت اخراج (دیپورت) می‌شوید.",
@@ -87,7 +87,7 @@ const FA: Record<string, string> = {
   "We chose option 2: appointments and interviews": "گزینهٔ ۲ را انتخاب کردیم: وقت ملاقات و مصاحبه",
   "We chose option 2: asylum interview": "گزینهٔ ۲ را انتخاب کردیم: مصاحبهٔ پناهندگی",
   "We finished checking your letter": "بررسی نامهٔ شما تمام شد",
-  "We're on hold": "در انتظار هستیم",
+  "We're on hold": "پشت خط منتظر هستیم",
   "A person from USCIS answered": "یک شخص از USCIS جواب داد",
   "We're calling you to connect you": "به شما زنگ می‌زنیم تا وصل شوید",
   "We connected you with USCIS": "شما را با USCIS وصل کردیم",

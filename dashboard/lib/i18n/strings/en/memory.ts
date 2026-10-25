@@ -25,6 +25,7 @@ export const memoryPage = {
     city: "City",
     county: "County",
     household_size: "People in your home",
+    contact_preference: "Best way to reach you",
   } as Record<string, string>,
   sources: {
     user_said: "You shared this",

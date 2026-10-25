@@ -48,7 +48,6 @@ from pydantic import BaseModel
 
 from app.phone.listen_audio import ListenTap
 from app.phone.listener import (
-    FORK_TIMING,
     LineListener,
     PlaybackMarkFrame,
     overheard,
@@ -66,9 +65,6 @@ VAD_START_S = 0.5
 """Speech this long before it counts as speech, so breaths and clicks don't open a
 turn (and hold back a menu answer). Risk: a rep's bare "Hello?" is about this
 long; if live calls miss one, 0.3 s is the fallback."""
-FORK_VAD_STOP_S = 0.3
-"""The forks' stop: shorter pauses end a phrase, so the live view gets smaller
-pieces sooner. Too short for the agent's own stream (it split menu sentences)."""
 START_TIMEOUT_S = 10.0
 _marks = count(1)
 
@@ -166,13 +162,13 @@ def _transport(
 
 
 def _ears(
-    settings: Settings, *, vad_stop_s: float = VAD_STOP_S
+    settings: Settings,
 ) -> list[FrameProcessor]:
     """Voice activity, then speech-to-text."""
     return [
         VADProcessor(
             vad_analyzer=SileroVADAnalyzer(
-                params=VADParams(start_secs=VAD_START_S, stop_secs=vad_stop_s)
+                params=VADParams(start_secs=VAD_START_S, stop_secs=VAD_STOP_S)
             )
         ),
         CartesiaSTTService(
@@ -277,8 +273,8 @@ async def run_fork(
     worker = _worker(
         [
             transport.input(),
-            *_ears(settings, vad_stop_s=FORK_VAD_STOP_S),
-            LineListener(overheard(line.emit, speaker), timing=FORK_TIMING),
+            *_ears(settings),
+            LineListener(overheard(line.emit, speaker)),
         ]
     )
     await _run(_runner_for(transport), worker)

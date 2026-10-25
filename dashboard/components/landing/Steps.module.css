@@ -1,0 +1,386 @@
+.band {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(24px, 4vh, 40px);
+}
+
+/* Same type scale as the hero, one size down. */
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(28px, 2.4vw, 40px);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.sub {
+  margin: 0;
+  font-size: 19px;
+  color: var(--muted);
+}
+
+/* Matches the hero's columns, so the window sits where the chat sat. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
+  gap: clamp(40px, 5vw, 88px);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Each step is a tall stretch of page; a line down the side shows where you are. */
+.step {
+  min-height: 26vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding-inline-start: 28px;
+  border-inline-start: 2px solid var(--line);
+  opacity: 0.35;
+  transition:
+    opacity 400ms ease,
+    border-color 400ms ease;
+}
+
+.active {
+  opacity: 1;
+  border-color: var(--forest-2);
+}
+
+.step h3 {
+  margin: 0;
+  font-size: clamp(22px, 1.9vw, 30px);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.step p {
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 38ch;
+}
+
+/* Only on narrow screens, where there is no window beside the steps. */
+.inlineArt {
+  display: none;
+}
+
+.stage {
+  position: sticky;
+  top: calc(50vh - 150px);
+  align-self: start;
+}
+
+/* The hero chat's window: same radius, forest bar, soft thread colour, same shadow. */
+.window {
+  margin: 0;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 30px 60px -32px rgba(14, 59, 44, 0.4);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  background: var(--forest);
+  color: #fff;
+}
+
+.barTitle {
+  font-size: var(--fs-lg);
+  font-weight: 650;
+  animation: rise 400ms ease-out both;
+}
+
+.segments {
+  display: flex;
+  gap: 6px;
+}
+
+.segments i {
+  width: 22px;
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.25);
+  transition: background 400ms ease;
+}
+
+.segments .on {
+  background: var(--lime);
+}
+
+.scenes {
+  position: relative;
+  height: 240px;
+  background: var(--sunk);
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 500ms ease,
+    transform 500ms ease;
+}
+
+.shown {
+  opacity: 1;
+  transform: none;
+}
+
+/* The drawings are built small; the window shows them larger. */
+.scene > :first-child {
+  scale: 1.05;
+}
+
+.scene:nth-child(3) > :first-child {
+  scale: 1;
+}
+
+/* A short line from Avocado, like the chat in the hero: a person talking, not a diagram label. */
+.say {
+  margin: 0;
+  max-width: 80%;
+  padding: 9px 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  border-end-start-radius: 4px;
+  font-size: var(--fs-md);
+  line-height: 1.4;
+}
+
+/* --- Step 1: phone --- */
+.phone {
+  position: relative;
+  width: 96px;
+  height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 18px 10px;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  border-radius: 18px;
+}
+
+.notch {
+  position: absolute;
+  top: 7px;
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  width: 26px;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--ink);
+}
+
+[dir="rtl"] .notch {
+  translate: 50% 0;
+}
+
+.sent {
+  animation: send 3.2s ease-in-out infinite;
+  padding: 5px;
+  background: var(--lime-soft);
+  border-radius: 10px;
+  border-end-end-radius: 3px;
+}
+
+.sendBtn {
+  animation: tap 3.2s ease-in-out infinite;
+  position: absolute;
+  bottom: -14px;
+  inset-inline-end: -14px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--forest);
+  color: #fff;
+}
+
+/* --- Step 2: checked letter --- */
+.checked {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.seal {
+  animation: seal 3.2s ease-out infinite;
+  position: absolute;
+  top: -12px;
+  inset-inline-end: -16px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--lime);
+  color: var(--forest);
+  border: 3px solid var(--sunk);
+}
+
+.source {
+  position: absolute;
+  bottom: -12px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--forest);
+  color: #fff;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* --- Step 3: call line --- */
+.call {
+  display: flex;
+  align-items: center;
+  width: min(100%, 300px);
+  padding-inline: 16px;
+}
+
+.node {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  color: var(--ink);
+}
+
+.you {
+  background: var(--lime);
+  border-color: var(--forest);
+  color: var(--forest);
+  animation: ring 1.6s ease-out infinite;
+}
+
+@keyframes send {
+  0%, 15% { transform: translateY(14px); opacity: 0; }
+  35%, 85% { transform: none; opacity: 1; }
+  100% { transform: translateY(-6px); opacity: 0; }
+}
+
+@keyframes tap {
+  0%, 20%, 40%, 100% { transform: none; }
+  30% { transform: scale(0.86); }
+}
+
+@keyframes seal {
+  0%, 30% { transform: scale(0); }
+  42% { transform: scale(1.15); }
+  50%, 100% { transform: scale(1); }
+}
+
+@keyframes flow {
+  to { background-position: 12px 0; }
+}
+
+@keyframes ring {
+  0% { box-shadow: 0 0 0 0 var(--lime-soft), 0 0 0 0 rgba(163, 238, 115, 0.5); }
+  100% { box-shadow: 0 0 0 6px var(--lime-soft), 0 0 0 16px rgba(163, 238, 115, 0); }
+}
+
+/* Dashes flowing toward you. */
+.wire {
+  flex: 1;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--line-strong) 0 6px, transparent 6px 12px);
+  background-size: 12px 2px;
+  animation: flow 0.9s linear infinite;
+}
+
+[dir="rtl"] .wire {
+  animation-direction: reverse;
+}
+
+.hold {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--line-strong);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stage {
+    display: none;
+  }
+
+  .list {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  .step {
+    min-height: 0;
+    opacity: 1;
+    border-color: var(--forest-2);
+  }
+
+  .inlineArt {
+    display: grid;
+    place-items: center;
+    height: 200px;
+    margin-top: 8px;
+    background: var(--sunk);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .step {
+    padding-inline-start: 20px;
+  }
+
+  .sub,
+  .step p {
+    font-size: var(--fs-lg);
+  }
+}

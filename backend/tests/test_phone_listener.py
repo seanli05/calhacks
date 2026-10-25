@@ -6,7 +6,6 @@ from array import array
 from app.phone.audio_pipeline import MarkingTwilioSerializer
 from app.phone.line import Heard, LineEvent, NonSpeech, Overheard, SpeechStarted
 from app.phone.listener import (
-    FORK_TIMING,
     LOUD_RMS,
     PlaybackMarkFrame,
     TurnAssembler,
@@ -20,17 +19,23 @@ GAP = TurnTiming().merge_gap_s
 GRACE = TurnTiming().final_grace_s
 
 
-def test_a_fork_makes_a_line_of_each_finished_phrase() -> None:
-    """Forks feed only the live view, so they don't wait to join phrases."""
-    turns = TurnAssembler(now=0, timing=FORK_TIMING)
+def test_a_short_pause_mid_sentence_stays_one_line() -> None:
+    """The forks' lines are what the live view translates, so a sentence with a
+    breath in it must stay whole."""
+    turns = TurnAssembler(now=0)
     turns.speech_started(1.0)
     turns.speech_stopped(2.0)
-    turns.transcript("Your interview is still on", 2.2)
-    assert turns.tick(2.3) == [Heard(text="Your interview is still on")]
-    assert turns.speech_started(2.5) == [SpeechStarted()]
+    turns.transcript("Applicants must bring a qualified interpreter,", 2.2)
+    assert turns.tick(2.3) == []
+    turns.speech_started(2.4)
     turns.speech_stopped(3.5)
-    turns.transcript("for November 12.", 3.6)
-    assert turns.tick(3.7) == [Heard(text="for November 12.")]
+    turns.transcript("so I can reschedule you now.", 3.6)
+    assert turns.tick(3.5 + GAP + 0.01) == [
+        Heard(
+            text="Applicants must bring a qualified interpreter, "
+            "so I can reschedule you now."
+        )
+    ]
 
 
 def _loud(turns: TurnAssembler, start: float, end: float) -> None:

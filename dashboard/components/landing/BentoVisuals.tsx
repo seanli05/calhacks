@@ -2,7 +2,7 @@
 
 import { Icon } from "@/components/Icon";
 import { MiniLetter } from "@/components/MiniLetter";
-import { duration } from "@/lib/format";
+import { duration, formatNumber } from "@/lib/format";
 import { useNow } from "@/lib/api/hooks";
 import { stringsFor, useLang, useStrings } from "@/lib/i18n";
 
@@ -87,14 +87,15 @@ export function MenuVisual() {
 }
 
 export function HoldVisual() {
-  const t = useStrings().landing.bento.hold;
+  const { lang } = useLang();
+  const t = stringsFor(lang).landing.bento.hold;
   const now = useNow();
   const held = HOLD_BASE_S + (Math.floor(now / 1000) % 600);
   return (
     <div className={styles.hold}>
       {/* The server and the browser can render a second apart. */}
       <span className={styles.clock} suppressHydrationWarning>
-        {duration(held)}
+        {duration(held, lang)}
       </span>
       <span className={styles.holdLabel}>
         <span className={styles.dot} />
@@ -123,11 +124,12 @@ export function RingVisual() {
 }
 
 export function PrepVisual() {
-  const t = useStrings().landing.bento.prep;
+  const { lang } = useLang();
+  const t = stringsFor(lang).landing.bento.prep;
   return (
     <div className={styles.prep}>
       <div className={styles.countdown}>
-        <span className={styles.days}>{DAYS_TO_INTERVIEW}</span>
+        <span className={styles.days}>{formatNumber(DAYS_TO_INTERVIEW, lang)}</span>
         <span>{t.days}</span>
       </div>
       <div className={styles.prepCols}>
@@ -153,12 +155,13 @@ export function PrepVisual() {
 }
 
 export function MemoryVisual() {
-  const t = useStrings().landing.bento.memory;
+  const s = useStrings();
+  const t = s.landing.bento.memory;
   return (
     <ul className={styles.facts}>
       {t.facts.map((f, i) => (
         <li key={f} className={i === 1 ? styles.gone : ""}>
-          <span>“{f}”</span>
+          <span>{s.common.quote(f)}</span>
           {i === 1 ? (
             <small>{t.deleted}</small>
           ) : (

@@ -179,9 +179,9 @@ const heard = (id: string, minStep: number, m: number): FeedSeed => ({
 });
 
 const FEED: FeedSeed[] = [
-  { id: "event_f01", minStep: 0, at: () => min(-2 * 24 * 60), type: "case.created", es: "Recibimos tu carta", en: "We received your letter" },
-  { id: "event_f02", minStep: 0, at: () => min(-2 * 24 * 60 + 1), type: "research.fast_done", es: "Te explicamos la carta en español", en: "We explained the letter in your language" },
-  { id: "event_f03", minStep: 0, at: () => min(-2 * 24 * 60 + 1), type: "memory.fact_saved", es: "Guardamos: tienes dos hijos en tu solicitud", en: "Saved: you have two children on your application", factId: "fact_demo01" },
+  { id: "event_f01", minStep: 0, at: () => min(-2 * 24 * 60), type: "case.created", es: "Recibimos su carta", en: "We received your letter" },
+  { id: "event_f02", minStep: 0, at: () => min(-2 * 24 * 60 + 1), type: "research.fast_done", es: "Le explicamos la carta en español", en: "We explained the letter in your language" },
+  { id: "event_f03", minStep: 0, at: () => min(-2 * 24 * 60 + 1), type: "memory.fact_saved", es: "Guardamos: tiene dos hijos en su solicitud", en: "Saved: you have two children on your application", factId: "fact_demo01" },
   { id: "event_s00", minStep: 0, at: () => min(D), type: "research.deep_started", job: DEEP_JOB, es: "Estamos revisando que la carta sea real", en: "We're checking that the letter is real" },
   check("event_s01", 0.02, "scam patterns", "0 alertas", "0 red flags", true, "No payment demands, threats, notario offers, or links outside official sites."),
   check("event_s02", 0.04, "form type", "coincide", "matches", true, "The form number is on an official page or the known form list."),
@@ -195,24 +195,24 @@ const FEED: FeedSeed[] = [
   check("event_s10", 0.42, "phone on the letter vs. the official site", "coincide", "matches", true, "The phone number on the letter is listed for the issuer on an official page."),
   check("event_s11", 0.46, "is the letter real?", "real", "real", true, "The letter's details matched the issuer's official site. The official phone number was found there too."),
   { id: "event_f04", minStep: 0, at: () => min(-2 * 24 * 60 + 3), type: "verification.verified", job: DEEP_JOB, es: "Confirmamos que la carta es real (uscis.gov)", en: "We confirmed the letter is real (uscis.gov)" },
-  { id: "event_f05", minStep: 0, at: () => min(-20), type: "consent.requested", es: "Te preguntamos si quieres que llamemos a USCIS", en: "We asked if you want us to call USCIS" },
-  { id: "event_f06", minStep: 1, at: () => min(-16), type: "consent.given", es: "Dijiste que sí a la llamada", en: "You said yes to the call" },
+  { id: "event_f05", minStep: 0, at: () => min(-20), type: "consent.requested", es: "Le preguntamos si quiere que llamemos a USCIS", en: "We asked if you want us to call USCIS" },
+  { id: "event_f06", minStep: 1, at: () => min(-16), type: "consent.given", es: "Usted dijo que sí a la llamada", en: "You said yes to the call" },
   { id: "event_f07", minStep: 1, at: () => min(-15), type: "call.dialing", call: true, es: "Llamamos al número oficial de USCIS", en: "We called the official USCIS number" },
   heard("event_m01", 2, -14.3),
   { id: "event_f08", minStep: 2, at: () => min(-14), type: "call.menu_choice", call: true, es: "Elegimos la opción 2: citas y entrevistas", en: "We chose option 2: appointments and interviews" },
   heard("event_m02", 2, -13.8),
   { id: "event_f09", minStep: 2, at: () => min(-13.5), type: "call.menu_choice", call: true, es: "Elegimos la opción 2: entrevista de asilo", en: "We chose option 2: asylum interview" },
-  { id: "event_s12", minStep: 0, at: () => min(D + 1.02), type: "research.deep_done", job: DEEP_JOB, es: "Terminamos de revisar tu carta", en: "We finished checking your letter" },
+  { id: "event_s12", minStep: 0, at: () => min(D + 1.02), type: "research.deep_done", job: DEEP_JOB, es: "Terminamos de revisar su carta", en: "We finished checking your letter" },
   { id: "event_f10", minStep: 3, at: () => min(-13), type: "call.on_hold", call: true, es: "Estamos en espera", en: "We're on hold" },
   { id: "event_f11", minStep: 4, at: () => atStep(4, 0), type: "call.human_detected", call: true, es: "Contestó una persona de USCIS", en: "A person from USCIS answered" },
-  { id: "event_f12", minStep: 4, at: () => atStep(4, 0), type: "call.user_dialed", call: true, es: "Te llamamos para conectarte", en: "We're calling you to connect you" },
-  { id: "event_f13", minStep: 5, at: () => atStep(5, 1), type: "call.user_joined", call: true, es: "Te conectamos con USCIS", en: "We connected you with USCIS" },
+  { id: "event_f12", minStep: 4, at: () => atStep(4, 0), type: "call.user_dialed", call: true, es: "Le llamamos para conectarle", en: "We're calling you to connect you" },
+  { id: "event_f13", minStep: 5, at: () => atStep(5, 1), type: "call.user_joined", call: true, es: "Le conectamos con USCIS", en: "We connected you with USCIS" },
   { id: "event_f14", minStep: 6, at: () => atStep(6, 6), type: "call.ended", call: true, es: "La llamada terminó", en: "The call ended" },
-  { id: "event_r01", caseId: RFE_CASE_ID, minStep: 0, at: () => min(-26 * 60), type: "case.created", es: "Recibimos tu carta", en: "We received your letter" },
-  { id: "event_r02", caseId: RFE_CASE_ID, minStep: 0, at: () => min(-26 * 60 + 1), type: "research.fast_done", es: "Te explicamos la carta en español", en: "We explained the letter in your language" },
+  { id: "event_r01", caseId: RFE_CASE_ID, minStep: 0, at: () => min(-26 * 60), type: "case.created", es: "Recibimos su carta", en: "We received your letter" },
+  { id: "event_r02", caseId: RFE_CASE_ID, minStep: 0, at: () => min(-26 * 60 + 1), type: "research.fast_done", es: "Le explicamos la carta en español", en: "We explained the letter in your language" },
   { id: "event_r03", caseId: RFE_CASE_ID, minStep: 0, at: () => min(-26 * 60 + 3), type: "verification.verified", es: "Confirmamos que la carta es real (uscis.gov)", en: "We confirmed the letter is real (uscis.gov)" },
-  { id: "event_r04", caseId: RFE_CASE_ID, minStep: 0, at: () => min(-25 * 60), type: "consent.requested", es: "Te preguntamos si quieres que llamemos a USCIS", en: "We asked if you want us to call USCIS" },
-  { id: "event_r05", caseId: RFE_CASE_ID, minStep: 1, at: () => rfeAt(1, -3), type: "consent.given", es: "Dijiste que sí a la llamada", en: "You said yes to the call" },
+  { id: "event_r04", caseId: RFE_CASE_ID, minStep: 0, at: () => min(-25 * 60), type: "consent.requested", es: "Le preguntamos si quiere que llamemos a USCIS", en: "We asked if you want us to call USCIS" },
+  { id: "event_r05", caseId: RFE_CASE_ID, minStep: 1, at: () => rfeAt(1, -3), type: "consent.given", es: "Usted dijo que sí a la llamada", en: "You said yes to the call" },
   { id: "event_r06", caseId: RFE_CASE_ID, minStep: 1, at: () => rfeAt(1, -3), type: "call.dialing", call: true, es: "Llamamos al número oficial de USCIS", en: "We called the official USCIS number" },
   { id: "event_r07", caseId: RFE_CASE_ID, minStep: 2, at: () => rfeAt(2, -2.5), type: "call.menu_heard", call: true, es: "Heard the phone menu", en: "Heard the phone menu",
     step: ["Escuchando", "Listening", "phone menu", "marcar", "press a key", null, "Lists numbered options. Option 1 is for a case you already filed."] },
@@ -220,8 +220,8 @@ const FEED: FeedSeed[] = [
   { id: "event_r09", caseId: RFE_CASE_ID, minStep: 2, at: () => rfeAt(2, -2.3), type: "call.menu_choice", call: true, es: "Elegimos la opción 3: una carta que pide pruebas", en: "We chose option 3: a letter asking for evidence" },
   { id: "event_r10", caseId: RFE_CASE_ID, minStep: 3, at: () => rfeAt(3, -2), type: "call.on_hold", call: true, es: "Estamos en espera", en: "We're on hold" },
   { id: "event_r11", caseId: RFE_CASE_ID, minStep: 4, at: () => rfeAt(4, 0), type: "call.human_detected", call: true, es: "Contestó una persona de USCIS", en: "A person from USCIS answered" },
-  { id: "event_r12", caseId: RFE_CASE_ID, minStep: 4, at: () => rfeAt(4, 0), type: "call.user_dialed", call: true, es: "Te llamamos para conectarte", en: "We're calling you to connect you" },
-  { id: "event_r13", caseId: RFE_CASE_ID, minStep: 5, at: () => rfeAt(5, 1), type: "call.user_joined", call: true, es: "Te conectamos con USCIS", en: "We connected you with USCIS" },
+  { id: "event_r12", caseId: RFE_CASE_ID, minStep: 4, at: () => rfeAt(4, 0), type: "call.user_dialed", call: true, es: "Le llamamos para conectarle", en: "We're calling you to connect you" },
+  { id: "event_r13", caseId: RFE_CASE_ID, minStep: 5, at: () => rfeAt(5, 1), type: "call.user_joined", call: true, es: "Le conectamos con USCIS", en: "We connected you with USCIS" },
   { id: "event_r14", caseId: RFE_CASE_ID, minStep: 6, at: () => rfeAt(6, 6), type: "call.ended", call: true, es: "La llamada terminó", en: "The call ended" },
 ];
 
@@ -232,11 +232,11 @@ function rfeAt(s: number, fallbackMinutes: number): string {
 function deleteEvents(lang: string): FeedItem[] {
   const items: FeedItem[] = [];
   for (const [id, at] of deletedFacts) {
-    items.push({ id: `event_del_${id}`, at, type: "fact.deleted", case_id: null, call_id: null, job_id: null, text: L(lang, "Borraste un dato", "You deleted a fact"), deleted_at: null });
+    items.push({ id: `event_del_${id}`, at, type: "fact.deleted", case_id: null, call_id: null, job_id: null, text: L(lang, "Usted borró un dato", "You deleted a fact"), deleted_at: null });
   }
-  if (deletedDocument) items.push({ id: "event_del_doc", at: deletedDocument, type: "document.deleted", case_id: null, call_id: null, job_id: null, text: L(lang, "Borraste la carta", "You deleted the letter"), deleted_at: null });
-  if (deletedTranscript) items.push({ id: "event_del_tr", at: deletedTranscript, type: "transcript.deleted", case_id: null, call_id: null, job_id: null, text: L(lang, "Borraste una transcripción", "You deleted a transcript"), deleted_at: null });
-  if (deletedAll) items.push({ id: "event_del_all", at: deletedAll, type: "user.deleted_all", case_id: null, call_id: null, job_id: null, text: L(lang, "Borraste todo", "You deleted everything"), deleted_at: null });
+  if (deletedDocument) items.push({ id: "event_del_doc", at: deletedDocument, type: "document.deleted", case_id: null, call_id: null, job_id: null, text: L(lang, "Usted borró la carta", "You deleted the letter"), deleted_at: null });
+  if (deletedTranscript) items.push({ id: "event_del_tr", at: deletedTranscript, type: "transcript.deleted", case_id: null, call_id: null, job_id: null, text: L(lang, "Usted borró una transcripción", "You deleted a transcript"), deleted_at: null });
+  if (deletedAll) items.push({ id: "event_del_all", at: deletedAll, type: "user.deleted_all", case_id: null, call_id: null, job_id: null, text: L(lang, "Usted borró todo", "You deleted everything"), deleted_at: null });
   return items;
 }
 
@@ -290,15 +290,15 @@ function asylumReport(lang: string): CallSummary["report"] {
     outcome: "resolved",
     summary: L(
       lang,
-      "El oficial Lee confirmó tu entrevista y explicó que debes llevar tu propio intérprete.",
+      "El oficial Lee confirmó su entrevista y explicó que debe llevar su propio intérprete.",
       "Officer Lee confirmed your interview and explained that you must bring your own interpreter.",
     ),
     reference_number: null,
     rep_name: "Officer Lee",
     next_steps: [
-      L(lang, "Tu entrevista sigue el 12 de noviembre a las 8:30 AM", "Your interview is still on November 12 at 8:30 AM"),
-      L(lang, "Tienes que llevar tu propio intérprete; USCIS no lo da", "You must bring your own interpreter; USCIS doesn't provide one"),
-      L(lang, "Si tu intérprete no puede ir, avisa por escrito antes de la cita", "If your interpreter can't come, tell USCIS in writing before the appointment"),
+      L(lang, "Su entrevista sigue el 12 de noviembre a las 8:30 AM", "Your interview is still on November 12 at 8:30 AM"),
+      L(lang, "Tiene que llevar su propio intérprete; USCIS no lo da", "You must bring your own interpreter; USCIS doesn't provide one"),
+      L(lang, "Si su intérprete no puede ir, avise a USCIS por escrito antes de la cita", "If your interpreter can't come, tell USCIS in writing before the appointment"),
     ],
     new_deadlines: [],
     followup_needed: false,
@@ -316,9 +316,9 @@ function rfeReport(lang: string): CallSummary["report"] {
     reference_number: "•••• 4410",
     rep_name: "Agent Ruiz",
     next_steps: [
-      L(lang, "Manda las pruebas a la dirección impresa en la carta, con la carta encima", "Mail the evidence to the address printed on the letter, with the letter on top"),
+      L(lang, "Mande las pruebas a la dirección impresa en la carta, con la carta encima", "Mail the evidence to the address printed on the letter, with the letter on top"),
       L(lang, "Tienen que llegar antes del 4 de diciembre; no dan más tiempo", "It has to arrive by December 4; they don't give extensions"),
-      L(lang, "Si te falta un documento, manda lo que tengas y explica por escrito por qué falta", "If a document is missing, send what you have and explain in writing why"),
+      L(lang, "Si le falta un documento, mande lo que tenga y explique por escrito por qué falta", "If a document is missing, send what you have and explain in writing why"),
     ],
     new_deadlines: [],
     followup_needed: false,
@@ -376,7 +376,7 @@ function rfeDetail(lang: string): CaseDetail {
     page_media_ids: [],
     explanation: L(
       lang,
-      "USCIS necesita más pruebas para tu permiso de trabajo. Tienes que mandarlas por correo antes del 4 de diciembre, o pueden negar la solicitud.",
+      "USCIS necesita más pruebas para su permiso de trabajo. Tiene que mandarlas por correo antes del 4 de diciembre, o pueden negar la solicitud.",
       "USCIS needs more evidence for your work permit. You have to mail it before December 4, or they may deny the application.",
     ),
     what_is_asked: L(
@@ -387,9 +387,9 @@ function rfeDetail(lang: string): CaseDetail {
     appointment: null,
     checklist: [
       { kind: "deadline", item: L(lang, "Que llegue a USCIS antes del 4 de diciembre", "It must reach USCIS by December 4") },
-      { kind: "bring", item: L(lang, "Copia de tu pasaporte o documento de identidad", "A copy of your passport or ID") },
-      { kind: "bring", item: L(lang, "Prueba de que entraste a EE. UU. (formulario I-94)", "Proof of your entry to the U.S. (Form I-94)") },
-      { kind: "bring", item: L(lang, "Esta carta, encima de todo lo que mandes", "This letter, on top of everything you send") },
+      { kind: "bring", item: L(lang, "Copia de su pasaporte o documento de identidad", "A copy of your passport or ID") },
+      { kind: "bring", item: L(lang, "Prueba de que entró a EE. UU. (formulario I-94)", "Proof of your entry to the U.S. (Form I-94)") },
+      { kind: "bring", item: L(lang, "Esta carta, encima de todo lo que mande", "This letter, on top of everything you send") },
     ],
     refs: [{ name: "receipt_number", masked: "•••• 7781" }],
     verification: { status: "verified", evidence: ["https://www.uscis.gov/contactcenter"], red_flags: [] },
@@ -458,19 +458,19 @@ export function caseDetail(caseId: string, lang: string): CaseDetail {
     page_media_ids: deletedDocument ? [] : [LETTER_MEDIA_ID],
     explanation: L(
       lang,
-      "Es la cita para tu entrevista de asilo. Tienes que ir con tus hijos y con un intérprete.",
+      "Es la cita para su entrevista de asilo. Tiene que ir con sus hijos y con un intérprete.",
       "This is your asylum interview appointment. You must go with your children and an interpreter.",
     ),
     what_is_asked: L(
       lang,
-      "Ir a la entrevista de asilo con tus dependientes y un intérprete calificado",
+      "Ir a la entrevista de asilo con sus dependientes y un intérprete calificado",
       "Attend asylum interview with dependents and a qualified interpreter",
     ),
     appointment: APPOINTMENT,
     checklist: [
-      { kind: "who_must_come", item: L(lang, "Todos los dependientes de tu solicitud I-589", "All dependents listed on the I-589") },
-      { kind: "bring", item: L(lang, "Un intérprete calificado si no hablas inglés con fluidez", "A qualified interpreter if you are not fluent in English") },
-      { kind: "bring", item: L(lang, "Identificación para ti y cada dependiente", "ID for you and each dependent") },
+      { kind: "who_must_come", item: L(lang, "Todos los dependientes de su solicitud I-589", "All dependents listed on the I-589") },
+      { kind: "bring", item: L(lang, "Un intérprete calificado si no habla inglés con fluidez", "A qualified interpreter if you are not fluent in English") },
+      { kind: "bring", item: L(lang, "Identificación para usted y cada dependiente", "ID for you and each dependent") },
     ],
     refs: [
       { name: "receipt_number", masked: "•••• 2345" },
@@ -530,9 +530,9 @@ export function transcript(callId: string): Transcript {
 export function memory(_userId: string, lang: string): Memory {
   if (deletedAll) return { profile: {}, facts: [], documents: [], transcripts: [] };
   const facts = [
-    { id: "fact_demo01", es: "Tienes dos hijos en tu solicitud de asilo", en: "Has two children on the asylum application", category: "immigration", source: "from_document" as const, sensitivity: "sensitive" as const },
-    { id: "fact_demo02", es: "Vives en el condado de Los Ángeles", en: "Lives in Los Angeles County", category: "contact", source: "user_said" as const, sensitivity: "normal" as const },
-    { id: "fact_demo03", es: "Prefieres mensajes de voz", en: "Prefers voice notes", category: "contact", source: "user_said" as const, sensitivity: "normal" as const },
+    { id: "fact_demo01", es: "Tiene dos hijos en su solicitud de asilo", en: "Has two children on the asylum application", category: "immigration", source: "from_document" as const, sensitivity: "sensitive" as const },
+    { id: "fact_demo02", es: "Vive en el condado de Los Ángeles", en: "Lives in Los Angeles County", category: "contact", source: "user_said" as const, sensitivity: "normal" as const },
+    { id: "fact_demo03", es: "Prefiere mensajes de voz", en: "Prefers voice notes", category: "contact", source: "user_said" as const, sensitivity: "normal" as const },
   ];
   return {
     profile: { county: "Los Angeles", household_size: "3" },
@@ -563,13 +563,13 @@ interface MessageSeed {
 
 const MESSAGES: MessageSeed[] = [
   { minStep: 0, at: () => min(-2 * 24 * 60), direction: "in", sender: "user", es: "", en: "", media: true },
-  { minStep: 0, at: () => min(-2 * 24 * 60 + 1), direction: "out", sender: "orchestrator", es: "Es la cita para tu entrevista de asilo: jueves 12 de noviembre a las 8:30 AM. Tienes que ir con tus hijos y llevar tu propio intérprete.", en: "It's your asylum interview appointment: Thursday, November 12 at 8:30 AM. You must go with your children and bring your own interpreter." },
-  { minStep: 0, at: () => min(-20), direction: "out", sender: "orchestrator", es: "Confirmamos que la carta es real. ¿Quieres que llamemos a USCIS y te avisemos cuando conteste una persona? Responde SÍ o NO.", en: "We confirmed the letter is real. Want us to call USCIS and ring you when a person answers? Reply YES or NO." },
+  { minStep: 0, at: () => min(-2 * 24 * 60 + 1), direction: "out", sender: "orchestrator", es: "Es la cita para su entrevista de asilo: jueves 12 de noviembre a las 8:30 AM. Tiene que ir con sus hijos y llevar su propio intérprete.", en: "It's your asylum interview appointment: Thursday, November 12 at 8:30 AM. You must go with your children and bring your own interpreter." },
+  { minStep: 0, at: () => min(-20), direction: "out", sender: "orchestrator", es: "Confirmamos que la carta es real. ¿Quiere que llamemos a USCIS y le avisemos cuando conteste una persona? Responda SÍ o NO.", en: "We confirmed the letter is real. Want us to call USCIS and ring you when a person answers? Reply YES or NO." },
   { minStep: 1, at: () => min(-16), direction: "in", sender: "user", es: "Sí, por favor", en: "Yes, please" },
-  { minStep: 1, at: () => min(-15), direction: "out", sender: "relay", es: "Estamos llamando a USCIS. Te avisamos cuando conteste alguien.", en: "We're calling USCIS. We'll let you know when someone answers." },
-  { minStep: 3, at: () => min(-13), direction: "out", sender: "relay", es: "Estamos en espera con USCIS. Te llamamos cuando conteste una persona.", en: "We're on hold with USCIS. We'll call you when a person answers." },
-  { minStep: 4, at: () => atStep(4, 0), direction: "out", sender: "relay", es: "¡Contestó una persona! Te estamos llamando ahora.", en: "A person answered! We're calling you now." },
-  { minStep: 6, at: () => atStep(6, 6), direction: "out", sender: "orchestrator", es: "Listo. Tu entrevista sigue el 12 de noviembre a las 8:30 AM. Recuerda llevar tu propio intérprete.", en: "Done. Your interview is still November 12 at 8:30 AM. Remember to bring your own interpreter." },
+  { minStep: 1, at: () => min(-15), direction: "out", sender: "relay", es: "Estamos llamando a USCIS. Le avisamos cuando conteste alguien.", en: "We're calling USCIS. We'll let you know when someone answers." },
+  { minStep: 3, at: () => min(-13), direction: "out", sender: "relay", es: "Estamos en espera con USCIS. Le llamamos cuando conteste una persona.", en: "We're on hold with USCIS. We'll call you when a person answers." },
+  { minStep: 4, at: () => atStep(4, 0), direction: "out", sender: "relay", es: "¡Contestó una persona! Le estamos llamando ahora.", en: "A person answered! We're calling you now." },
+  { minStep: 6, at: () => atStep(6, 6), direction: "out", sender: "orchestrator", es: "Listo. Su entrevista sigue el 12 de noviembre a las 8:30 AM. Recuerde llevar su propio intérprete.", en: "Done. Your interview is still November 12 at 8:30 AM. Remember to bring your own interpreter." },
 ];
 
 export function messages(_userId: string): Message[] {
@@ -595,8 +595,8 @@ export function suggestions(_userId: string, lang: string): Suggestion[] {
       id: "sug_countdown",
       kind: "countdown",
       case_id: FIXTURE_CASE_ID,
-      title: L(lang, "Tu entrevista es en 20 días", "Your interview is in 20 days"),
-      detail: L(lang, "Repasa qué llevar", "Review what to bring"),
+      title: L(lang, "Su entrevista es en 20 días", "Your interview is in 20 days"),
+      detail: L(lang, "Repase qué llevar", "Review what to bring"),
       action: L(lang, "Preparar", "Prepare"),
       prefill: pick(demoLanguage(), "¿Qué tengo que llevar a mi entrevista de asilo?", "What do I need to bring to my asylum interview?"),
     },
@@ -613,8 +613,8 @@ export function suggestions(_userId: string, lang: string): Suggestion[] {
       id: "sug_checklist",
       kind: "checklist",
       case_id: FIXTURE_CASE_ID,
-      title: L(lang, "No olvides: un intérprete", "Don't forget: an interpreter"),
-      detail: L(lang, "Te ayudamos", "We can help"),
+      title: L(lang, "No olvide: un intérprete", "Don't forget: an interpreter"),
+      detail: L(lang, "Le ayudamos", "We can help"),
       action: L(lang, "Preguntar", "Ask"),
       prefill: pick(demoLanguage(), "¿Cómo consigo un intérprete calificado?", "How do I find a qualified interpreter?"),
     },

@@ -6,7 +6,8 @@ The phone agent dials this line in the demo. Three phases:
     OFFICER an LLM plays the asylum officer who picks up
 
 MOCK_AGENCY_MODE=quick skips IVR and HOLD: the officer picks up after a short
-greeting, for testing live calls and the bridge.
+greeting, for testing live calls and the bridge. MOCK_AGENCY_MODE=short plays a
+shorter IVR (one keypad menu, one open question) and a short hold.
 """
 
 import asyncio
@@ -52,7 +53,7 @@ class MockAgencyLine:
         self.call_id = call_id
         self.phase = Phase.IVR
         self.case = settings.case_record
-        self.tree = PhoneTree(self.case)
+        self.tree = PhoneTree(self.case, short=settings.mode is Mode.SHORT)
         self.officer: LlmAgent | None = None
         self.agent_speaking = False
 
@@ -166,23 +167,20 @@ class MockAgencyLine:
 
     async def _hold_then_officer(self) -> AsyncIterator[OutputEvent]:
         self.phase = Phase.HOLD
-        logger.info(
-            f"hold_started call_id={self.call_id} hold_s={self.settings.hold_seconds}"
-        )
-        minutes = max(2, round(self.settings.hold_seconds / 60) + 3)
+        hold_s = self.settings.call_hold_seconds
+        logger.info(f"hold_started call_id={self.call_id} hold_s={hold_s}")
+        minutes = max(2, round(hold_s / 60) + 3)
         yield AgentSendText(
             text=prompts.HOLD_START.format(minutes=minutes), interruptible=False
         )
 
         waited = 0.0
         announcement = 0
-        while waited < self.settings.hold_seconds:
-            pause = min(
-                self.settings.hold_announce_every_s, self.settings.hold_seconds - waited
-            )
+        while waited < hold_s:
+            pause = min(self.settings.hold_announce_every_s, hold_s - waited)
             await asyncio.sleep(pause)
             waited += pause
-            if waited < self.settings.hold_seconds:
+            if waited < hold_s:
                 text = prompts.HOLD_ANNOUNCEMENTS[
                     announcement % len(prompts.HOLD_ANNOUNCEMENTS)
                 ]
