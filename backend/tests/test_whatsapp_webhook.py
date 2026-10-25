@@ -1,5 +1,6 @@
 import base64
 from collections.abc import Callable, Iterator
+from typing import Any
 
 import httpx
 import pytest
@@ -7,6 +8,7 @@ from app.main import app
 from app.orchestrator.pipe import get_pipe
 from app.relay.inbound import InboundMessage
 from app.relay.media import MediaDownloadError, download_media
+from app.relay.whatsapp import TwilioWhatsApp
 from app.settings import Settings, get_settings
 from fastapi.testclient import TestClient
 from twilio.request_validator import RequestValidator
@@ -157,3 +159,35 @@ async def test_media_failure_raises_without_the_url(
             await download_media(http, MEDIA_URL, "image/jpeg", "SM1", SETTINGS)
 
     assert MEDIA_URL not in str(caught.value)
+
+
+# The typing indicator (Twilio public beta)
+
+
+async def test_typing_indicator_failure_never_raises(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Best effort: a sandbox without the beta, or Twilio down, must not break a
+    reply."""
+    calls: list[dict[str, Any]] = []
+
+    async def post(self: httpx.AsyncClient, url: str, **kwargs: Any) -> httpx.Response:
+        calls.append({"url": url, **kwargs})
+        raise httpx.ConnectError("down")
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", post)
+    settings = Settings(
+        _env_file=None,  # type: ignore[call-arg]
+        twilio_account_sid="AC123",
+        twilio_auth_token="token",
+    )
+    whatsapp = TwilioWhatsApp(settings)
+
+    await whatsapp.typing("SM1")
+    await whatsapp.typing("SM2")
+
+    assert [c["json"] for c in calls] == [
+        {"channel": "WHATSAPP", "messageId": "SM1"},
+        {"channel": "WHATSAPP", "messageId": "SM2"},
+    ]
+    assert len([r for r in caplog.records if r.levelname == "WARNING"]) == 1

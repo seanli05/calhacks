@@ -1,4 +1,5 @@
-"""Thin wrapper over Twilio WhatsApp: send text and download media. Faked in tests."""
+"""Thin wrapper over Twilio WhatsApp: send text, download media, and show "typing…".
+Faked in tests."""
 
 import asyncio
 import logging
@@ -19,6 +20,9 @@ logger = logging.getLogger(__name__)
 # Twilio rejects WhatsApp bodies over 1,600 characters.
 MAX_BODY_CHARS = 1600
 SEND_TIMEOUT_S = 10.0
+# Twilio's typing indicator (WhatsApp, public beta). Not in the Python SDK yet.
+TYPING_URL = "https://messaging.twilio.com/v3/Indicators/Typing.json"
+TYPING_TIMEOUT_S = 5.0
 
 
 class WhatsAppSendError(Exception):
@@ -33,6 +37,12 @@ class WhatsApp(Protocol):
     async def download(
         self, media: InboundMedia, message_sid: str
     ) -> DownloadedMedia: ...
+
+    async def typing(self, message_sid: str) -> None:
+        """Show "typing…" in reply to an inbound message, and mark it read. WhatsApp
+        clears it when our next message arrives, or after 25 s. Best effort: never
+        raises."""
+        ...
 
 
 def split_body(body: str, limit: int = MAX_BODY_CHARS) -> list[str]:
@@ -58,6 +68,7 @@ class TwilioWhatsApp:
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
+        self._typing_failed = False
         self._twilio = Client(
             settings.twilio_account_sid,
             settings.twilio_auth_token,
@@ -95,6 +106,31 @@ class TwilioWhatsApp:
             return await download_media(
                 client, media.url, media.content_type, message_sid, self._settings
             )
+
+    async def typing(self, message_sid: str) -> None:
+        settings = self._settings
+        if not settings.twilio_account_sid or not settings.twilio_auth_token:
+            return
+        try:
+            async with httpx.AsyncClient(timeout=TYPING_TIMEOUT_S) as client:
+                response = await client.post(
+                    TYPING_URL,
+                    json={"channel": "WHATSAPP", "messageId": message_sid},
+                    auth=(settings.twilio_account_sid, settings.twilio_auth_token),
+                )
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            # The status only: the response body can echo the message's details.
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            # Warn once; a sandbox without the beta would fail on every message.
+            log = logger.debug if self._typing_failed else logger.warning
+            log(
+                "Typing indicator failed sid=%s: %s %s",
+                message_sid,
+                type(exc).__name__,
+                status or "",
+            )
+            self._typing_failed = True
 
 
 @lru_cache

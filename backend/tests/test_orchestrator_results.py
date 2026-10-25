@@ -383,9 +383,13 @@ async def test_explanation_waits_for_a_turn_in_progress(
     await asyncio.sleep(0.05)
     assert [m.direction for m in db.messages] == ["in"]
 
+    # The user sees "typing…" on their message while the turn waits and works.
+    assert set(whatsapp.typing_sids) == {db.messages[0].twilio_sid}
+
     release.set()
     await asyncio.gather(handling, explaining)
 
+    assert not conversation.is_typing(user.id)
     first, second = [m.body_original for m in db.messages if m.direction == "out"]
     assert first == "turn reply"
     assert second.startswith("[es] This is a USCIS notice")

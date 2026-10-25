@@ -14,6 +14,7 @@ from app.contracts import (
     ResearchFastJob,
 )
 from app.db import tables
+from app.orchestrator.conversation import Conversation
 from app.orchestrator.job_watch import JobWatcher
 from app.orchestrator.letter_result import LetterResults
 from app.orchestrator.letters import Letters
@@ -145,10 +146,17 @@ async def test_slow_fast_pass_says_its_taking_longer_once(
     whatsapp: FakeWhatsApp,
     job_watcher: JobWatcher,
     letter_results: LetterResults,
+    conversation: Conversation,
     db: FakeDB,
 ) -> None:
     user = await use_spanish(db)
-    letters = Letters(whatsapp, job_watcher, letter_results, slow_after_s=0.05)
+    letters = Letters(
+        whatsapp,
+        job_watcher,
+        letter_results,
+        slow_after_s=0.05,
+        conversation=conversation,
+    )
 
     await letters.start(user.id, "doc_1")
     await asyncio.sleep(0.2)
@@ -161,6 +169,62 @@ async def test_slow_fast_pass_says_its_taking_longer_once(
     await settle()
     assert not job_watcher.is_watching(job.id)
     assert db.outbound_templates() == ["research.slow"]
+
+
+async def test_user_sees_typing_while_the_fast_pass_reads_the_letter(
+    pipe: InboundPipe,
+    whatsapp: FakeWhatsApp,
+    conversation: Conversation,
+    job_watcher: JobWatcher,
+    db: FakeDB,
+) -> None:
+    """ "Typing…" on the last photo, refreshed until the result; no message, no
+    row."""
+    user = await use_spanish(db)
+    photo = inbound(photos=1)
+    await pipe.handle(photo)
+    await wait_for_batches()
+    await asyncio.sleep(0.1)  # a few refreshes
+
+    assert conversation.is_typing(user.id)
+    assert len(whatsapp.typing_sids) >= 2
+    assert set(whatsapp.typing_sids) == {photo.message_sid}
+    assert db.outbound_templates() == ["letter.received"]
+
+    [job] = db.jobs_of(JobType.RESEARCH_FAST)
+    db.finish_job(job.id)
+    await settle()
+    assert not conversation.is_typing(user.id)
+    pings = len(whatsapp.typing_sids)
+    await asyncio.sleep(0.1)
+    assert len(whatsapp.typing_sids) == pings
+
+
+async def test_typing_stops_at_its_cap(
+    whatsapp: FakeWhatsApp, conversation: Conversation
+) -> None:
+    conversation.heard("user_1", "SM9")
+    conversation.typing("user_1", "lookup", max_s=0.05)
+    await asyncio.sleep(0.15)
+
+    assert not conversation.is_typing("user_1")
+    pings = len(whatsapp.typing_sids)
+    assert pings >= 1
+    await asyncio.sleep(0.1)
+    assert len(whatsapp.typing_sids) == pings
+
+
+async def test_typing_shows_while_any_reason_is_open(
+    whatsapp: FakeWhatsApp, conversation: Conversation
+) -> None:
+    conversation.heard("user_1", "SM9")
+    conversation.typing("user_1", "turn", max_s=5)
+    conversation.typing("user_1", "lookup", max_s=5)
+
+    conversation.done_typing("user_1", "turn")
+    assert conversation.is_typing("user_1")
+    conversation.done_typing("user_1", "lookup")
+    assert not conversation.is_typing("user_1")
 
 
 async def test_stale_fast_pass_is_ignored(

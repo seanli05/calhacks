@@ -400,6 +400,7 @@ class FakeDB:
 class FakeWhatsApp:
     def __init__(self) -> None:
         self.sent: list[str] = []
+        self.typing_sids: list[str] = []
         self.broken_urls: set[str] = set()
         self.fail_sends = False
 
@@ -414,6 +415,9 @@ class FakeWhatsApp:
         if media.url in self.broken_urls:
             raise MediaDownloadError(f"Media download failed for {message_sid}")
         return DownloadedMedia(content_type=media.content_type, data=b"jpeg")
+
+    async def typing(self, message_sid: str) -> None:
+        self.typing_sids.append(message_sid)
 
 
 class FakeTranslator:

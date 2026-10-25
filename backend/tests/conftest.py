@@ -116,8 +116,8 @@ def call_status(whatsapp: FakeWhatsApp) -> CallStatusWatcher:
 
 
 @pytest.fixture
-def conversation() -> Conversation:
-    return Conversation()
+def conversation(whatsapp: FakeWhatsApp) -> Conversation:
+    return Conversation(whatsapp, typing_refresh_s=0.02)
 
 
 @pytest.fixture
@@ -160,9 +160,12 @@ def letter_results(
 
 @pytest.fixture
 def letters(
-    whatsapp: FakeWhatsApp, job_watcher: JobWatcher, letter_results: LetterResults
+    whatsapp: FakeWhatsApp,
+    job_watcher: JobWatcher,
+    letter_results: LetterResults,
+    conversation: Conversation,
 ) -> Letters:
-    return Letters(whatsapp, job_watcher, letter_results)
+    return Letters(whatsapp, job_watcher, letter_results, conversation=conversation)
 
 
 @pytest.fixture

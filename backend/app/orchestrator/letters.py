@@ -6,6 +6,8 @@ The orchestrator mints the `case_id` and queues `research_fast`; research create
 Until then the only record that a letter is being read is here, in memory, so "same
 letter or new?" can be asked from the first photo on (whatsapp-pipe.md, concern 1).
 A restart forgets letters still being read: a photo sent then becomes a new letter.
+While the fast pass runs, the user sees "typing…" (conversation.py), until the result
+or the "taking longer" message.
 """
 
 import logging
@@ -15,6 +17,7 @@ from app.contracts import Component, JobStatus, ResearchFastJob
 from app.contracts.common import CaseId, DocumentId, JobId, UserId
 from app.db import jobs, reads, tables
 from app.db.ids import new_id
+from app.orchestrator.conversation import Conversation
 from app.orchestrator.job_watch import JobWatcher
 from app.orchestrator.letter_result import LetterResults
 from app.relay.outbound import send_template
@@ -24,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Plan.md → Failure rules: past this, say it's taking longer and keep waiting.
 FAST_SLOW_AFTER_S = 45.0
+_TYPING = "letter"
 
 
 @dataclass(frozen=True)
@@ -39,11 +43,14 @@ class Letters:
         watcher: JobWatcher,
         results: LetterResults,
         slow_after_s: float = FAST_SLOW_AFTER_S,
+        *,
+        conversation: Conversation,
     ) -> None:
         self._whatsapp = whatsapp
         self._watcher = watcher
         self._results = results
         self._slow_after_s = slow_after_s
+        self._conversation = conversation
         # The letter each user is waiting on a fast pass for.
         self._reading: dict[UserId, _Letter] = {}
         # The newest fast job per case; an older one's result is stale.
@@ -139,6 +146,7 @@ class Letters:
         )
         self._reading[user.id] = letter
         self._latest_fast[letter.case_id] = job.id
+        self._conversation.typing(user.id, _TYPING, self._slow_after_s)
         logger.info(
             "Research queued user_id=%s case_id=%s document_id=%s job_id=%s",
             user.id,
@@ -159,6 +167,7 @@ class Letters:
     async def _fast_slow(self, job: tables.Job) -> None:
         if not self._is_latest(job):
             return
+        self._conversation.done_typing(job.user_id, _TYPING)
         user = await reads.get_user(job.user_id)
         if user is None:
             return
@@ -180,6 +189,8 @@ class Letters:
                 "Stale fast pass ignored case_id=%s job_id=%s", job.case_id, job.id
             )
             return
+        # Before the result goes out: a refresh after it would show "typing…" again.
+        self._conversation.done_typing(job.user_id, _TYPING)
         letter = self._reading.get(job.user_id)
         if letter is not None and letter.case_id == job.case_id:
             del self._reading[job.user_id]

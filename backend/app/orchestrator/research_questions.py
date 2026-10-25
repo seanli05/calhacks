@@ -6,7 +6,7 @@ translated free text with its official sources (the orchestrator may write free
 text, rule 1). A decline gets a fixed template, so "no legal advice" and "we don't
 discuss the claim" never depend on a model or a translation (C33, C34). The answer
 is sent under the user's conversation lock, so it never crosses a turn's reply
-(conversation.py).
+(conversation.py). Until it's ready, the user sees "typing…".
 """
 
 import logging
@@ -31,6 +31,9 @@ from app.translation.translate import Translator, localize
 logger = logging.getLogger(__name__)
 
 MAX_SOURCES = 3
+# "Typing…" while research looks it up; past this the user just waits for the answer.
+LOOKUP_TYPING_S = 90.0
+_TYPING = "lookup"
 
 _DECLINE_TEMPLATES = {
     ResearchQuestionStatus.NOT_CONFIRMED: "research_question.not_found",
@@ -73,9 +76,11 @@ class ResearchQuestions:
             job.id,
         )
         self._watcher.watch(job.id, self.finished)
+        self._conversation.typing(user.id, _TYPING, LOOKUP_TYPING_S)
         return job.id
 
     async def finished(self, job: tables.Job) -> None:
+        self._conversation.done_typing(job.user_id, _TYPING)
         user = await reads.get_user(job.user_id)
         if user is None:
             return

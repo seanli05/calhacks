@@ -80,6 +80,8 @@ class TurnRunner(Protocol):
 
 # Before the user picks a language, an undetectable message is logged as English.
 _FALLBACK_LANGUAGE = "en"
+# "Typing…" during a turn: its 60 s budget plus a wait for the conversation lock.
+TURN_TYPING_S = 90.0
 
 
 class InboundPipe:
@@ -111,7 +113,7 @@ class InboundPipe:
         self._consent = consent
         self._fact_consent = fact_consent
         self.photos = PhotoBatcher(self._letter_ready, quiet_window_s)
-        self.conversation = conversation or Conversation()
+        self.conversation = conversation or Conversation(whatsapp)
         self.conversation.bind(self.question_open)
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
@@ -157,6 +159,7 @@ class InboundPipe:
         """Route the message; returns the user and the orchestrator turn to run, if
         any."""
         user = await writes.get_or_create_user(message.whatsapp_number)
+        self.conversation.heard(user.id, message.message_sid)
         saved, failed = await self._save_media(user.id, message)
 
         step = None
@@ -413,14 +416,20 @@ class InboundPipe:
         consent_pending: bool = False,
     ) -> None:
         if self._turn is not None:
-            async with self.conversation.speaking(user.id):
-                await self._turn(
-                    user,
-                    message_id,
-                    same_or_new_pending=same_or_new_pending,
-                    consent_pending=consent_pending,
-                )
-                await self._ask_about_facts(user.id)
+            # "Typing…" from the start, even while a proactive message holds the
+            # lock; it stops before "may I save this?", so it can't show after it.
+            with self.conversation.typing_while(user.id, "turn", TURN_TYPING_S):
+                async with self.conversation.speaking(user.id):
+                    try:
+                        await self._turn(
+                            user,
+                            message_id,
+                            same_or_new_pending=same_or_new_pending,
+                            consent_pending=consent_pending,
+                        )
+                    finally:
+                        self.conversation.done_typing(user.id, "turn")
+                    await self._ask_about_facts(user.id)
         elif message.text:
             # No Anthropic key: echo, so the pipe can still be tried on a phone.
             await send_text(self._whatsapp, user, f"Echo: {message.text}")
@@ -435,7 +444,7 @@ def get_pipe() -> InboundPipe:
     settings = get_settings()
     whatsapp = get_whatsapp()
     translator = get_translator()
-    conversation = Conversation()
+    conversation = Conversation(whatsapp)
     consent, letters = _results_path(whatsapp, translator, conversation)
     if translator is None:
         logger.warning(
@@ -484,4 +493,4 @@ def _results_path(
     )
     verdicts = Verdicts(whatsapp, translator, consent, conversation=conversation)
     results = LetterResults(whatsapp, translator, verdicts, conversation=conversation)
-    return consent, Letters(whatsapp, job_watcher, results)
+    return consent, Letters(whatsapp, job_watcher, results, conversation=conversation)
