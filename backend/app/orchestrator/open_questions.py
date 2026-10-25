@@ -27,8 +27,9 @@ class OpenQuestion:
     options_en: tuple[str, ...]
 
 
-# Settles "same letter or new?" with 1 (same) or 2 (new); False if it isn't open.
-SettleSameOrNew = Callable[[tables.User, int], Awaitable[bool]]
+# Settles "same letter or new?" with 1 (same) or 2 (new), sending no confirmation;
+# returns the template that would confirm it, or None if the question isn't open.
+SettleSameOrNew = Callable[[tables.User, int], Awaitable[str | None]]
 
 
 @dataclass(frozen=True)

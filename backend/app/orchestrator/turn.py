@@ -11,12 +11,20 @@ answer it through guarded tools, then reply to the rest of the message. When it
 ends with a plain reply at a quiet moment, "may I save this?" (C15) goes at the end
 of that same message.
 
+One message per turn: an answer's confirmation and a consent question the user asked
+for are part of the reply, in the model's words. If the turn ends with no reply to
+send, they go out as their templates instead.
+
+Letters still being grouped or read have no `cases` row yet (letters.py), so the
+turn is told about them separately (`<letters_in_progress>`).
+
 The pipe runs this outside its per-number routing lock (concern 8).
 """
 
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import anthropic
@@ -24,7 +32,7 @@ from anthropic import AsyncAnthropic
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.contracts import Component, FactSource, MemoryWriteJob, MessageDirection
-from app.contracts.common import MessageId, UserId
+from app.contracts.common import CaseId, MessageId, UserId
 from app.db import jobs, reads, tables
 from app.orchestrator.consent import ConsentGate
 from app.orchestrator.open_questions import OpenQuestions
@@ -32,7 +40,7 @@ from app.orchestrator.prompts import ORCHESTRATOR_SYSTEM
 from app.orchestrator.research_questions import ResearchQuestions
 from app.orchestrator.tools import CaseTools, build_tools
 from app.relay.outbound import send_template, send_text
-from app.relay.whatsapp import WhatsApp
+from app.relay.whatsapp import WhatsApp, WhatsAppSendError
 from app.translation.translate import Translator
 
 if TYPE_CHECKING:
@@ -50,6 +58,32 @@ UNAVAILABLE = "orchestrator.unavailable"
 
 # The pipe's check that "may I save this?" won't crowd anything (C15, pacing).
 QuietMoment = Callable[[UserId], Awaitable[bool]]
+
+
+@dataclass(frozen=True)
+class LettersInProgress:
+    """A letter the user sent that the turn's tools can't see yet: photos still
+    arriving, or the fast pass reading it."""
+
+    photos_arriving: bool = False
+    reading_case_id: CaseId | None = None
+
+    def render(self) -> list[str]:
+        lines = ["<letters_in_progress>"]
+        if self.photos_arriving:
+            lines.append(
+                "- Photos of a letter are arriving. It will be read once they stop "
+                "(a few seconds)."
+            )
+        if self.reading_case_id is not None:
+            lines.append(
+                f"- {self.reading_case_id}: the letter is being read now. Its "
+                "explanation is sent on its own, usually within a minute."
+            )
+        if len(lines) == 1:
+            lines.append("(none)")
+        lines.append("</letters_in_progress>")
+        return lines
 
 
 class OrchestratorTurn:
@@ -83,12 +117,18 @@ class OrchestratorTurn:
         *,
         open_questions: OpenQuestions | None = None,
         quiet_moment: QuietMoment | None = None,
+        letters_in_progress: LettersInProgress | None = None,
     ) -> None:
         """Reply to the user's latest message (`message_id`), which the pipe has
         already logged; then queue the memory writer on it (Goal 6.5).
         `open_questions` is what the user hasn't answered yet; with `quiet_moment`,
         a plain reply may end with "may I save this?"."""
-        await self._reply(user, open_questions or OpenQuestions(), quiet_moment)
+        await self._reply(
+            user,
+            open_questions or OpenQuestions(),
+            quiet_moment,
+            letters_in_progress or LettersInProgress(),
+        )
         await _queue_memory_write(user, message_id)
 
     async def _reply(
@@ -96,6 +136,7 @@ class OrchestratorTurn:
         user: tables.User,
         open_questions: OpenQuestions,
         quiet_moment: QuietMoment | None,
+        letters_in_progress: LettersInProgress,
     ) -> None:
         tools = CaseTools(
             user,
@@ -106,7 +147,7 @@ class OrchestratorTurn:
             fact_consent=self._fact_consent,
             open_questions=open_questions,
         )
-        context = await build_context(user, open_questions)
+        context = await build_context(user, open_questions, letters_in_progress)
         try:
             async with asyncio.timeout(self._turn_timeout_s):
                 reply_en = await self._ask_claude(tools, context)
@@ -117,17 +158,15 @@ class OrchestratorTurn:
             logger.error("Turn timed out user_id=%s", user.id)
             reply_en = None
         user = tools.user
-        if tools.language_switched or tools.consent_requested:
-            return  # a template already answered
-        if reply_en is None:
-            # After an answer's own confirmation, no text means nothing more to say.
-            if not tools.answer_confirmed:
-                await send_template(self._whatsapp, user, UNAVAILABLE)
+        if tools.language_switched:
+            # The language template answered; anything settled still gets confirmed.
+            await self._send_confirmations(user, tools)
             return
-        language = user.language or "en"
-        body = await self._translator.from_english(reply_en, language)
-        if body is None:
-            await send_template(self._whatsapp, user, UNAVAILABLE)
+        body = None
+        if reply_en is not None:
+            body = await self._translator.from_english(reply_en, user.language or "en")
+        if reply_en is None or body is None:
+            await self._without_reply(user, tools)
             return
         save = None
         if (
@@ -139,9 +178,30 @@ class OrchestratorTurn:
         if save is not None:
             body = f"{body}\n\n{save.text}"
             reply_en = f"{reply_en}\n\n{save.text_en}"
-        await send_text(self._whatsapp, user, body, body_en=reply_en)
+        try:
+            sent = await send_text(self._whatsapp, user, body, body_en=reply_en)
+        except WhatsAppSendError:
+            if tools.consent_question is not None and self._consent is not None:
+                self._consent.withdraw(user.id)
+            raise
         if save is not None and self._fact_consent is not None:
             self._fact_consent.asked(user.id, save)
+        if tools.consent_question is not None and self._consent is not None:
+            # Rule 4: only a reply sent after this message answers it.
+            self._consent.asked(user.id, sent.created_at)
+
+    async def _without_reply(self, user: tables.User, tools: CaseTools) -> None:
+        """No reply to send (no text, or the model or translation failed): what the
+        reply would have said goes out as templates, never English (rule 6)."""
+        await self._send_confirmations(user, tools)
+        if tools.consent_question is not None and self._consent is not None:
+            await self._consent.send_question(user)
+        elif not tools.confirmations and not tools.answer_confirmed:
+            await send_template(self._whatsapp, user, UNAVAILABLE)
+
+    async def _send_confirmations(self, user: tables.User, tools: CaseTools) -> None:
+        for template, case_id in tools.confirmations:
+            await send_template(self._whatsapp, user, template, case_id=case_id)
 
     async def _ask_claude(self, tools: CaseTools, context: str) -> str | None:
         runner = self._client.beta.messages.tool_runner(
@@ -191,11 +251,13 @@ async def _queue_memory_write(user: tables.User, message_id: MessageId) -> None:
 
 
 async def build_context(
-    user: tables.User, open_questions: OpenQuestions | None = None
+    user: tables.User,
+    open_questions: OpenQuestions | None = None,
+    letters_in_progress: LettersInProgress | None = None,
 ) -> str:
-    """The turn's user message: recent conversation in English, open cases, and the
-    questions waiting for the user's answer. Built from stored rows only; refs are
-    never resolved."""
+    """The turn's user message: recent conversation in English, open cases, letters
+    not read yet, and the questions waiting for the user's answer. Built from stored
+    rows only; refs are never resolved."""
     messages = (await reads.list_messages(user.id))[-HISTORY_MESSAGES:]
     lines = [_history_line(message) for message in messages]
     cases = [
@@ -210,6 +272,7 @@ async def build_context(
         "<open_cases>",
         *(cases or ["(none)"]),
         "</open_cases>",
+        *(letters_in_progress or LettersInProgress()).render(),
         *(open_questions or OpenQuestions()).render(),
         "Reply to the user's latest message.",
     ]

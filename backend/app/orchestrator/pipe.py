@@ -56,7 +56,7 @@ from app.orchestrator.open_questions import (
 )
 from app.orchestrator.photos import PHOTO_QUIET_WINDOW_S, PendingPages, PhotoBatcher
 from app.orchestrator.research_questions import ResearchQuestions
-from app.orchestrator.turn import OrchestratorTurn, QuietMoment
+from app.orchestrator.turn import LettersInProgress, OrchestratorTurn, QuietMoment
 from app.orchestrator.verdicts import Verdicts
 from app.relay.ask_user import AskUser, get_ask_user
 from app.relay.inbound import InboundMedia, InboundMessage
@@ -85,6 +85,7 @@ class TurnRunner(Protocol):
         *,
         open_questions: OpenQuestions | None = None,
         quiet_moment: QuietMoment | None = None,
+        letters_in_progress: LettersInProgress | None = None,
     ) -> None: ...
 
 
@@ -184,7 +185,11 @@ class InboundPipe:
             )
         return OpenQuestions(
             tuple(questions),
-            settle_same_or_new=self._settle_same_or_new if same_or_new else None,
+            settle_same_or_new=(
+                partial(self._settle_same_or_new, confirm=False)
+                if same_or_new
+                else None
+            ),
         )
 
     async def _guarded[T](
@@ -356,12 +361,16 @@ class InboundPipe:
         self.photos.add(user.id, pages)
         await send_template(self._whatsapp, user, "letter.received")
 
-    async def _settle_same_or_new(self, user: tables.User, choice: int) -> bool:
-        """1: the held photos join the letter; 2: they start a new one. False if no
-        "same letter or new?" is open (the turn's tool, a stale snapshot)."""
+    async def _settle_same_or_new(
+        self, user: tables.User, choice: int, *, confirm: bool = True
+    ) -> str | None:
+        """1: the held photos join the letter; 2: they start a new one. Returns the
+        template that confirms it, sent only with `confirm` (the turn's reply says
+        it instead); None if no "same letter or new?" is open (the turn's tool, a
+        stale snapshot)."""
         pending = self.photos.take_pending(user.id)
         if pending is None:
-            return False
+            return None
         if choice == 1:
             await writes.add_pages(pending.document_id, pending.media_ids)
             logger.info(
@@ -370,12 +379,16 @@ class InboundPipe:
                 pending.document_id,
                 len(pending.media_ids),
             )
-            await send_template(self._whatsapp, user, "letter.pages_added")
+            template = "letter.pages_added"
+            if confirm:
+                await send_template(self._whatsapp, user, template)
             await self.letters.pages_added(user, pending.document_id)
         else:
             self.photos.add(user.id, pending.media_ids)
-            await send_template(self._whatsapp, user, "letter.received")
-        return True
+            template = "letter.received"
+            if confirm:
+                await send_template(self._whatsapp, user, template)
+        return template
 
     async def _without_turn(
         self,
@@ -441,6 +454,10 @@ class InboundPipe:
                         message_id,
                         open_questions=await self.open_questions(user.id),
                         quiet_moment=self._quiet_moment,
+                        letters_in_progress=LettersInProgress(
+                            photos_arriving=self.photos.is_open(user.id),
+                            reading_case_id=self.letters.reading_case(user.id),
+                        ),
                     )
                 finally:
                     self.conversation.done_typing(user.id, "turn")

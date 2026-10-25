@@ -9,6 +9,11 @@ request, and in words only when the words the model quotes are in it. The model 
 ask for consent (`request_consent`) and relay the user's answer, but never answer for
 them.
 
+When the user asks for the call themselves, the turn opens the request without a
+template (`request(..., send=False)`) and asks in its own words; `asked` then marks
+when that question went out, so only a reply after it counts. A turn that answers in
+words also sends no template (`confirm=False`): its reply carries the confirmation.
+
 The open request lives in memory, one per user. A restart forgets it, and a "1" sent
 then goes to the orchestrator turn, which can ask again. No request goes out while
 another numbered question is open (conversation.py), so a "1" never answers the
@@ -20,7 +25,7 @@ new consent request (failed, unreachable: C21) or a suggestion to close the case
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, Literal
 
@@ -72,6 +77,9 @@ GOAL_CONTEXT = (
 class PendingConsent:
     case_id: CaseId
     asked_at: datetime
+    # What the call is for and who it's to, for a question the turn writes.
+    goal_en: str | None = None
+    agency: str = DEFAULT_AGENCY
 
 
 class ConsentGate:
@@ -109,12 +117,15 @@ class ConsentGate:
         goal_en: str | None = None,
         verified: bool = False,
         template: str = "consent.request",
+        send: bool = True,
     ) -> str | None:
         """Ask the user whether to call about this case. With `verified`, the same
         message leads with "it's genuine" (one message for the verdict and the
         question, Verdicts); `template` names another lead the same way (it and its
-        `_generic` form end with the request). Returns None once asked, or the
-        reason (English, for the model) the call can't be offered."""
+        `_generic` form end with the request). With `send=False`, the request opens
+        but nothing is sent: the turn asks in its own words, then calls `asked`.
+        Returns None once asked, or the reason (English, for the model) the call
+        can't be offered."""
         case = await reads.get_case(case_id)
         if case is None or case.user_id != user.id:
             return f"No case {case_id} for this user."
@@ -132,37 +143,75 @@ class ConsentGate:
         if brief is None:
             return "The call plan isn't ready yet."
         goal_en = goal_en or _call_goal_en(brief)
+        if verified:
+            template = "verification.verified_call"
+        pending = PendingConsent(case_id, utcnow(), goal_en, _agency(case))
+        if send:
+            asked = await self._send_question(user, pending, template)
+            pending = replace(pending, asked_at=asked.created_at)
+        self._pending[user.id] = pending
+        extra = {} if send else {"via": "words"}
+        await _event(
+            EventType.CONSENT_REQUESTED,
+            user.id,
+            case_id,
+            "Asked the user for permission to call",
+            agency=pending.agency,
+            **extra,
+        )
+        logger.info(
+            "Consent requested user_id=%s case_id=%s sent=%s", user.id, case_id, send
+        )
+        return None
+
+    def asked(self, user_id: UserId, at: datetime) -> None:
+        """The turn's own question about the open request went out at `at`: only a
+        reply from then on answers it."""
+        pending = self._pending.get(user_id)
+        if pending is not None:
+            self._pending[user_id] = replace(pending, asked_at=at)
+
+    def withdraw(self, user_id: UserId) -> None:
+        """The turn's question never reached the user: close the request, so no
+        reply can answer a question they didn't see (rule 4)."""
+        if self._pending.pop(user_id, None) is not None:
+            logger.warning("Consent request withdrawn, not sent user_id=%s", user_id)
+
+    async def send_question(self, user: tables.User) -> None:
+        """Send the template question for the open request, when the turn opened it
+        but couldn't ask in its own words."""
+        pending = self._pending.get(user.id)
+        if pending is None:
+            return
+        try:
+            asked = await self._send_question(user, pending, "consent.request")
+        except WhatsAppSendError:
+            self.withdraw(user.id)
+            raise
+        self.asked(user.id, asked.created_at)
+
+    async def _send_question(
+        self, user: tables.User, pending: PendingConsent, template: str
+    ) -> tables.Message:
+        goal_en = pending.goal_en
         language = user.language or "en"
         goal = (
             await localize(self._translator, goal_en, language, context=GOAL_CONTEXT)
             if goal_en
             else None
         )
-        if verified:
-            template = "verification.verified_call"
         if goal is not None and goal_en is not None:
-            asked = await send_template(
+            return await send_template(
                 self._whatsapp,
                 user,
                 template,
                 {"goal": goal},
                 values_en={"goal": goal_en},
-                case_id=case_id,
+                case_id=pending.case_id,
             )
-        else:
-            asked = await send_template(
-                self._whatsapp, user, f"{template}_generic", case_id=case_id
-            )
-        self._pending[user.id] = PendingConsent(case_id, asked.created_at)
-        await _event(
-            EventType.CONSENT_REQUESTED,
-            user.id,
-            case_id,
-            "Asked the user for permission to call",
-            agency=_agency(case),
+        return await send_template(
+            self._whatsapp, user, f"{template}_generic", case_id=pending.case_id
         )
-        logger.info("Consent requested user_id=%s case_id=%s", user.id, case_id)
-        return None
 
     async def answer(
         self,
@@ -171,13 +220,16 @@ class ConsentGate:
         choice: int,
         *,
         via: Literal["words"] | None = None,
-    ) -> None:
+        confirm: bool = True,
+    ) -> str | None:
         """The user's 1 (call) or 2 (don't) to the open request. Either way the
-        request is used up: a later call asks again (C21)."""
+        request is used up: a later call asks again (C21). Returns the template that
+        confirms the outcome (`consent.given`, `.declined`, `.unavailable`), sent
+        only with `confirm`; None if no request was open."""
         pending = self._pending.pop(user.id, None)
         if pending is None:
             logger.error("Consent answer with no open request user_id=%s", user.id)
-            return
+            return None
         extra = {"via": via} if via else {}
         if choice != 1:
             await _event(
@@ -188,11 +240,12 @@ class ConsentGate:
                 consent_message_id=reply.id,
                 **extra,
             )
-            await send_template(
-                self._whatsapp, user, "consent.declined", case_id=pending.case_id
-            )
-            return
-        await self._start_call(user, pending, reply, extra)
+            if confirm:
+                await send_template(
+                    self._whatsapp, user, "consent.declined", case_id=pending.case_id
+                )
+            return "consent.declined"
+        return await self._start_call(user, pending, reply, extra, confirm)
 
     async def answer_in_words(
         self,
@@ -200,34 +253,37 @@ class ConsentGate:
         case_id: CaseId,
         choice: int,
         user_words: str,
-    ) -> str | None:
-        """C43: the turn relays a yes or no the user wrote in words. Refuses (the
-        reason, in English, for the model) unless a request for this case is open,
-        the user's latest message is their own and came after it, and
-        `user_words` (the words the model read as the answer) are in that message.
-        Returns None once answered, which sends its own confirmation."""
+        *,
+        confirm: bool = True,
+    ) -> tuple[str | None, str | None]:
+        """C43: the turn relays a yes or no the user wrote in words. Refuses unless
+        a request for this case is open, the user's latest message is their own and
+        came after it, and `user_words` (the words the model read as the answer)
+        are in that message. Returns (refusal, confirmation): the reason, in English
+        for the model, or the template `answer` returned."""
         pending = self._pending.get(user.id)
         if pending is None or pending.case_id != case_id:
-            return "No call question is open for this case."
+            return "No call question is open for this case.", None
         reply = await _latest_inbound(user)
         if reply is None or not _is_yes_to(reply, user, pending):
             return (
                 "The user hasn't answered since the question went out. Only their "
                 "latest message, sent after the question, can answer it."
-            )
+            ), None
         if not _quotes(reply, user_words):
             return (
                 "user_words must be copied from the user's latest message. Only "
                 "that message can answer the call question."
-            )
+            ), None
         logger.info(
             "Consent answered in words user_id=%s case_id=%s choice=%d",
             user.id,
             case_id,
             choice,
         )
-        await self.answer(user, reply, choice, via="words")
-        return None
+        return None, await self.answer(
+            user, reply, choice, via="words", confirm=confirm
+        )
 
     async def _start_call(
         self,
@@ -235,9 +291,10 @@ class ConsentGate:
         pending: PendingConsent,
         reply: tables.Message,
         extra: dict[str, str],
-    ) -> None:
+        confirm: bool,
+    ) -> str:
         """Queue the call, after checking the gate once more: things may have
-        changed since the request went out."""
+        changed since the request went out. Returns the confirming template."""
         case_id = pending.case_id
         refusal = await self._refusal(case_id)
         brief = await reads.latest_brief(case_id)
@@ -249,10 +306,11 @@ class ConsentGate:
             logger.error(
                 "Call refused user_id=%s case_id=%s: %s", user.id, case_id, refusal
             )
-            await send_template(
-                self._whatsapp, user, "consent.unavailable", case_id=case_id
-            )
-            return
+            if confirm:
+                await send_template(
+                    self._whatsapp, user, "consent.unavailable", case_id=case_id
+                )
+            return "consent.unavailable"
         # Logged before the job exists: if the consent record can't be written,
         # there's no call.
         await _event(
@@ -285,10 +343,14 @@ class ConsentGate:
         # consent.given already says we're calling: no "calling now" after it.
         self._call_status.watch(user.id, since, announce_dialing=False)
         self._job_watcher.watch(job.id, self._call_finished)
-        try:
-            await send_template(self._whatsapp, user, "consent.given", case_id=case_id)
-        except WhatsAppSendError as exc:
-            logger.error("Consent ack not sent case_id=%s: %s", case_id, exc)
+        if confirm:
+            try:
+                await send_template(
+                    self._whatsapp, user, "consent.given", case_id=case_id
+                )
+            except WhatsAppSendError as exc:
+                logger.error("Consent ack not sent case_id=%s: %s", case_id, exc)
+        return "consent.given"
 
     async def _refusal(self, case_id: CaseId) -> str | None:
         """Why no call can be offered for this case right now, or None."""

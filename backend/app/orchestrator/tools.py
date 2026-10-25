@@ -5,14 +5,17 @@ a model; `build_tools` wraps it for the SDK's tool runner. Results are JSON in
 English. Sensitive values stay `<ref:...>` placeholders: nothing here resolves a ref
 (C11, C34).
 
-`request_consent` only asks: there's no `start_call` tool. A call starts only from
-the user's own YES (rule 4): a bare "1" in code, or words the `answer_call_consent`
-tool relays, which the consent gate checks against the user's latest message
-(consent.py, C43). Research starts from photos, so there's no `start_research` tool.
+`request_consent` only asks: there's no `start_call` tool. It opens the request and
+the turn's reply asks it in the model's words. A call starts only from the user's
+own YES (rule 4): a bare "1"/yes in code, or words the `answer_call_consent` tool
+relays, which the consent gate checks against the user's latest message (consent.py,
+C43). Research starts from photos, so there's no `start_research` tool.
 
 The `answer_*` tools answer whatever numbered question is open (open_questions.py)
 when the user answers in words. Each refuses, with the reason, when the move isn't
-legal right now.
+legal right now. An answer sends no confirmation of its own: the turn's reply says
+it, in the same message as the rest, and the template goes out only if the turn
+ends with no reply (`confirmations`).
 """
 
 import json
@@ -75,10 +78,35 @@ _LISTEN_NOTES: dict[ListenInResult, str] = {
     "(or is already on) to speak with them.",
     "call_over": "The call has ended.",
 }
-# After an answer tool that sent its own confirmation.
+# After an answer tool that sent its own confirmation (a call question that had
+# timed out: the relay told the user which option was taken).
 _CONFIRMED = (
     "The user was sent a confirmation. Reply only to the rest of their message; if "
     "there's nothing else in it, reply with no text at all."
+)
+# After an answer tool that settled a question: the reply confirms it, one message
+# with the rest (the template goes out only if the reply has no text).
+_THEN = " in a few words, then reply to the rest of their message."
+_CONFIRM_NOTES: dict[str, str] = {
+    "consent.given": "The call is queued. Tell the user you're calling USCIS now and "
+    "will let them know when a person answers," + _THEN,
+    "consent.declined": "No call will be made. Tell the user that's fine and they "
+    "can write if they change their mind," + _THEN,
+    "consent.unavailable": "The call couldn't be started after all. Say so gently, "
+    "and that they can write to try later," + _THEN,
+    "memory.saved": "Saved. Tell the user" + _THEN,
+    "memory.not_saved": "Not saved. Tell the user" + _THEN,
+    "letter.pages_added": "The photos were added to their letter, which will be "
+    "read again. Tell the user" + _THEN,
+    "letter.received": "The photos start a new letter, which will be read once "
+    "they stop sending pages. Tell the user" + _THEN,
+}
+_CONSENT_QUESTION = (
+    "Nothing was sent yet: ask now, in your reply, in your own words. One short, warm "
+    "message: you'll call {agency}{goal}, wait on hold, and ring their phone when a "
+    "person answers; you won't share their case numbers or date of birth. End by "
+    "asking whether you should go ahead. No numbered options. If their message asks "
+    "something else too, answer it briefly first."
 )
 _HANG_UP_NOTES: dict[HangUpResult, str] = {
     "ending": "The call is being ended now. Tell the user in a few words; a short "
@@ -107,9 +135,13 @@ class CaseTools:
         self._fact_consent = fact_consent
         self._open = open_questions or OpenQuestions()
         self.language_switched = False
-        self.consent_requested = False
+        # The case whose consent question the reply must ask (request_consent).
+        self.consent_question: CaseId | None = None
         # An answer tool sent the user its own confirmation.
         self.answer_confirmed = False
+        # Confirmations the reply carries instead of a template: (template, case).
+        # The turn sends the templates if it ends with no reply to send.
+        self.confirmations: list[tuple[str, CaseId | None]] = []
 
     async def list_active_cases(self) -> str:
         cases = []
@@ -196,15 +228,17 @@ class CaseTools:
     async def request_consent(self, case_id: CaseId) -> str:
         if self._consent is None:
             return _json({"error": "Calls aren't available right now."})
-        refusal = await self._consent.request(self.user, case_id)
+        refusal = await self._consent.request(self.user, case_id, send=False)
         if refusal is not None:
             return _json({"error": refusal})
-        self.consent_requested = True
+        pending = self._consent.pending(self.user.id)
+        assert pending is not None
+        self.consent_question = case_id
+        goal = f' about this: "{pending.goal_en}"' if pending.goal_en else ""
         return _json(
             {
-                "asked": case_id,
-                "note": "The user was sent a yes/no question about the call. Don't "
-                "reply further.",
+                "opened": case_id,
+                "note": _CONSENT_QUESTION.format(agency=pending.agency, goal=goal),
             }
         )
 
@@ -253,13 +287,15 @@ class CaseTools:
             return _json({"error": "Calls aren't available right now."})
         if answer not in ("yes", "no"):
             return _json({"error": 'answer must be "yes" or "no".'})
-        refusal = await self._consent.answer_in_words(
-            self.user, case_id, 1 if answer == "yes" else 2, user_words
+        refusal, template = await self._consent.answer_in_words(
+            self.user, case_id, 1 if answer == "yes" else 2, user_words, confirm=False
         )
         if refusal is not None:
             return _json({"error": refusal})
-        self.answer_confirmed = True
-        return _json({"answered": case_id, "answer": answer, "note": _CONFIRMED})
+        assert template is not None
+        return self._confirmed(
+            {"answered": case_id, "answer": answer}, template, case_id
+        )
 
     async def answer_same_or_new(
         self, choice: Literal["same_letter", "new_letter"]
@@ -267,10 +303,10 @@ class CaseTools:
         settle = self._open.settle_same_or_new
         if settle is None or choice not in ("same_letter", "new_letter"):
             return _json({"error": 'No "same letter or new?" question is open.'})
-        if not await settle(self.user, 1 if choice == "same_letter" else 2):
+        template = await settle(self.user, 1 if choice == "same_letter" else 2)
+        if template is None:
             return _json({"error": 'No "same letter or new?" question is open.'})
-        self.answer_confirmed = True
-        return _json({"answered": choice, "note": _CONFIRMED})
+        return self._confirmed({"answered": choice}, template)
 
     async def answer_save_facts(self, answer: Literal["yes", "no"]) -> str:
         facts = self._fact_consent
@@ -278,9 +314,20 @@ class CaseTools:
             return _json({"error": 'No "may I save this?" question is open.'})
         if answer not in ("yes", "no"):
             return _json({"error": 'answer must be "yes" or "no".'})
-        await facts.answer(self.user, 1 if answer == "yes" else 2)
-        self.answer_confirmed = True
-        return _json({"answered": answer, "note": _CONFIRMED})
+        template = await facts.answer(
+            self.user, 1 if answer == "yes" else 2, confirm=False
+        )
+        if template is None:
+            return _json({"error": 'No "may I save this?" question is open.'})
+        return self._confirmed({"answered": answer}, template)
+
+    def _confirmed(
+        self, result: dict[str, Any], template: str, case_id: CaseId | None = None
+    ) -> str:
+        """An answer settled a question: the reply confirms it (the template goes
+        out only if the turn ends with no reply)."""
+        self.confirmations.append((template, case_id))
+        return _json(result | {"note": _CONFIRM_NOTES[template]})
 
     async def ask_official_source(self, question: str, case_id: str | None) -> str:
         if self._research_questions is None:
@@ -378,10 +425,10 @@ def build_tools(tools: CaseTools) -> list[BetaAsyncFunctionTool[Any]]:
 
     @beta_async_tool
     async def request_consent(case_id: str) -> str:
-        """Ask the user whether we may call USCIS about this letter. Sends them a
-        yes/no question; the call starts only if they answer yes. Use it when the
-        user asks for a call, or to offer one again. It refuses if the letter
-        isn't verified or a call is already under way.
+        """Open the question whether we may call USCIS about this letter; you then
+        ask it in your reply, as its result says. The call starts only if the user
+        answers yes. Use it when the user asks for a call, or to offer one again.
+        It refuses if the letter isn't verified or a call is already under way.
 
         Args:
             case_id: A case ID from list_active_cases.
