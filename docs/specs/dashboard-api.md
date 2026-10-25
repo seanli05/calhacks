@@ -28,6 +28,8 @@ Conventions:
 | `GET /api/users/{user_id}/cases?lang=` | `CaseSummary[]` | Active cases, newest first, with `case_progress`, the appointment, and the latest call. |
 | `GET /api/cases/{case_id}?lang=` | `CaseDetail` | See [Case detail](#case-detail). |
 | `GET /api/calls/{call_id}/transcript` | `Transcript` | Lines as stored (English). 404 when deleted. |
+| `GET /api/calls/{call_id}/live?lang=` | `LiveCallEvent` stream | Server-sent events. See [Live call](#live-call). |
+| `GET /api/glossary?lang=` | `GlossaryEntry[]` | `reads.get_glossary(lang)`, by term. The dashboard asks for the user's language. |
 | `GET /api/users/{user_id}/memory?lang=` | `Memory` | Profile fields, active and pending facts (`fact` localized), documents, transcripts. |
 | `GET /api/users/{user_id}/messages` | `Message[]` | `reads.list_messages`: `body` = `body_original`. |
 | `GET /api/users/{user_id}/suggestions?lang=` | `Suggestion[]` | See [Suggestions](#suggestions). |
@@ -43,6 +45,15 @@ Conventions:
 - `verification`: the latest verification. `evidence` and `red_flags` from its `result` JSON (R2 `Verification`); localize `red_flags`.
 - `brief`: the newest brief for the case. The brief JSON is still provisional (`backend/app/contracts/brief.py`), so read `call_goal_en` and `questions_to_ask` defensively and return null fields if they're missing.
 - `calls`: every call for the case, oldest first. `hold_started_at` is the `created_at` of the first `call.on_hold` event for that call (the phone agent repeats it while waiting). `report` is from `calls.report` (P3) with `next_steps_en` and `summary_en` localized (`summary` is null when the call never reached a person). `transcript_id` is null when no transcript exists.
+
+### Live call
+
+`api/live.py`. Follows the call's transcript (the phone agent's `transcripts` row) every 0.5 s from the `call.user_joined` event until the call is `ended`; nothing is sent before the user joins, and `agent` lines are left out.
+
+- Each new agency or user line: `line` (the English as heard), then `delta`s with its translation streamed from `MODEL_FAST` (prompt in `live_prompts.py`, grounded in the glossary terms it uses), then `done`. English, no key, or a failure before the first token sends the line as heard in one `delta`.
+- Tips (`live_tips.py`) are rule-based, no model call, so rule 1 holds: `ask` is the next of the brief's `questions_to_ask`, one open at a time, after an agency line; `yourself` follows an agency line that asks about the applicant's identity and never carries an answer (rule 3). `tip_used` when the user's line says most of the question's words (any reply, for `yourself`).
+- A reconnect replays the call from the start; finished translations are cached in memory, so the replay makes no model calls. The dashboard folds replayed lines into what it has.
+- Lines only appear as the phone agent saves them. It saves the transcript once, at wrap-up, today; for a live view it has to save as each line is heard (`writes.phone.save_transcript` already allows that).
 
 ### Feed rendering
 

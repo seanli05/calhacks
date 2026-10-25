@@ -66,10 +66,17 @@ const live = {
     request<void>(`/api/transcripts/${transcriptId}`, { method: "DELETE" }),
   deleteEverything: (userId: string) =>
     request<DeleteCounts>(`/api/users/${userId}/delete-everything`, { method: "POST" }),
-  // Fixtures only until the backend has these routes; live mode shows them empty.
-  glossary: (_lang: string): Promise<GlossaryEntry[]> => Promise.resolve([]),
-  /** Streams the bridged call into `emit`; returns stop. */
-  liveCall: (_callId: string, _lang: string, _emit: (event: LiveCallEvent) => void): (() => void) => () => {},
+  glossary: (lang: string) => request<GlossaryEntry[]>(`/api/glossary${qs({ lang })}`),
+  /**
+   * Streams the bridged call into `emit` (server-sent events); returns stop. After a
+   * dropped connection the browser reconnects and the server replays the call from
+   * the start, which `useLiveCall` folds into what it already has.
+   */
+  liveCall: (callId: string, lang: string, emit: (event: LiveCallEvent) => void): (() => void) => {
+    const source = new EventSource(`/api/calls/${callId}/live${qs({ lang })}`);
+    source.onmessage = (e: MessageEvent<string>) => emit(JSON.parse(e.data) as LiveCallEvent);
+    return () => source.close();
+  },
 };
 
 const fixtures: typeof live = {

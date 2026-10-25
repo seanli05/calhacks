@@ -15,6 +15,7 @@ from app.contracts import (
     MessageDirection,
     MessageSender,
     Sensitivity,
+    TrustLevel,
     Urgency,
     VerificationStatus,
 )
@@ -198,3 +199,53 @@ class Suggestion(BaseModel):
     detail: Localized
     action: Localized
     prefill: str
+
+
+class GlossaryEntry(BaseModel):
+    term: str
+    translation: str
+    trust_level: TrustLevel
+    source_url: str | None
+
+
+class LiveTip(BaseModel):
+    """`say_en` is English to read out loud; null for `yourself`, which marks a
+    question only the user may answer (rule 3) and never carries an answer."""
+
+    id: str
+    kind: Literal["ask", "yourself"]
+    line_id: str
+    say_en: str | None
+    meaning: Localized
+
+
+class LiveLineHeard(BaseModel):
+    type: Literal["line"] = "line"
+    id: str
+    at: dt.datetime
+    speaker: Literal["agent", "agency", "user"]
+    en: str
+
+
+class LiveDelta(BaseModel):
+    type: Literal["delta"] = "delta"
+    id: str
+    text: str
+
+
+class LiveLineDone(BaseModel):
+    type: Literal["done"] = "done"
+    id: str
+
+
+class LiveTipShown(BaseModel):
+    type: Literal["tip"] = "tip"
+    tip: LiveTip
+
+
+class LiveTipUsed(BaseModel):
+    type: Literal["tip_used"] = "tip_used"
+    id: str
+
+
+LiveCallEvent = LiveLineHeard | LiveDelta | LiveLineDone | LiveTipShown | LiveTipUsed

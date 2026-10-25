@@ -187,26 +187,60 @@
   border-color: var(--lime);
 }
 
-/* On the call: smaller than the "person answered" moment, bigger than a strip. */
+/* On the call: one row (pill, title, timer, Details), leaving the column to the
+   live translation. The bar and the headline row dissolve so their children line up. */
 .compact {
-  padding: 14px 24px 16px;
-  gap: 10px;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px 10px 22px;
+}
+
+.compact .bar,
+.compact .row {
+  display: contents;
+}
+
+.compact .pill {
+  order: 0;
 }
 
 .compact .headline {
-  gap: 4px;
+  order: 1;
+  flex: 1;
+  min-width: 0;
 }
 
 .compact .headline h1 {
-  font-size: clamp(22px, 1.6vw, 30px);
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .compact .headline p {
-  font-size: var(--fs-md);
+  display: none;
+}
+
+.compact .timer {
+  order: 2;
 }
 
 .compact .t {
-  font-size: clamp(24px, 1.8vw, 34px);
+  font-family: var(--font-code);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--h-muted);
+}
+
+.compact .tl {
+  display: none;
+}
+
+.compact .toggle {
+  order: 3;
 }
 
 @media (max-width: 640px) {

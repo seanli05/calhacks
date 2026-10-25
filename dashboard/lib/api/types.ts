@@ -262,9 +262,9 @@ export interface Suggestion {
 export type DeleteCounts = Record<string, number>;
 
 /**
- * The bridged call as it happens, both legs, in the viewer's language. Mock only
- * for now (fixtures): the backend stream needs the phone agent to save each line
- * as it's heard, not only at wrap-up.
+ * GET /api/calls/{call_id}/live?lang=xx (server-sent events): the bridged call as it
+ * happens, both legs, in the viewer's language. Lines appear as the phone agent
+ * saves them to the transcript.
  */
 export type LiveCallEvent =
   /** A finished turn was heard; its translation streams next as `delta`s. */

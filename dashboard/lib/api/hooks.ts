@@ -161,8 +161,13 @@ export function useLiveCall(callId: string | null, active: boolean): LiveCall {
     return api.liveCall(callId, lang, (event) =>
       setLive((prev) => {
         switch (event.type) {
-          case "line":
-            return { ...prev, lines: [...prev.lines, { ...event, text: "", done: false }] };
+          case "line": {
+            // A reconnect replays the call: start the known line over in place.
+            const line = { ...event, text: "", done: false };
+            return prev.lines.some((l) => l.id === event.id)
+              ? { ...prev, lines: prev.lines.map((l) => (l.id === event.id ? line : l)) }
+              : { ...prev, lines: [...prev.lines, line] };
+          }
           case "delta":
             return {
               ...prev,
@@ -171,7 +176,9 @@ export function useLiveCall(callId: string | null, active: boolean): LiveCall {
           case "done":
             return { ...prev, lines: prev.lines.map((l) => (l.id === event.id ? { ...l, done: true } : l)) };
           case "tip":
-            return { ...prev, tips: [...prev.tips, { ...event.tip, used: false }] };
+            return prev.tips.some((t) => t.id === event.tip.id)
+              ? prev
+              : { ...prev, tips: [...prev.tips, { ...event.tip, used: false }] };
           case "tip_used":
             return { ...prev, tips: prev.tips.map((t) => (t.id === event.id ? { ...t, used: true } : t)) };
         }
