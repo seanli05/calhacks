@@ -16,6 +16,9 @@ import { TryActions } from "./TryActions";
 import { useTryLinks } from "./useTryLinks";
 import styles from "./Landing.module.css";
 
+/** Read once per page load: the values are fixed at build time. */
+const DEMO_USERS = demoUsers();
+
 const PERK_ICONS: IconName[] = ["chat", "book", "shield"];
 
 /**
@@ -29,7 +32,7 @@ export function Landing() {
   return (
     <div className={styles.page}>
       <div className={styles.wrap}>
-        <Header actions={<DashboardMenu users={demoUsers()} />} />
+        <Header actions={<DashboardMenu users={DEMO_USERS} />} />
       </div>
       <main>
         <div className={styles.wrap}>

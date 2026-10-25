@@ -15,11 +15,14 @@ export type DemoUser = { label: string; href: string };
  */
 export function demoUsers(): DemoUser[] {
   const accounts = [
-    { label: "Mariam · دری", value: process.env.NEXT_PUBLIC_MARIAM_HOST_DASHBOARD },
-    { label: "Ana · English", value: process.env.NEXT_PUBLIC_ANA_HOST_DASHBOARD },
+    { label: "Mariam · دری", env: "NEXT_PUBLIC_MARIAM_HOST_DASHBOARD", value: process.env.NEXT_PUBLIC_MARIAM_HOST_DASHBOARD },
+    { label: "Ana · English", env: "NEXT_PUBLIC_ANA_HOST_DASHBOARD", value: process.env.NEXT_PUBLIC_ANA_HOST_DASHBOARD },
   ];
-  const users = accounts.flatMap(({ label, value }) => {
-    const href = dashboardHref(value?.trim() ?? "");
+  const users = accounts.flatMap(({ label, env, value }) => {
+    const raw = value?.trim() ?? "";
+    const href = dashboardHref(raw);
+    // Set but unusable (a typo, a missing "user_"): say so instead of silently dropping it.
+    if (raw && !href) console.warn(`${env} should be a user ID (user_...) or a dashboard URL; got "${raw}".`);
     return href ? [{ label, href }] : [];
   });
   if (users.length === 0 && DATA_MODE === "fixtures") return [{ label: "Demo", href: `/u/${FIXTURE_USER_ID}` }];
@@ -28,7 +31,7 @@ export function demoUsers(): DemoUser[] {
 
 /** A user ID becomes its "My cases" page; a URL or path is used as is. */
 function dashboardHref(value: string): string | null {
-  if (value.startsWith("user_")) return `/u/${value}`;
+  if (/^user_[0-9a-f]+$/.test(value)) return `/u/${value}`;
   if (value.startsWith("http://") || value.startsWith("https://") || value.startsWith("/")) return value;
   return null;
 }
