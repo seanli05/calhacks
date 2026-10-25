@@ -1,10 +1,16 @@
-"""First-contact language pick (team decision, Oct 23).
+"""First-contact language pick (Plan.md C45, replacing the Oct 23 one-tap confirm).
 
-A first message with text gets a one-tap confirm in the detected language; a
-photo-only one gets the multilingual menu. No silent detection: short replies are
-ambiguous, and a relative may type in English for the parent who takes the call.
+A first message clear enough to read sets the language at once, and the reply
+confirms it in passing ("if another language is easier, just tell me"); the user
+switches any time by asking (the turn's `set_language`). Only an unclear message
+("ok", "hi", an emoji, mixed languages, a language we don't write in, a photo with no
+text) gets the multilingual question. That question has no numbers to pick from,
+but a number still works, and so does the language's name or a sentence in it.
 
-The pending prompt is read back from the message log (the user's last outbound
+Before, a first message got "Shall we continue in Spanish? 1 Yes / 2 Another
+language", and anything but 1 or 2 got the same question again.
+
+The pending question is read back from the message log (the user's last outbound
 language template), so it survives a restart.
 """
 
@@ -13,50 +19,70 @@ from dataclasses import dataclass
 from app.contracts import MessageDirection
 from app.contracts.common import LanguageCode, UserId
 from app.db import reads, tables
-from app.relay.replies import parse_choice, parse_yes_no
+from app.relay.replies import parse_choice
 from app.relay.templates import LANGUAGES
 
-CONFIRM = "language.confirm"
 MENU = "language.menu"
+# The retired one-tap confirm: one still pending in a user's history counts as asked.
+CONFIRM = "language.confirm"
 _PROMPTS = {CONFIRM, MENU}
+# A reply that names a language, in any of the menu's languages. No bare codes:
+# "es" and "en" are everyday Spanish words ("¿qué es…?", "en español").
+_NAMES: dict[str, LanguageCode] = {
+    "español": "es",
+    "espanol": "es",
+    "castellano": "es",
+    "spanish": "es",
+    "اسپانیایی": "es",
+    "english": "en",
+    "inglés": "en",
+    "ingles": "en",
+    "انگلیسی": "en",
+    "دری": "fa",
+    "dari": "fa",
+    "فارسی": "fa",
+    "farsi": "fa",
+    "persian": "fa",
+}
+# A language's name inside a short reply ("english please", "en español"); longer
+# text is read by detection instead.
+_MAX_PICK_WORDS = 4
+_TRIM = " .,!¡?¿؟،:;"
 
 
 @dataclass(frozen=True)
 class LanguageStep:
-    """What to do next: set `chosen`, or send `prompt` (in `prompt_language` when
-    given), or neither."""
+    """What to do next: set `chosen`, or send `prompt`, or neither. `guessed` means
+    `chosen` came from how the user wrote, not from a pick, so the reply confirms it
+    in passing."""
 
     chosen: LanguageCode | None = None
+    guessed: bool = False
     prompt: str | None = None
-    prompt_language: LanguageCode | None = None
 
 
-def answer_to_prompt(
-    text: str, last_prompt: tables.Message | None
-) -> LanguageStep | None:
-    """The step for a reply to the pending language prompt; None if it isn't one."""
-    if last_prompt is None:
+def picked(text: str) -> LanguageCode | None:
+    """The language a short reply picks: its menu number or its name."""
+    choice = parse_choice(text, len(LANGUAGES))
+    if choice is not None:
+        return LANGUAGES[choice - 1]
+    words = [word.strip(_TRIM) for word in text.casefold().split()]
+    if not words or len(words) > _MAX_PICK_WORDS:
         return None
-    if last_prompt.template == CONFIRM:
-        choice = parse_yes_no(text)
-        if choice == 1:
-            return LanguageStep(chosen=last_prompt.language)
-        if choice == 2:
-            return LanguageStep(prompt=MENU)
-    if last_prompt.template == MENU:
-        choice = parse_choice(text, len(LANGUAGES))
-        if choice is not None:
-            return LanguageStep(chosen=LANGUAGES[choice - 1])
-    return None
+    named = {_NAMES[word] for word in words if word in _NAMES}
+    return named.pop() if len(named) == 1 else None
 
 
-def prompt_for(
-    detected: LanguageCode | None, *, has_text: bool, prompt_pending: bool
+def language_step(
+    text: str, detected: LanguageCode | None, *, prompt_pending: bool
 ) -> LanguageStep:
-    """The prompt for a message that didn't answer one."""
+    """The step for a message from a user with no language yet. `detected` is what
+    detection read from `text` (None when unsure or not run)."""
+    if text and (choice := picked(text)) is not None:
+        return LanguageStep(chosen=choice)
     if detected in LANGUAGES:
-        return LanguageStep(prompt=CONFIRM, prompt_language=detected)
-    if prompt_pending and not has_text:
+        return LanguageStep(chosen=detected, guessed=True)
+    if prompt_pending and not text:
         # More photos while we wait for the pick: don't ask again.
         return LanguageStep()
     return LanguageStep(prompt=MENU)

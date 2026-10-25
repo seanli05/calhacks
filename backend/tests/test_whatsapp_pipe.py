@@ -49,44 +49,95 @@ from whatsapp_fakes import (
 # Language pick
 
 
-async def test_text_first_contact_confirms_detected_language(
+@pytest.fixture
+def runner() -> FakeRunnerClient:
+    return FakeRunnerClient(reply="A language is how we write to each other.")
+
+
+@pytest.fixture
+def talking_pipe(
+    whatsapp: FakeWhatsApp,
+    ask_user: AskUser,
+    letters: Letters,
+    consent: ConsentGate,
+    conversation: Conversation,
+    translator: FakeTranslator,
+    detected: dict[str, str | None],
+    runner: FakeRunnerClient,
+) -> InboundPipe:
+    """Detection and the real turn on a fake model: a first message gets answered."""
+    fake: Any = translator
+    client: Any = runner
+    turn = OrchestratorTurn(client, "model", whatsapp, fake, consent)
+
+    async def detect(text: str) -> str | None:
+        return detected.get(text)
+
+    return InboundPipe(
+        whatsapp,
+        detect,
+        ask_user,
+        letters,
+        quiet_window_s=QUIET_S,
+        to_english=translator.to_english,
+        turn=turn.run,
+        consent=consent,
+        conversation=conversation,
+    )
+
+
+async def test_clear_first_message_sets_the_language_and_is_answered(
+    talking_pipe: InboundPipe,
+    db: FakeDB,
+    detected: dict,
+    runner: FakeRunnerClient,
+) -> None:
+    """C45: on a real phone, "What is a language" got the 1/2 confirm again; now it
+    gets an answer, which mentions the language in passing."""
+    detected["¿qué es un idioma?"] = "es"
+
+    await talking_pipe.handle(inbound("¿qué es un idioma?"))
+
+    assert db.users[NUMBER].language == "es"
+    assert db.outbound_templates() == [None]
+    reply = db.messages[-1]
+    assert (reply.sender, reply.language) == ("orchestrator", "es")
+    context = runner.requests[0]["messages"][0]["content"]
+    assert "<language_note>" in context and "read it as Spanish" in context
+
+
+async def test_a_guessed_language_is_noted_only_on_the_first_turn(
+    talking_pipe: InboundPipe, db: FakeDB, detected: dict, runner: FakeRunnerClient
+) -> None:
+    detected["hola, recibí una carta"] = "es"
+    await talking_pipe.handle(inbound("hola, recibí una carta"))
+
+    await talking_pipe.handle(inbound("¿y qué hago ahora?"))
+
+    assert "<language_note>" not in runner.requests[1]["messages"][0]["content"]
+
+
+async def test_dari_first_message_is_answered_in_dari(
+    talking_pipe: InboundPipe, db: FakeDB, detected: dict
+) -> None:
+    detected["سلام، یک نامه گرفتم"] = "fa"
+
+    await talking_pipe.handle(inbound("سلام، یک نامه گرفتم"))
+
+    assert db.users[NUMBER].language == "fa"
+    assert db.messages[-1].language == "fa"
+    assert "language.confirm" not in db.outbound_templates()
+
+
+async def test_without_a_turn_a_guessed_language_is_confirmed_by_template(
     pipe: InboundPipe, db: FakeDB, whatsapp: FakeWhatsApp, detected: dict
 ) -> None:
     detected["hola, recibí una carta"] = "es"
 
     await pipe.handle(inbound("hola, recibí una carta"))
 
-    assert whatsapp.sent == [render("language.confirm", "es")]
-    first_in, confirm = db.messages
-    assert (first_in.direction, first_in.language) == ("in", "es")
-    assert (confirm.template, confirm.language, confirm.twilio_sid) == (
-        "language.confirm",
-        "es",
-        "SM1",
-    )
-    assert confirm.body_en == render("language.confirm", "en")
-
-    await pipe.handle(inbound("1"))
-
-    user = db.users[NUMBER]
-    assert user.language == "es"
-    assert whatsapp.sent[-1] == render("language.set", "es")
-
-
-async def test_dari_first_contact_confirms_in_dari_and_takes_a_persian_digit(
-    pipe: InboundPipe, db: FakeDB, whatsapp: FakeWhatsApp, detected: dict
-) -> None:
-    detected["سلام، یک نامه گرفتم"] = "fa"
-
-    await pipe.handle(inbound("سلام، یک نامه گرفتم"))
-
-    assert whatsapp.sent == [render("language.confirm", "fa")]
-    assert "دری" in whatsapp.sent[0]
-
-    await pipe.handle(inbound("۱"))
-
-    assert db.users[NUMBER].language == "fa"
-    assert whatsapp.sent[-1] == render("language.set", "fa")
+    assert db.users[NUMBER].language == "es"
+    assert whatsapp.sent == [render("language.set", "es")]
 
 
 async def test_dari_is_the_third_choice_on_the_menu(
@@ -98,18 +149,49 @@ async def test_dari_is_the_third_choice_on_the_menu(
     assert db.users[NUMBER].language == "fa"
 
 
-async def test_other_language_leads_to_menu_then_pick(
-    pipe: InboundPipe, db: FakeDB, whatsapp: FakeWhatsApp, detected: dict
+@pytest.mark.parametrize(
+    ("reply", "language"),
+    [
+        ("español", "es"),
+        ("English please", "en"),
+        ("دری", "fa"),
+        ("2", "en"),
+        ("en español por favor", "es"),
+    ],
+)
+async def test_the_menu_takes_a_language_by_name_or_number(
+    pipe: InboundPipe, db: FakeDB, whatsapp: FakeWhatsApp, reply: str, language: str
 ) -> None:
-    detected["hello"] = "en"
+    await pipe.handle(inbound("ok"))
 
-    await pipe.handle(inbound("hello"))
-    await pipe.handle(inbound("2"))
-    assert db.outbound_templates()[-1] == "language.menu"
+    await pipe.handle(inbound(reply))
+
+    assert db.users[NUMBER].language == language
+    assert whatsapp.sent[-1] == render("language.set", language)
+
+
+async def test_a_clear_sentence_answers_the_menu_too(
+    talking_pipe: InboundPipe, db: FakeDB, detected: dict, runner: FakeRunnerClient
+) -> None:
+    detected["what is this letter about?"] = "en"
+    await talking_pipe.handle(inbound("ok"))
+
+    await talking_pipe.handle(inbound("what is this letter about?"))
+
+    assert db.users[NUMBER].language == "en"
+    assert db.outbound_templates() == ["language.menu", None]
+    assert len(runner.requests) == 1
+
+
+async def test_an_unsupported_language_gets_the_menu(
+    pipe: InboundPipe, db: FakeDB, detected: dict
+) -> None:
+    detected["bonjour, j'ai reçu une lettre"] = "fr"
+
+    await pipe.handle(inbound("bonjour, j'ai reçu une lettre"))
+
+    assert db.outbound_templates() == ["language.menu"]
     assert db.users[NUMBER].language is None
-
-    await pipe.handle(inbound("1"))
-    assert db.users[NUMBER].language == LANGUAGES[0] == "es"
 
 
 async def test_undetectable_text_gets_the_menu(
@@ -138,6 +220,21 @@ async def test_photo_first_contact_holds_the_letter_until_language_is_picked(
 
     [document] = db.documents
     assert [p["media_id"] for p in document.pages] == [m.id for m in db.media]
+
+
+async def test_photo_with_a_clear_caption_needs_no_language_question(
+    talking_pipe: InboundPipe, db: FakeDB, detected: dict, runner: FakeRunnerClient
+) -> None:
+    detected["me llegó esta carta"] = "es"
+    message = inbound("me llegó esta carta", photos=1)
+
+    await talking_pipe.handle(message)
+    await wait_for_batches()
+
+    assert db.users[NUMBER].language == "es"
+    assert db.outbound_templates() == ["language.set_letter"]
+    assert len(db.documents) == 1
+    assert runner.requests == []  # the explanation answers it
 
 
 # Photos once the language is known
@@ -501,9 +598,10 @@ def test_render_without_language_sends_every_language_once() -> None:
     assert render("language.menu", None) == render("language.menu", "es")
 
 
-def test_menu_lists_languages_in_order() -> None:
-    menu = render("language.menu", None)
-    assert menu.index("1 Español") < menu.index("2 English") < menu.index("3 دری")
+def test_menu_lists_languages_in_order_without_numbers() -> None:
+    options = render("language.menu", None).splitlines()[-1]
+    assert options.index("Español") < options.index("English") < options.index("دری")
+    assert not re.search(r"[0-9۰-۹]", render("language.menu", None))
 
 
 def _placeholders(text: str) -> set[str]:
