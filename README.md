@@ -66,6 +66,8 @@ npm run dev     # http://localhost:3000, against the backend on :8000
 NEXT_PUBLIC_DATA=fixtures npm run dev   # on fake data, no backend needed
 ```
 
+For the demo, set `NEXT_PUBLIC_DEMO_USERS` in `dashboard/.env.local` (see `dashboard/.env.example`) to show "Already have a dashboard?" on the landing page, one link per demo account. The IDs survive `app.db.reset --keep-users`; restart the dashboard after changing it.
+
 ### Using the database
 
 **Which database.** The deployed backend, the dashboard, live run-throughs and the demo all use the shared database (`DATABASE_URL`). Tests and `app.dev.rehearsal` use your own Neon branch (`TEST_DATABASE_URL`), never the shared one, because they drop every table. Ask person 1 for a branch; the URLs go in your `.env`/`.env.local`, never in git.

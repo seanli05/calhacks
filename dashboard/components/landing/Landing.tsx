@@ -2,6 +2,7 @@
 
 import { Header } from "@/components/Header";
 import { Icon, type IconName } from "@/components/Icon";
+import { demoUsers } from "@/lib/demoUsers";
 import { useStrings } from "@/lib/i18n";
 
 import { ChatDemo } from "./ChatDemo";
@@ -39,7 +40,7 @@ export function Landing() {
                 </span>
               </h1>
               <p className={styles.sub}>{t.sub}</p>
-              <TryActions links={links} qrSize={96} scan={false} />
+              <TryActions links={links} qrSize={96} scan={false} dashboards={demoUsers()} />
               <ul className={styles.perks}>
                 {t.perks.map((perk, i) => (
                   <li key={perk}>
