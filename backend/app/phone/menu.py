@@ -176,7 +176,7 @@ async def decide(
             )
     except (LlmError, TimeoutError) as exc:
         logger.warning(
-            "menu decision failed (%s): %s", context, exc or type(exc).__name__
+            "menu decision failed (%s): %s", context, str(exc) or type(exc).__name__
         )
         return _fallback(history, "Menu decision failed")
 

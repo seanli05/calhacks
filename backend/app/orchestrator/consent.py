@@ -1,25 +1,28 @@
 """Consent and the call (Plan.md → H2, P3, C8, C21, C22; Goal 6.3, 6.4).
 
-Product rule 4, in code: a call job is queued only from the user's own numbered YES
-to a consent request for that case, sent while the case is verified with an official
-number, and one YES covers one call. The model can ask for consent (the turn's
-`request_consent` tool) but can't start a call: only the user's reply does, through
-`answer`.
+Product rule 4, in code: a call job is queued only from the user's own YES to a
+consent request for that case, sent while the case is verified with an official
+number, and one YES covers one call. The YES is either a bare "1"/yes word, answered
+in code (`answer`), or words the turn's `answer_call_consent` tool passes on (C43,
+`answer_in_words`). Either way it's the user's latest message, sent after the
+request, and in words only when the words the model quotes are in it. The model can
+ask for consent (`request_consent`) and relay the user's answer, but never answer for
+them.
 
 The open request lives in memory, one per user. A restart forgets it, and a "1" sent
 then goes to the orchestrator turn, which can ask again. No request goes out while
 another numbered question is open (conversation.py), so a "1" never answers the
 wrong question.
 
-When the call job finishes, the user gets the summary, then either a new consent
-request (failed, unreachable: C21) or a suggestion to close the case (resolved with no
-follow-up: C22).
+When the call job finishes, the user gets one message: the summary, with either a
+new consent request (failed, unreachable: C21) or a suggestion to close the case
+(resolved with no follow-up: C22) at its end.
 """
 
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ValidationError
 
@@ -43,7 +46,7 @@ from app.db.events import append_event
 from app.db.ids import new_id
 from app.db.tables import utcnow
 from app.orchestrator.call_status import CallStatusWatcher
-from app.orchestrator.call_summary import send_call_summary
+from app.orchestrator.call_summary import send_call_summary, summary_lead
 from app.orchestrator.conversation import Conversation
 from app.orchestrator.job_watch import JobWatcher
 from app.relay.outbound import send_template
@@ -105,11 +108,13 @@ class ConsentGate:
         *,
         goal_en: str | None = None,
         verified: bool = False,
+        template: str = "consent.request",
     ) -> str | None:
         """Ask the user whether to call about this case. With `verified`, the same
         message leads with "it's genuine" (one message for the verdict and the
-        question, Verdicts). Returns None once asked, or the reason (English, for
-        the model) the call can't be offered."""
+        question, Verdicts); `template` names another lead the same way (it and its
+        `_generic` form end with the request). Returns None once asked, or the
+        reason (English, for the model) the call can't be offered."""
         case = await reads.get_case(case_id)
         if case is None or case.user_id != user.id:
             return f"No case {case_id} for this user."
@@ -133,7 +138,8 @@ class ConsentGate:
             if goal_en
             else None
         )
-        template = "verification.verified_call" if verified else "consent.request"
+        if verified:
+            template = "verification.verified_call"
         if goal is not None and goal_en is not None:
             asked = await send_template(
                 self._whatsapp,
@@ -159,7 +165,12 @@ class ConsentGate:
         return None
 
     async def answer(
-        self, user: tables.User, reply: tables.Message, choice: int
+        self,
+        user: tables.User,
+        reply: tables.Message,
+        choice: int,
+        *,
+        via: Literal["words"] | None = None,
     ) -> None:
         """The user's 1 (call) or 2 (don't) to the open request. Either way the
         request is used up: a later call asks again (C21)."""
@@ -167,6 +178,7 @@ class ConsentGate:
         if pending is None:
             logger.error("Consent answer with no open request user_id=%s", user.id)
             return
+        extra = {"via": via} if via else {}
         if choice != 1:
             await _event(
                 EventType.CONSENT_DECLINED,
@@ -174,15 +186,55 @@ class ConsentGate:
                 pending.case_id,
                 "The user said no to the call",
                 consent_message_id=reply.id,
+                **extra,
             )
             await send_template(
                 self._whatsapp, user, "consent.declined", case_id=pending.case_id
             )
             return
-        await self._start_call(user, pending, reply)
+        await self._start_call(user, pending, reply, extra)
+
+    async def answer_in_words(
+        self,
+        user: tables.User,
+        case_id: CaseId,
+        choice: int,
+        user_words: str,
+    ) -> str | None:
+        """C43: the turn relays a yes or no the user wrote in words. Refuses (the
+        reason, in English, for the model) unless a request for this case is open,
+        the user's latest message is their own and came after it, and
+        `user_words` (the words the model read as the answer) are in that message.
+        Returns None once answered, which sends its own confirmation."""
+        pending = self._pending.get(user.id)
+        if pending is None or pending.case_id != case_id:
+            return "No call question is open for this case."
+        reply = await _latest_inbound(user)
+        if reply is None or not _is_yes_to(reply, user, pending):
+            return (
+                "The user hasn't answered since the question went out. Only their "
+                "latest message, sent after the question, can answer it."
+            )
+        if not _quotes(reply, user_words):
+            return (
+                "user_words must be copied from the user's latest message. Only "
+                "that message can answer the call question."
+            )
+        logger.info(
+            "Consent answered in words user_id=%s case_id=%s choice=%d",
+            user.id,
+            case_id,
+            choice,
+        )
+        await self.answer(user, reply, choice, via="words")
+        return None
 
     async def _start_call(
-        self, user: tables.User, pending: PendingConsent, reply: tables.Message
+        self,
+        user: tables.User,
+        pending: PendingConsent,
+        reply: tables.Message,
+        extra: dict[str, str],
     ) -> None:
         """Queue the call, after checking the gate once more: things may have
         changed since the request went out."""
@@ -209,6 +261,7 @@ class ConsentGate:
             case_id,
             "The user said yes to one call",
             consent_message_id=reply.id,
+            **extra,
         )
         since = utcnow()
         job = await jobs.enqueue(
@@ -229,7 +282,8 @@ class ConsentGate:
         logger.info(
             "Call queued user_id=%s case_id=%s job_id=%s", user.id, case_id, job.id
         )
-        self._call_status.watch(user.id, since)
+        # consent.given already says we're calling: no "calling now" after it.
+        self._call_status.watch(user.id, since, announce_dialing=False)
         self._job_watcher.watch(job.id, self._call_finished)
         try:
             await send_template(self._whatsapp, user, "consent.given", case_id=case_id)
@@ -266,9 +320,6 @@ class ConsentGate:
             return
         async with self._conversation.speaking(user.id):
             try:
-                await send_call_summary(
-                    self._whatsapp, self._translator, user, report, case_id
-                )
                 await self._after_call(user, case_id, report)
             except WhatsAppSendError as exc:
                 logger.error("Post-call message not sent case_id=%s: %s", case_id, exc)
@@ -276,15 +327,27 @@ class ConsentGate:
     async def _after_call(
         self, user: tables.User, case_id: CaseId, report: CallReport | None
     ) -> None:
-        outcome = report.outcome if report is not None else CallOutcome.FAILED
-        if outcome in (CallOutcome.FAILED, CallOutcome.USER_UNREACHABLE):
-            refusal = await self.request(user, case_id)
-            if refusal is not None:
-                logger.info("No retry offered case_id=%s: %s", case_id, refusal)
-        elif outcome == CallOutcome.RESOLVED and report and not report.followup_needed:
-            await send_template(
-                self._whatsapp, user, "summary.suggest_close", case_id=case_id
-            )
+        """The summary and what to offer next, in one message."""
+        lead = summary_lead(report)
+        if lead in _RETRY_LEADS:
+            # A new consent request (C21), led by why the call didn't finish.
+            refusal = await self.request(user, case_id, template=_RETRY_LEADS[lead])
+            if refusal is None:
+                return
+            logger.info("No retry offered case_id=%s: %s", case_id, refusal)
+        suggest_close = bool(
+            report
+            and report.outcome == CallOutcome.RESOLVED
+            and not report.followup_needed
+        )
+        await send_call_summary(
+            self._whatsapp,
+            self._translator,
+            user,
+            report,
+            case_id,
+            suggest_close=suggest_close,
+        )
 
 
 def _call_goal_en(brief: tables.CaseBrief) -> str | None:
@@ -309,6 +372,39 @@ def _agency(case: tables.Case) -> str:
         logger.exception("Bad stored R1 case_id=%s", case.id)
         return DEFAULT_AGENCY
     return issuer or DEFAULT_AGENCY
+
+
+# Summary templates that end with a new consent request, by the summary they lead
+# with.
+_RETRY_LEADS = {
+    "summary.call_failed": "summary.call_failed_retry",
+    # The status watcher already said we couldn't reach them: just ask again.
+    "summary.unreachable_followup": "consent.request",
+}
+
+
+async def _latest_inbound(user: tables.User) -> tables.Message | None:
+    messages = await reads.list_messages(user.id)
+    return next(
+        (m for m in reversed(messages) if m.direction == MessageDirection.IN), None
+    )
+
+
+def _quotes(reply: tables.Message, user_words: str) -> bool:
+    """`user_words` appear in the reply, in English or as written (ignoring case
+    and spacing)."""
+    words = _normalized(user_words)
+    if not words:
+        return False
+    return any(
+        words in _normalized(text)
+        for text in (reply.body_en, reply.body_original)
+        if text
+    )
+
+
+def _normalized(text: str) -> str:
+    return " ".join(text.casefold().split())
 
 
 def _is_yes_to(

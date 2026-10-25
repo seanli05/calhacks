@@ -21,6 +21,24 @@ from app.settings import get_settings
 logger = logging.getLogger(__name__)
 
 
+def _show_app_logs() -> None:
+    """Print our own INFO lines. Uvicorn sets up only its loggers, so without this
+    every `app.*` INFO line (calls queued, listen legs, consent) was dropped and
+    only warnings reached the console, with no timestamp."""
+    app_logger = logging.getLogger("app")
+    if app_logger.handlers:
+        return
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
+    )
+    app_logger.addHandler(handler)
+    app_logger.setLevel(logging.INFO)
+
+
+_show_app_logs()
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await create_all()

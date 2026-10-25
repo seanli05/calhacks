@@ -1,20 +1,37 @@
 """The WhatsApp pipe on fakes (see whatsapp_fakes.py and conftest.py)."""
 
+import asyncio
 import re
 import string
+import time
+from collections.abc import Callable
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from app.contracts import CallOutcome, FactSource, FactStatus, JobType, Sensitivity
 from app.db import tables
+from app.dev import fake_call, fake_research
+from app.dev.fake_phone import FakePhone
+from app.dev.fake_research import FakeResearch
+from app.orchestrator.consent import ConsentGate
+from app.orchestrator.conversation import Conversation
+from app.orchestrator.fact_consent import FactConsent
+from app.orchestrator.job_watch import JobWatcher
+from app.orchestrator.letters import Letters
 from app.orchestrator.pipe import InboundPipe
+from app.orchestrator.turn import OrchestratorTurn
+from app.relay.ask_user import AskUser
 from app.relay.replies import parse_choice, parse_yes_no
 from app.relay.templates import LANGUAGES, TEMPLATES, render
 from app.relay.whatsapp import MAX_BODY_CHARS, split_body
 from app.translation.detect import _Detected, detect_language
 from whatsapp_fakes import (
     NUMBER,
+    QUIET_S,
     FakeDB,
+    FakeRunnerClient,
+    FakeTranslator,
     FakeWhatsApp,
     inbound,
     use_spanish,
@@ -194,6 +211,196 @@ async def test_text_after_language_goes_to_the_orchestrator(
 
     reply = db.messages[-1]
     assert (reply.sender, reply.template) == ("orchestrator", None)
+
+
+# Pacing over the whole demo path (agentic-routing plan, step 0)
+
+# Test seconds per real second: the fakes keep their real pacing (research 5 s and
+# 10 s, call steps 3 s), squeezed 50 times.
+SCALE = 0.02
+# Two messages closer than this, with nothing from the user between, read as a burst.
+BURST_S = 5.0
+# Messages that must go out at once, whatever was just sent (C36, P1).
+URGENT = {"call.human_detected", "ask_user.menu_choice"}
+# What the user takes to read a question and answer it.
+USER_READS_S = 3.0
+
+
+async def _until(condition: Callable[[], bool], timeout_s: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout_s
+    while not condition():
+        if time.monotonic() > deadline:
+            pytest.fail("condition never became true")
+        await asyncio.sleep(0.005)
+
+
+def _label(message: tables.Message) -> str:
+    if message.template:
+        return message.template
+    return f"text: {(message.body_en or '')[:40]!r}"
+
+
+def bursts(messages: list[tables.Message]) -> list[tuple[str, str, float]]:
+    """Back-to-back outbound pairs under BURST_S (in real seconds), with no inbound
+    message between them."""
+    found = []
+    previous: tables.Message | None = None
+    for message in messages:
+        if message.direction == "in":
+            previous = None
+            continue
+        if previous is not None:
+            gap_s = (message.created_at - previous.created_at).total_seconds() / SCALE
+            if gap_s < BURST_S:
+                found.append((_label(previous), _label(message), round(gap_s, 1)))
+        previous = message
+    return found
+
+
+async def _demo_path(
+    db: FakeDB,
+    pipe: InboundPipe,
+    ask_user: AskUser,
+    job_watcher: JobWatcher,
+    consent: ConsentGate,
+    *,
+    question_after: bool = False,
+) -> None:
+    """Letter → explanation → verdict + consent → YES → the fake call → summary;
+    with `question_after`, the user then asks something."""
+    user = await use_spanish(db)
+    research = FakeResearch(
+        "+15005550006",
+        fake_research.Pacing(fast_s=5 * SCALE, deep_s=10 * SCALE, poll_s=0.01),
+    )
+    research.start(run_for_s=5)
+    phone = FakePhone(
+        ask_user,
+        fake_call.Pacing(step_s=3 * SCALE, on_hold_count=3, ask_timeout_s=45),
+        poll_s=0.01,
+    )
+    phone.start(5)
+
+    await pipe.handle(inbound(photos=1))
+    await _until(lambda: consent.pending(user.id) is not None)
+    await asyncio.sleep(USER_READS_S * SCALE)
+    await pipe.handle(inbound("1"))
+    await _until(lambda: "ask_user.menu_choice" in db.outbound_templates())
+    await asyncio.sleep(USER_READS_S * SCALE)
+    await pipe.handle(inbound("2"))
+    [call_job] = db.jobs_of(JobType.CALL)
+    await _until(lambda: not job_watcher.is_watching(call_job.id))
+    await asyncio.sleep(10 * SCALE)  # anything that follows the summary
+    if question_after:
+        # The memory writer held a fact from earlier messages.
+        await db.add_fact(
+            user.id,
+            "Has two children",
+            "household",
+            FactSource.USER_SAID,
+            Sensitivity.NORMAL,
+            FactStatus.PENDING_CONSENT,
+        )
+        await pipe.handle(inbound("¿tengo que llevar a mis hijos?"))
+        await asyncio.sleep(10 * SCALE)
+
+
+@pytest.fixture(params=["as_reported", "resolved_no_followup", "failed"])
+def call_outcome(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+    db: FakeDB,
+    phone_db: Any,
+) -> str:
+    """The fake phone's report, rewritten to the outcome under test."""
+    edits = {
+        "as_reported": {},
+        "resolved_no_followup": {
+            "outcome": CallOutcome.RESOLVED,
+            "followup_needed": False,
+        },
+        "failed": {"outcome": CallOutcome.FAILED},
+    }[request.param]
+
+    async def finish(job_id: str, result: Any) -> None:
+        db.finish_job(job_id, result.model_copy(update=edits))
+
+    monkeypatch.setattr("app.db.jobs.finish", finish)
+    return request.param
+
+
+@pytest.fixture
+def chatty_pipe(
+    whatsapp: FakeWhatsApp,
+    ask_user: AskUser,
+    letters: Letters,
+    consent: ConsentGate,
+    conversation: Conversation,
+    translator: FakeTranslator,
+) -> InboundPipe:
+    """A pipe with the real turn on a fake model that answers every message."""
+    fake: Any = translator
+    client: Any = FakeRunnerClient(reply="Yes, bring your children.")
+    fact_consent = FactConsent(whatsapp, fake)
+    turn = OrchestratorTurn(
+        client,
+        "model",
+        whatsapp,
+        fake,
+        consent,
+        ask_user=ask_user,
+        fact_consent=fact_consent,
+    )
+
+    async def detect(text: str) -> None:
+        return None
+
+    return InboundPipe(
+        whatsapp,
+        detect,
+        ask_user,
+        letters,
+        quiet_window_s=QUIET_S,
+        to_english=translator.to_english,
+        turn=turn.run,
+        consent=consent,
+        fact_consent=fact_consent,
+        conversation=conversation,
+    )
+
+
+async def test_demo_path_sends_no_bursts(
+    db: FakeDB,
+    pipe: InboundPipe,
+    ask_user: AskUser,
+    job_watcher: JobWatcher,
+    consent: ConsentGate,
+    research_db: Any,
+    call_outcome: str,
+) -> None:
+    await _demo_path(db, pipe, ask_user, job_watcher, consent)
+
+    found = [pair for pair in bursts(db.messages) if pair[1] not in URGENT]
+    assert found == []
+
+
+async def test_a_question_after_the_call_sends_no_bursts(
+    db: FakeDB,
+    chatty_pipe: InboundPipe,
+    ask_user: AskUser,
+    job_watcher: JobWatcher,
+    consent: ConsentGate,
+    research_db: Any,
+    phone_db: Any,
+) -> None:
+    await _demo_path(
+        db, chatty_pipe, ask_user, job_watcher, consent, question_after=True
+    )
+
+    # The reply and "may I save this?" went out as one message.
+    assert "May I remember this" in (db.messages[-1].body_en or "")
+    found = [pair for pair in bursts(db.messages) if pair[1] not in URGENT]
+    assert found == []
 
 
 # Pure pieces

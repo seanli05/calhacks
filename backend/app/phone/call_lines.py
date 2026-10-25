@@ -1,8 +1,8 @@
 """The runner's fixed lines to a representative. Fixed text, never model output, so
 rule 3 and C35 hold by review: the agent says it's automated and calls for the
 applicant, and it never names anyone, gives an identifier, or mentions the case.
-`JOIN_PROMPTS` and `LISTEN_PROMPTS` are the lines the applicant hears, in their own
-language (rule 6)."""
+`JOIN_PROMPTS`, `LISTEN_PROMPTS` and `LISTENING_NOW` are the lines the applicant
+hears, in their own language (rule 6)."""
 
 from dataclasses import dataclass
 
@@ -88,6 +88,22 @@ LISTEN_PROMPTS: dict[LanguageCode, JoinPrompt] = {
 asked to sit in. The key press keeps carrier voicemail from recording the call
 (C29)."""
 
+LISTENING_NOW: dict[LanguageCode, JoinPrompt] = {
+    "en": JoinPrompt(
+        "You're listening now. The office can't hear you.",
+        "en-US",
+        "Polly.Joanna",
+    ),
+    "es": JoinPrompt(
+        "Ya está escuchando. La oficina no puede oírle.",
+        "es-US",
+        "Polly.Lupe",
+    ),
+}
+"""Said right after the listen leg's key press, before the call plays: without it,
+a quiet moment on the call (the agent waiting for a menu) sounded like nothing
+happened."""
+
 FALLBACK_LANGUAGE: LanguageCode = "en"
 
 
@@ -99,3 +115,8 @@ def join_prompt(language: LanguageCode) -> JoinPrompt:
 def listen_prompt(language: LanguageCode) -> JoinPrompt:
     """The listen prompt in `language`, or English when there's none for it yet."""
     return LISTEN_PROMPTS.get(language, LISTEN_PROMPTS[FALLBACK_LANGUAGE])
+
+
+def listening_now(language: LanguageCode) -> JoinPrompt:
+    """The line after the listen key press, or English when there's none yet."""
+    return LISTENING_NOW.get(language, LISTENING_NOW[FALLBACK_LANGUAGE])

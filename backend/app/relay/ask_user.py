@@ -174,32 +174,54 @@ class AskUser:
         return timed_out.question
 
     async def handle_reply(
-        self, user: tables.User, question: tables.Question, text: str
+        self,
+        user: tables.User,
+        question: tables.Question,
+        text: str,
+        *,
+        reprompt: bool = True,
     ) -> bool:
-        """Route a reply to `question`. Returns False if the text isn't an answer and
-        should go on to normal routing (only for questions already timed out)."""
+        """Route a bare-number reply to `question`. Returns False if the text isn't
+        a number and should go on to normal routing: always for a question already
+        timed out, and for an open one unless `reprompt` (no orchestrator turn to
+        read the text), which asks again for a number instead."""
         choice = parse_choice(text, len(question.options_en))
+        if choice is None:
+            if question.status != QuestionStatus.OPEN or not reprompt:
+                return False
+            await send_template(
+                self._whatsapp,
+                user,
+                "ask_user.reprompt",
+                {"count": len(question.options_en)},
+                question_id=question.id,
+            )
+            return True
         if question.status == QuestionStatus.OPEN:
-            if choice is None:
-                await send_template(
-                    self._whatsapp,
-                    user,
-                    "ask_user.reprompt",
-                    {"count": len(question.options_en)},
-                    question_id=question.id,
-                )
-                return True
-            answered = await writes.answer_question(question.id, choice)
-            if answered is not None:
-                future = self._waiting.get(question.id)
-                if future is not None and not future.done():
-                    future.set_result(choice)
-                return True
-            # The timeout closed the question between our read and our answer.
-        elif choice is None:
-            return False
-        await self._late_reply(user, question, choice)
+            await self.answer(user, question, choice)
+        else:
+            await self._late_reply(user, question, choice)
         return True
+
+    async def answer(
+        self, user: tables.User, question: tables.Question, choice: int
+    ) -> bool:
+        """Answer the user's open `question` with `choice` (1-based), for the pipe
+        or the orchestrator turn's answer tool. Returns False if the timeout closed
+        it first; the user is then told which option was taken (C24)."""
+        if question.user_id != user.id:
+            raise ValueError(f"question {question.id} isn't this user's")
+        if not 1 <= choice <= len(question.options_en):
+            raise ValueError(f"choice {choice} out of range for {question.id}")
+        answered = await writes.answer_question(question.id, choice)
+        if answered is not None:
+            future = self._waiting.get(question.id)
+            if future is not None and not future.done():
+                future.set_result(choice)
+            return True
+        # The timeout closed the question between our read and our answer.
+        await self._late_reply(user, question, choice)
+        return False
 
     async def _answered(
         self, question: tables.Question, case_id: str, choice: int

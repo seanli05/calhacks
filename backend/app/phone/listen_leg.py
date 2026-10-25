@@ -24,7 +24,7 @@ from aiohttp import ClientError
 from twilio.base.exceptions import TwilioRestException
 
 from app.contracts.common import CallId, LanguageCode
-from app.phone.call_lines import listen_prompt
+from app.phone.call_lines import listen_prompt, listening_now
 from app.phone.line import LineEvent, ListenEnded, ListenRequested, ListenStarted
 from app.phone.listen_audio import ListenMixer, ListenSink
 from app.phone.twilio_rest import (
@@ -156,7 +156,9 @@ class ListenLeg:
         self.sid = self.sid or call_sid
         self.stage = "listening"
         self._emit(ListenStarted())
-        return listen_stream_twiml(self._urls.listen_stream(call_id))
+        return listen_stream_twiml(
+            self._urls.listen_stream(call_id), listening_now(self._language)
+        )
 
     def missed_gate(self, call_sid: str) -> str:
         if self._matches(call_sid) and self.stage == "ringing":

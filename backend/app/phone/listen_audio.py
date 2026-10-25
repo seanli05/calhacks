@@ -176,14 +176,25 @@ async def run_listener(
         logger.warning("listen stream refused by its line (sid=%s)", start.call_sid)
         await websocket.close()
         return
+    logger.info("listen stream started (sid=%s)", start.call_sid)
     writer = asyncio.create_task(sink.run())
     reader = asyncio.create_task(_until_stop(websocket))
     try:
         done, _ = await asyncio.wait(
             {writer, reader}, return_when=asyncio.FIRST_COMPLETED
         )
-        if writer in done and (exc := writer.exception()) is not None:
-            logger.info("listen stream write failed: %s", type(exc).__name__)
+        # Why it ended: Twilio's stop (the user hung up), or a failed read or write.
+        for name, task in (("write", writer), ("read", reader)):
+            if task in done and (exc := task.exception()) is not None:
+                logger.warning(
+                    "listen stream %s failed (sid=%s): %s",
+                    name,
+                    start.call_sid,
+                    str(exc) or type(exc).__name__,
+                )
+        logger.info(
+            "listen stream ended (sid=%s, dropped=%d)", start.call_sid, sink.dropped
+        )
     finally:
         line.detach_listener(sink)
         for task in (writer, reader):

@@ -402,6 +402,9 @@ async def test_signed_listen_callbacks_reach_the_line(client: TestClient) -> Non
     try:
         joined = _post(client, f"{base}/joined", {"CallSid": LISTEN_SID})
         assert "/listen/stream" in joined.text
+        # They hear that it worked before the call plays (a quiet menu was silence).
+        said = joined.text.index("<Say")
+        assert said < joined.text.index("<Connect>")
         status = _post(
             client, f"{base}/status", {"CallSid": LISTEN_SID, "CallStatus": "completed"}
         )

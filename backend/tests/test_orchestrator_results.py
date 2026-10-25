@@ -591,11 +591,18 @@ def report(**changes: Any) -> CallReport:
 async def test_resolved_call_gets_the_summary_and_a_close_suggestion(
     db: FakeDB, pipe: InboundPipe, consent: ConsentGate
 ) -> None:
-    await call_ends(db, pipe, consent, report(followup_needed=False))
-    await until(lambda: db.outbound_templates()[-1] == "summary.suggest_close")
+    user = await call_ends(db, pipe, consent, report(followup_needed=False))
+    close = render("summary.suggest_close", "es")
+    await until(lambda: db.messages[-1].body_original.endswith(close))
 
-    summary = db.messages[-2]
+    # One message: the summary, ending with the close suggestion (pacing).
+    summary = db.messages[-1]
+    assert db.messages[-2].direction == "out"
+    assert db.messages[-2].template == "consent.given"
     assert summary.sender == "orchestrator"
+    assert summary.user_id == user.id
+    assert summary.body_en is not None
+    assert summary.body_en.endswith(render("summary.suggest_close", "en"))
     assert summary.body_original.startswith(
         "[es] Here's how the call with USCIS went:\n- Interview is still on"
     )
@@ -616,7 +623,8 @@ async def test_resolved_call_with_follow_up_doesnt_suggest_closing(
     await until(lambda: not job_watcher.is_watching(job.id))
 
     assert db.messages[-1].sender == "orchestrator"
-    assert "summary.suggest_close" not in db.outbound_templates()
+    close = render("summary.suggest_close", "es")
+    assert not db.messages[-1].body_original.endswith(close)
 
 
 async def test_a_call_the_user_ended_is_confirmed_without_a_retry_offer(
@@ -633,12 +641,10 @@ async def test_a_call_the_user_ended_is_confirmed_without_a_retry_offer(
 @pytest.mark.parametrize(
     ("call_report", "template"),
     [
-        (None, "summary.call_failed"),
-        (report(outcome=CallOutcome.FAILED), "summary.call_failed"),
-        (
-            report(outcome=CallOutcome.USER_UNREACHABLE),
-            "summary.unreachable_followup",
-        ),
+        (None, "summary.call_failed_retry"),
+        (report(outcome=CallOutcome.FAILED), "summary.call_failed_retry"),
+        # The status watcher already said we couldn't reach them.
+        (report(outcome=CallOutcome.USER_UNREACHABLE), "consent.request"),
     ],
     ids=["job-failed", "hold-exceeded", "unreachable"],
 )
@@ -649,11 +655,11 @@ async def test_unfinished_call_offers_a_retry_with_new_consent(
     call_report: CallReport | None,
     template: str,
 ) -> None:
-    """C21: a retry asks again, and the user is told why."""
+    """C21: a retry asks again, and the user is told why, in one message."""
     user = await call_ends(db, pipe, consent, call_report)
-    await until(lambda: db.outbound_templates()[-1] == "consent.request")
+    await until(lambda: db.outbound_templates()[-1] == template)
 
-    assert db.outbound_templates()[-2] == template
+    assert db.outbound_templates()[-2] == "consent.given"
     assert consent.pending(user.id) is not None
     assert len(db.jobs_of(JobType.CALL)) == 1  # nothing queued without a new YES
     assert db.jobs_of(JobType.CALL)[0].status == (

@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 import pytest
-from app.contracts import CallReport, JobStatus, JobType, VerificationStatus
+from app.contracts import JobStatus, JobType, VerificationStatus
 from app.db import tables
 from app.dev.fake_call import Pacing
 from app.dev.fake_phone import FakePhone
@@ -17,42 +17,6 @@ from app.relay.ask_user import AskUser
 from whatsapp_fakes import FakeDB, inbound, use_spanish
 
 PACING = Pacing(step_s=0.02, on_hold_count=2, ask_timeout_s=5)
-
-
-@pytest.fixture
-def phone_db(db: FakeDB, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    """Fakes for the phone writes; returns what was written."""
-    written: dict[str, Any] = {"reports": [], "transcripts": []}
-
-    async def create_call(case_id: str, *ids: str) -> tables.Call:
-        call = tables.Call(
-            case_id=case_id, job_id=ids[0], brief_id=ids[1], consent_message_id=ids[2]
-        )
-        db.calls[call.id] = call
-        return call
-
-    async def set_call_state(call_id: str, state: str) -> None:
-        db.calls[call_id].state = state
-
-    async def save_transcript(call_id: str, lines: list) -> tables.Transcript:
-        transcript = tables.Transcript(call_id=call_id, lines=lines)
-        written["transcripts"].append(transcript)
-        return transcript
-
-    async def save_call_report(call_id: str, report: CallReport) -> None:
-        written["reports"].append(report)
-
-    for name, fake in [
-        ("create_call", create_call),
-        ("set_call_state", set_call_state),
-        ("save_transcript", save_transcript),
-        ("save_call_report", save_call_report),
-    ]:
-        monkeypatch.setattr(f"app.db.writes.phone.{name}", fake)
-    for name in ("claim_next", "finish", "fail"):
-        monkeypatch.setattr(f"app.db.jobs.{name}", getattr(db, name))
-    monkeypatch.setattr("app.dev.fake_call.append_event", db.append_event)
-    return written
 
 
 async def until(condition: Any, timeout_s: float = 3.0) -> None:
@@ -94,8 +58,7 @@ async def test_yes_to_summary_on_the_fake_phone(
     templates = db.outbound_templates()
     assert templates[templates.index("consent.request") :] == [
         "consent.request",
-        "consent.given",
-        "call.dialing",
+        "consent.given",  # says we're calling: no call.dialing after it
         "ask_user.menu_choice",
         "call.on_hold",  # one: the 10-minute rule drops the second
         "call.human_detected",

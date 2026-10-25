@@ -3,11 +3,8 @@ Anthropic, no Twilio, no database."""
 
 import json
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
-import anthropic
-import httpx2
 import pytest
 from app.contracts import (
     AskUserRequest,
@@ -19,12 +16,19 @@ from app.contracts import (
     VerificationStatus,
 )
 from app.db import tables
+from app.orchestrator.open_questions import OpenQuestions, QuestionKind
 from app.orchestrator.pipe import InboundPipe
 from app.orchestrator.tools import CaseTools
 from app.orchestrator.turn import UNAVAILABLE, OrchestratorTurn
 from app.relay.ask_user import AskUser
 from app.relay.templates import render
-from whatsapp_fakes import FakeDB, FakeWhatsApp, inbound, use_spanish
+from whatsapp_fakes import (
+    FakeDB,
+    FakeRunnerClient,
+    FakeWhatsApp,
+    inbound,
+    use_spanish,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "contracts"
 
@@ -224,43 +228,6 @@ class FakeTranslator:
         return None if self.fail_out else f"{language.upper()}({text_en})"
 
 
-class FakeRunnerClient:
-    """Stands in for `client.beta.messages.tool_runner`: optionally calls tools the
-    way the model would, then yields one final message."""
-
-    def __init__(
-        self,
-        reply: str | None = "Your interview is on 2026-11-18 at 08:30.",
-        tool_calls: list[tuple[str, dict[str, Any]]] | None = None,
-        fail: bool = False,
-        stop_reason: str = "end_turn",
-    ) -> None:
-        self.beta = SimpleNamespace(messages=self)
-        self.requests: list[dict[str, Any]] = []
-        self.tool_results: list[str] = []
-        self._reply = reply
-        self._tool_calls = tool_calls or []
-        self._fail = fail
-        self._stop_reason = stop_reason
-
-    def tool_runner(self, **request: Any) -> Any:
-        self.requests.append(request)
-        return self._run(request)
-
-    async def _run(self, request: dict[str, Any]) -> Any:
-        if self._fail:
-            raise anthropic.APITimeoutError(
-                request=httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
-            )
-        tools = {tool.name: tool for tool in request["tools"]}
-        for name, tool_input in self._tool_calls:
-            self.tool_results.append(await tools[name].call(tool_input))
-        content = (
-            [SimpleNamespace(type="text", text=self._reply)] if self._reply else []
-        )
-        yield SimpleNamespace(stop_reason=self._stop_reason, content=content)
-
-
 def make_turn(
     client: FakeRunnerClient,
     whatsapp: FakeWhatsApp,
@@ -299,8 +266,12 @@ async def test_turn_replies_in_the_users_language_with_english_logged(
         "ask_official_source",
         "listen_to_call",
         "hang_up_call",
+        "answer_call_question",
+        "answer_call_consent",
+        "answer_same_or_new",
+        "answer_save_facts",
         "set_language",
-    }  # no start_call: only the user's numbered YES starts one (rule 4)
+    }  # no start_call: only the user's own YES starts one (rule 4)
     # Goal 6.5: the memory writer runs on the user's message after each reply.
     [memory] = db.jobs_of(JobType.MEMORY_WRITE)
     assert memory.payload["source_ref"] == "msg_1"
@@ -382,10 +353,11 @@ def wired_pipe(
         user: tables.User,
         message_id: str,
         *,
-        same_or_new_pending: bool = False,
-        consent_pending: bool = False,
+        open_questions: OpenQuestions | None = None,
+        **_: Any,
     ) -> None:
-        turns.append({"user": user.id, "pending": same_or_new_pending})
+        kinds = [q.kind for q in open_questions.questions] if open_questions else []
+        turns.append({"user": user.id, "open": kinds})
 
     async def detect(text: str) -> None:
         return None
@@ -411,7 +383,7 @@ async def test_spanish_text_is_logged_with_english_and_reaches_the_turn(
     await pipe.handle(inbound("¿Qué dice mi carta?"))
 
     assert db.messages[0].body_en == "EN(¿Qué dice mi carta?)"
-    assert turns == [{"user": user.id, "pending": False}]
+    assert turns == [{"user": user.id, "open": []}]
 
 
 async def test_reply_to_an_open_question_is_not_translated(
@@ -452,6 +424,6 @@ async def test_text_while_same_or_new_is_pending_goes_to_the_turn(
     await pipe.handle(inbound("¿cuál es la diferencia?"))
 
     assert db.outbound_templates() == ["letter.same_or_new"]
-    assert turns == [{"user": user.id, "pending": True}]
+    assert turns == [{"user": user.id, "open": [QuestionKind.SAME_OR_NEW]}]
     await pipe.handle(inbound("1"))
     assert db.outbound_templates()[-1] == "letter.pages_added"
