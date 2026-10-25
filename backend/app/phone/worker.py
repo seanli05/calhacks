@@ -218,13 +218,20 @@ class PhoneWorker:
 
 def twilio_lines(settings: Settings) -> LineFactory:
     """A new Twilio line per call. It dials only `official_dial_number` (rule 2,
-    with C40's demo swap inside it), and its join gate speaks the job's language."""
+    with C40's demo swap inside it), and its join gate speaks the job's language
+    (no gate when `PHONE_JOIN_GATE=false`)."""
     numbers = DbNumberSource()
     calls = TwilioCalls(settings)
     urls = LineUrls.from_settings(settings)
 
     def line(job: CallJob) -> Telephony:
-        return TwilioTelephony(numbers, calls, urls, user_language=job.user_language)
+        return TwilioTelephony(
+            numbers,
+            calls,
+            urls,
+            user_language=job.user_language,
+            join_gate=settings.phone_join_gate,
+        )
 
     return line
 

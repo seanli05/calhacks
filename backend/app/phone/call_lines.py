@@ -61,7 +61,8 @@ JOIN_PROMPTS: dict[LanguageCode, JoinPrompt] = {
 }
 """Keyed by the user's language (`CallJob.user_language`, from `users.language`:
 the language they write to us in). The key press keeps the representative out of
-voicemail, which Twilio reports as answered (spikes/bridge/README.md)."""
+voicemail, which Twilio reports as answered (spikes/bridge/README.md). Unused when
+the line has no gate (`PHONE_JOIN_GATE=false`)."""
 
 LISTEN_PROMPTS: dict[LanguageCode, JoinPrompt] = {
     "en": JoinPrompt(

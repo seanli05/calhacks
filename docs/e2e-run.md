@@ -51,6 +51,7 @@ Also the setup for whoever is the team host. If you're not the team host, tell t
    RESEARCH_WORKER=true
    MEMORY_WORKER=true
    PHONE_WORKER=true
+   PHONE_JOIN_GATE=false   # the demo: join on pick-up, no key press (README → the phone agent)
    DEV_ENDPOINTS=false
    DEMO_DIAL_NUMBER=<the mock agency line, from .env.example>
    ```
@@ -104,7 +105,7 @@ The landing page shows the seeded demo user, not you. Open `http://localhost:300
 3. **Explanation**, then **verification** against uscis.gov. Research takes a minute or two.
 4. **"Would you like me to call USCIS for you?"** Answer YES with the number. The uvicorn log shows `Call queued`.
 5. **The call.** The agent dials `DEMO_DIAL_NUMBER`, answers the menu by speaking, and holds. If it can't tell which option fits, it asks you on WhatsApp; answer with the number.
-6. **Your phone rings** within ~5 s of a person answering. Pick up, press a key when asked, and answer the representative's questions yourself (the agent never answers for you).
+6. **Your phone rings** within ~5 s of a person answering. Pick up (press a key when asked, if `PHONE_JOIN_GATE` is on), and answer the representative's questions yourself (the agent never answers for you).
 7. **Summary on WhatsApp** after the call, with the reference number and next steps.
 
 ### Who plays the agency
