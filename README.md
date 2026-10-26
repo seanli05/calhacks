@@ -1,6 +1,4 @@
-# Cal Hacks: Government Letter Agent
-
-*Name TBD (shortlist: Kinvoy, Unhold).*
+# Avocado
 
 A WhatsApp agent that helps immigrant families deal with immigration letters, starting with the USCIS I-797C asylum interview notice. Send a photo of a letter, and the agent:
 
